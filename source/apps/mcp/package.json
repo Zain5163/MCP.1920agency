@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "start": "node --experimental-strip-types src/server.ts",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "start:http": "node --experimental-strip-types src/http-server.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0",
@@ -15,7 +16,9 @@
     "@social-publisher/db": "workspace:*",
     "@social-publisher/publisher": "workspace:*",
     "@social-publisher/vault": "workspace:*",
-    "zod": "^3.24.1"
+    "zod": "^3.24.1",
+    "@social-publisher/auth": "workspace:*",
+    "@social-publisher/telemetry": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.9.0",

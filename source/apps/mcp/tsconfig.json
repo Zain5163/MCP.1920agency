@@ -1,5 +1,20 @@
 {
   "extends": "../../tsconfig.base.json",
-  "compilerOptions": { "rootDir": "./src", "outDir": "./dist", "noEmit": true },
+  "compilerOptions": {
+    "rootDir": "./src",
+    "outDir": "./dist",
+    "noEmit": true,
+    // Relaxed for this app ONLY.
+    //
+    // @modelcontextprotocol/sdk declares options like `sessionIdGenerator?: () => string`
+    // but requires passing an explicit `undefined` for stateless mode. Under
+    // exactOptionalPropertyTypes that is a type error we cannot fix without
+    // casting away the SDK's types at every call site, which would hide real
+    // mistakes rather than just this one.
+    //
+    // Every other workspace keeps the strict setting. Revisit when the SDK ships
+    // types compatible with it.
+    "exactOptionalPropertyTypes": false
+  },
   "include": ["src/**/*.ts"]
 }

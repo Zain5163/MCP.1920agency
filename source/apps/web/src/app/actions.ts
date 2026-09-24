@@ -6,8 +6,10 @@ import { redirect } from 'next/navigation'
 import type { MediaRef, Platform, PostDraft } from '@social-publisher/core'
 import { db } from '@social-publisher/db'
 
-import { currentSession, endSession, passwordMatches, startSession } from '@/lib/auth'
-import { currentTenantId, listConnections, mediaStore, publishService, targetFor } from '@/lib/engine'
+import { authenticate } from '@social-publisher/auth'
+
+import { currentUser, endSession, startSession } from '@/lib/auth'
+import { listConnections, mediaStore, publishService, scope, targetFor } from '@/lib/engine'
 
 export interface ActionResult {
   readonly ok: boolean
@@ -16,12 +18,21 @@ export interface ActionResult {
 }
 
 export async function login(_prev: unknown, formData: FormData): Promise<ActionResult> {
+  const email = String(formData.get('email') ?? '')
   const password = String(formData.get('password') ?? '')
-  if (!passwordMatches(password)) {
-    // Deliberately vague: a specific message tells an attacker which half was wrong.
-    return { ok: false, message: 'Incorrect password.' }
+
+  if (email === '' || password === '') {
+    return { ok: false, message: 'Enter your email and password.' }
   }
-  await startSession(await currentTenantId())
+
+  const user = await authenticate(email, password)
+  if (user === null) {
+    // One message for both a wrong email and a wrong password: naming which was
+    // wrong tells an attacker which accounts exist.
+    return { ok: false, message: 'Those details are not correct.' }
+  }
+
+  await startSession(user.id)
   redirect('/')
 }
 
@@ -30,10 +41,11 @@ export async function logout(): Promise<void> {
   redirect('/login')
 }
 
+/** Resolves the signed-in user's tenant, or sends them to sign in. */
 async function requireSession(): Promise<string> {
-  const session = await currentSession()
-  if (session === null) redirect('/login')
-  return session.tenantId
+  const user = await currentUser()
+  if (user === null) redirect('/login')
+  return user.tenantId
 }
 
 /**
@@ -111,9 +123,13 @@ export async function createPost(_prev: unknown, formData: FormData): Promise<Ac
     return { ok: false, message: 'Nothing was posted — fix these first:', details }
   }
 
-  const post = await db().post.create({
-    data: { tenantId, body, createdBy: 'web' },
-  })
+  const tenant = scope(tenantId)
+
+  // Proves every chosen connection belongs to this account. Throws rather than
+  // silently publishing to the subset that happens to be ours.
+  await tenant.requireConnections(targets.map((t) => t.id))
+
+  const post = await tenant.createPost({ body, createdBy: 'web' })
 
   for (const [position, item] of stored.entries()) {
     const asset = await db().mediaAsset.create({
@@ -142,6 +158,7 @@ export async function createPost(_prev: unknown, formData: FormData): Promise<Ac
       })
       await db().job.create({ data: { tenantId, targetId: target.id, runAfter: scheduledFor } })
     }
+    await tenant.record('web', 'post.scheduled', { postId: post.id, at: scheduledFor.toISOString() })
     revalidatePath('/')
     return {
       ok: true,
@@ -176,6 +193,11 @@ export async function createPost(_prev: unknown, formData: FormData): Promise<Ac
     })
   }
 
+  await tenant.record('web', 'post.published', {
+    postId: post.id,
+    succeeded: report.succeeded.length,
+    failed: report.failed.length,
+  })
   revalidatePath('/')
 
   const details = [

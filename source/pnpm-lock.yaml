@@ -171,6 +171,9 @@ importers:
       '@social-publisher/adapters':
         specifier: workspace:*
         version: link:../../packages/adapters
+      '@social-publisher/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
       '@social-publisher/config':
         specifier: workspace:*
         version: link:../../packages/config
@@ -205,6 +208,9 @@ importers:
       '@social-publisher/adapters':
         specifier: workspace:*
         version: link:../../packages/adapters
+      '@social-publisher/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
       '@social-publisher/config':
         specifier: workspace:*
         version: link:../../packages/config
@@ -217,6 +223,9 @@ importers:
       '@social-publisher/publisher':
         specifier: workspace:*
         version: link:../../packages/publisher
+      '@social-publisher/telemetry':
+        specifier: workspace:*
+        version: link:../../packages/telemetry
       '@social-publisher/vault':
         specifier: workspace:*
         version: link:../../packages/vault
@@ -236,6 +245,9 @@ importers:
       '@social-publisher/adapters':
         specifier: workspace:*
         version: link:../../packages/adapters
+      '@social-publisher/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
       '@social-publisher/config':
         specifier: workspace:*
         version: link:../../packages/config
@@ -325,6 +337,19 @@ importers:
       '@social-publisher/core':
         specifier: workspace:*
         version: link:../core
+    devDependencies:
+      '@types/node':
+        specifier: ^22.9.0
+        version: 22.20.4
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+
+  packages/auth:
+    dependencies:
+      '@social-publisher/db':
+        specifier: workspace:*
+        version: link:../db
     devDependencies:
       '@types/node':
         specifier: ^22.9.0

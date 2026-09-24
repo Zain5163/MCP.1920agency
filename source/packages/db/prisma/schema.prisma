@@ -91,10 +91,45 @@ model User {
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  apiTokens ApiToken[]
 
   @@index([tenantId])
   @@map("users")
+}
+
+/// A bearer token a customer's AI client sends with every MCP call.
+///
+/// Stored as a SHA-256 hash, not the token itself. Unlike a password, an API
+/// token is 256 bits of randomness, so there is nothing to brute-force and a fast
+/// hash is correct here — it also lets us look a token up by hash in one indexed
+/// query rather than checking every row.
+///
+/// `prefix` is the first few visible characters, kept in the clear so a user can
+/// tell their tokens apart in a list without us ever being able to show the
+/// original value again.
+model ApiToken {
+  id       String @id @default(uuid(7))
+  tenantId String @map("tenant_id")
+  userId   String @map("user_id")
+
+  /// Human label, e.g. "Claude on my laptop".
+  name      String
+  tokenHash String @unique @map("token_hash")
+  prefix    String
+
+  lastUsedAt DateTime? @map("last_used_at")
+  expiresAt  DateTime? @map("expires_at")
+  revokedAt  DateTime? @map("revoked_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([userId])
+  @@map("api_tokens")
 }
 
 model Tenant {
@@ -103,6 +138,7 @@ model Tenant {
   createdAt DateTime @default(now()) @map("created_at")
 
   users        User[]
+  apiTokens    ApiToken[]
   connections  Connection[]
   posts        Post[]
   mediaAssets  MediaAsset[]

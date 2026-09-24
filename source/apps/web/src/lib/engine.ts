@@ -3,7 +3,7 @@ import 'server-only'
 import { FacebookPageAdapter, InstagramAdapter } from '@social-publisher/adapters'
 import { optional, required } from '@social-publisher/config'
 import type { Connection } from '@social-publisher/core'
-import { db, prismaCredentialStore } from '@social-publisher/db'
+import { TenantScope, db, prismaCredentialStore } from '@social-publisher/db'
 import { MediaStore } from '@social-publisher/media'
 import { PublishService, type TargetSpec } from '@social-publisher/publisher'
 import { TokenVault, parseKey } from '@social-publisher/vault'
@@ -56,11 +56,16 @@ export async function currentTenantId(): Promise<string> {
   return tenant.id
 }
 
+/**
+ * Every request works through a scope rather than the raw client, so a page or
+ * action cannot read another account's data even by mistake.
+ */
+export function scope(tenantId: string): TenantScope {
+  return new TenantScope(tenantId)
+}
+
 export async function listConnections(tenantId: string): Promise<Connection[]> {
-  const rows = await db().connection.findMany({
-    where: { tenantId },
-    orderBy: { createdAt: 'asc' },
-  })
+  const rows = await scope(tenantId).connections()
   return rows.map((r) => ({
     id: r.id,
     tenantId: r.tenantId,

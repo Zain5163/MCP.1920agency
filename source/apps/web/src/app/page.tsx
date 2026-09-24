@@ -1,11 +1,12 @@
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 
 import { CAPABILITIES } from '@social-publisher/core'
-import { db, health, queueStats } from '@social-publisher/db'
+import { health, queueStats } from '@social-publisher/db'
 
 import { logout } from './actions'
-import { currentSession } from '@/lib/auth'
-import { listConnections } from '@/lib/engine'
+import { currentUser } from '@/lib/auth'
+import { listConnections, scope } from '@/lib/engine'
 import { Composer, type AccountOption } from '@/components/Composer'
 
 export const dynamic = 'force-dynamic'
@@ -21,19 +22,14 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: 'ok
 }
 
 export default async function Dashboard() {
-  const session = await currentSession()
-  if (session === null) redirect('/login')
+  const user = await currentUser()
+  if (user === null) redirect('/login')
 
   const [connections, dbState, queue, posts] = await Promise.all([
-    listConnections(session.tenantId),
+    listConnections(user.tenantId),
     health(),
     queueStats(),
-    db().post.findMany({
-      where: { tenantId: session.tenantId },
-      orderBy: { createdAt: 'desc' },
-      take: 12,
-      include: { targets: { include: { connection: true } } },
-    }),
+    scope(user.tenantId).posts(12),
   ])
 
   const accounts: AccountOption[] = connections.map((c) => ({
@@ -48,8 +44,13 @@ export default async function Dashboard() {
   return (
     <div className="mx-auto max-w-[1100px] px-4 pb-16 pt-6">
       <header className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-line pb-5">
-        <div className="text-lg font-bold tracking-tight">
-          Ads<span className="text-brand">Pilot</span>
+        <div className="flex items-center gap-5">
+          <span className="text-lg font-bold tracking-tight">
+            Ads<span className="text-brand">Pilot</span>
+          </span>
+          <Link href="/tokens" className="text-[0.85rem] text-muted no-underline hover:text-ink">
+            API tokens
+          </Link>
         </div>
         <form action={logout}>
           <button type="submit" className="btn-ghost">

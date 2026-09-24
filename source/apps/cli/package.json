@@ -8,7 +8,8 @@
     "status": "node --experimental-strip-types src/status.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "set-password": "node --experimental-strip-types src/set-db-password.ts",
-    "post": "node --experimental-strip-types src/post.ts"
+    "post": "node --experimental-strip-types src/post.ts",
+    "create-user": "node --experimental-strip-types src/create-user.ts"
   },
   "dependencies": {
     "@social-publisher/adapters": "workspace:*",
@@ -17,7 +18,8 @@
     "@social-publisher/db": "workspace:*",
     "@social-publisher/vault": "workspace:*",
     "@social-publisher/publisher": "workspace:*",
-    "@social-publisher/media": "workspace:*"
+    "@social-publisher/media": "workspace:*",
+    "@social-publisher/auth": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.9.0",
