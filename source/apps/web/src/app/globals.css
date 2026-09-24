@@ -1,0 +1,94 @@
+@import 'tailwindcss';
+
+/**
+ * AdsPilot design tokens.
+ *
+ * Tailwind v4 is CSS-first: @theme generates the utility classes, so defining a
+ * colour here gives you bg-surface, text-muted, border-line and so on. One source
+ * of truth for the palette rather than hex values scattered through components.
+ */
+@theme {
+  --color-bg: #0b0d10;
+  --color-surface: #12151a;
+  --color-surface-2: #171b21;
+  --color-line: #232830;
+  --color-ink: #e6e8eb;
+  --color-muted: #9aa4b2;
+  --color-brand: #7c5cff;
+  --color-brand-soft: #9d85ff;
+  --color-ok: #5ee6a8;
+  --color-warn: #ffc95c;
+  --color-bad: #ff6b6b;
+
+  --font-sans: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --radius-card: 12px;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    background-color: var(--color-bg);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    @apply antialiased;
+  }
+
+  /* Visible focus everywhere, rather than removing outlines for looks. */
+  :focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
+  }
+
+  textarea,
+  input,
+  select {
+    @apply w-full rounded-lg border border-line bg-surface-2 px-3 py-2.5 text-[0.92rem] text-ink;
+  }
+
+  textarea:focus,
+  input:focus {
+    @apply border-brand outline-none;
+  }
+
+  input[type='checkbox'] {
+    @apply h-4 w-4 w-auto accent-[var(--color-brand)];
+  }
+
+  ::placeholder {
+    color: var(--color-muted);
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-xl border border-line bg-surface p-5;
+  }
+
+  .btn {
+    @apply cursor-pointer rounded-lg border-0 bg-brand px-4 py-2.5 text-[0.92rem] font-semibold text-white transition-opacity;
+  }
+  .btn:hover:not(:disabled) {
+    @apply opacity-90;
+  }
+  .btn:disabled {
+    @apply cursor-not-allowed opacity-50;
+  }
+
+  .btn-ghost {
+    @apply cursor-pointer rounded-lg border border-line bg-transparent px-4 py-2.5 text-[0.92rem] font-medium text-muted;
+  }
+  .btn-ghost:hover {
+    @apply text-ink;
+  }
+
+  .field-label {
+    @apply mb-1.5 block text-[0.82rem] text-muted;
+  }
+
+  .tag {
+    @apply mr-1.5 mb-1.5 inline-block rounded-full border border-line px-2 py-0.5 text-[0.72rem] text-muted;
+  }
+}

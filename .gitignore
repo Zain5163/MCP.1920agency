@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+.next/
+out/
+*.tsbuildinfo
+
+# Secrets — these must NEVER be committed.
+# The real config lives at ~/.social-publisher/.env, outside this folder entirely,
+# which is the primary protection. These patterns are a second line of defence.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Logs and local state
+logs/
+*.log
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/

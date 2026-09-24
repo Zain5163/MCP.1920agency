@@ -1,0 +1,24 @@
+{
+  "name": "@social-publisher/worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node --experimental-strip-types src/worker.ts",
+    "once": "node --experimental-strip-types src/worker.ts --once",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@social-publisher/adapters": "workspace:*",
+    "@social-publisher/config": "workspace:*",
+    "@social-publisher/core": "workspace:*",
+    "@social-publisher/db": "workspace:*",
+    "@social-publisher/media": "workspace:*",
+    "@social-publisher/publisher": "workspace:*",
+    "@social-publisher/vault": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "typescript": "^5.7.2"
+  }
+}

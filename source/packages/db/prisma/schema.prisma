@@ -1,0 +1,316 @@
+// Social Publisher schema.
+//
+// Two rules hold throughout:
+//
+//  1. EVERY table carries tenant_id, including while there is exactly one tenant.
+//     Retrofitting tenant scoping is a rewrite, and it costs one column now.
+//
+//  2. NOTHING here stores a plaintext credential. connections.secret_ciphertext is an
+//     opaque envelope produced by packages/vault, and only packages/vault may read it.
+//
+// Conventions follow the supabase-postgres-best-practices skill:
+//  - UUIDv7 primary keys, not v4. v7 is time-ordered, so inserts land at the end of
+//    the index instead of scattering across it. v4 fragments the B-tree.
+//  - snake_case for every table AND column. Postgres folds unquoted identifiers to
+//    lowercase, so a camelCase column becomes "camelCase" and needs quoting forever —
+//    which breaks the raw SQL used by the job queue.
+//  - Every foreign key column is explicitly indexed. Postgres does not do this
+//    automatically, and an unindexed FK makes JOINs and ON DELETE scans full scans.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  // Supabase: pooled connection for the app, direct connection for migrations.
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Platform {
+  facebook_page
+  instagram
+  threads
+  mastodon
+  telegram
+  discord
+  youtube
+  tiktok
+  linkedin
+  x
+}
+
+/// Whether a connection uses our Meta app's credentials or the tenant's own.
+/// This single column is the bring-your-own-keys model; it must exist from the
+/// first migration even though nothing reads it yet.
+enum CredentialSource {
+  platform_app
+  tenant_byo
+}
+
+enum TargetState {
+  pending
+  scheduled
+  publishing
+  published
+  failed
+  needs_reauth
+  cancelled
+}
+
+enum JobState {
+  queued
+  running
+  done
+  failed
+}
+
+/// Who a person is in the product, separate from which social accounts we hold.
+///
+/// `owner` is the platform operator (us) and is the ONLY role that may act across
+/// tenants. That power is not reachable from a TenantScope — it requires an
+/// explicitly constructed AdminScope, and every use of it is written to the audit
+/// log. An admin capability you can reach by accident is a confused-deputy bug
+/// waiting to happen.
+enum Role {
+  owner
+  admin
+  member
+}
+
+model User {
+  id           String   @id @default(uuid(7))
+  tenantId     String   @map("tenant_id")
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  role         Role     @default(member)
+  displayName  String?  @map("display_name")
+
+  lastLoginAt DateTime? @map("last_login_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("users")
+}
+
+model Tenant {
+  id        String   @id @default(uuid(7))
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  users        User[]
+  connections  Connection[]
+  posts        Post[]
+  mediaAssets  MediaAsset[]
+  auditEntries AuditLog[]
+
+  @@map("tenants")
+}
+
+/// One connected social account.
+model Connection {
+  id                String           @id @default(uuid(7))
+  tenantId          String           @map("tenant_id")
+  platform          Platform
+  /// The platform's own id: a Facebook Page id, an Instagram user id, etc.
+  platformAccountId String           @map("platform_account_id")
+  displayName       String           @map("display_name")
+  credentialSource  CredentialSource @default(platform_app) @map("credential_source")
+
+  /// Opaque envelope from packages/vault. Never read outside that package.
+  secretCiphertext String @map("secret_ciphertext")
+  keyVersion       Int    @default(1) @map("key_version")
+
+  scopes    String[]  @default([])
+  expiresAt DateTime? @map("expires_at")
+
+  /// Set when a refresh fails or a token is revoked. Surfaced to the user, because
+  /// a silently dead connection is indistinguishable from "nothing was scheduled".
+  needsReauth  Boolean @default(false) @map("needs_reauth")
+  reauthReason String? @map("reauth_reason")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  targets Target[]
+
+  /// Reconnecting the same account must update the existing row, not create a duplicate.
+  @@unique([tenantId, platform, platformAccountId])
+  @@index([tenantId, needsReauth])
+  @@map("connections")
+}
+
+/// A piece of content, before it is bound to any platform.
+model Post {
+  id       String @id @default(uuid(7))
+  tenantId String @map("tenant_id")
+  body     String
+
+  /// Per-platform text overrides, keyed by platform. Null means use `body`.
+  overrides Json?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  /// Free text: "mcp", or a user id once there is a UI.
+  createdBy String   @default("mcp") @map("created_by")
+
+  tenant  Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  media   PostMedia[]
+  targets Target[]
+
+  @@index([tenantId, createdAt])
+  @@map("posts")
+}
+
+/// Join table: ordering matters for carousels, so it is explicit rather than implicit.
+model PostMedia {
+  postId  String @map("post_id")
+  mediaId String @map("media_id")
+  /// Position in a carousel. Instagram and Threads honour this.
+  position Int
+
+  post  Post       @relation(fields: [postId], references: [id], onDelete: Cascade)
+  media MediaAsset @relation(fields: [mediaId], references: [id], onDelete: Restrict)
+
+  @@id([postId, mediaId])
+  @@index([postId, position])
+  /// Indexed so "is this asset still referenced?" does not scan, and because the
+  /// Restrict on media deletion checks this column.
+  @@index([mediaId])
+  @@map("post_media")
+}
+
+/// One post to one connection. The unit that independently succeeds or fails.
+///
+/// Separate from Post because posting to five platforms is one piece of content and
+/// five outcomes. Three can publish while two fail and retry, and "it partly worked"
+/// is the normal case, not an edge case.
+model Target {
+  id           String      @id @default(uuid(7))
+  tenantId     String      @map("tenant_id")
+  postId       String      @map("post_id")
+  connectionId String      @map("connection_id")
+  state        TargetState @default(pending)
+
+  scheduledFor DateTime? @map("scheduled_for")
+  publishedAt  DateTime? @map("published_at")
+
+  /// The id the platform assigned. Also the idempotency guard: if this is set, the
+  /// post already went out and must never be re-attempted.
+  platformPostId String? @map("platform_post_id")
+  platformUrl    String? @map("platform_url")
+
+  /// Stable across retries. Passed to platforms that accept a client idempotency token.
+  idempotencyKey String @unique @map("idempotency_key")
+
+  /// Populated on failure. platform_message is shown to the user verbatim.
+  failureClass    String? @map("failure_class")
+  errorCode       String? @map("error_code")
+  platformMessage String? @map("platform_message")
+
+  attempts Int @default(0)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  post       Post       @relation(fields: [postId], references: [id], onDelete: Cascade)
+  connection Connection @relation(fields: [connectionId], references: [id], onDelete: Restrict)
+  jobs       Job[]
+
+  @@index([tenantId, state])
+  @@index([state, scheduledFor])
+  /// Both foreign keys indexed: postId for cascade deletes, connectionId because the
+  /// Restrict on connection deletion checks it.
+  @@index([postId])
+  @@index([connectionId])
+  @@map("targets")
+}
+
+/// The queue. Claimed with the atomic UPDATE ... FROM (SELECT ... FOR UPDATE SKIP
+/// LOCKED) pattern, so concurrent workers take different rows instead of blocking
+/// on each other.
+///
+/// Postgres rather than Redis/BullMQ: at this volume a table does the job, and it
+/// removes Docker and a second service from the stack. The worker depends only on a
+/// JobQueue interface, so swapping this out later is contained.
+model Job {
+  id       String   @id @default(uuid(7))
+  tenantId String   @map("tenant_id")
+  targetId String   @map("target_id")
+  state    JobState @default(queued)
+
+  runAfter DateTime @default(now()) @map("run_after")
+  attempts Int      @default(0)
+
+  /// Set when a worker claims the job. A stale lock is reclaimable, so a worker that
+  /// dies mid-publish does not strand the job forever.
+  lockedAt DateTime? @map("locked_at")
+  lockedBy String?   @map("locked_by")
+
+  lastError String? @map("last_error")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  target Target @relation(fields: [targetId], references: [id], onDelete: Cascade)
+
+  /// The claim query's index: ready jobs, oldest first.
+  @@index([state, runAfter])
+  @@index([tenantId])
+  @@index([targetId])
+  @@map("jobs")
+}
+
+model MediaAsset {
+  id       String @id @default(uuid(7))
+  tenantId String @map("tenant_id")
+
+  r2Key String @map("r2_key")
+  /// Must stay reachable for the whole publish window: Instagram and TikTok FETCH
+  /// media from this URL rather than accepting an upload. Do not delete an asset
+  /// until every target referencing it is in a terminal state.
+  publicUrl String @map("public_url")
+
+  mime            String
+  bytes           Int
+  width           Int?
+  height          Int?
+  durationSeconds Float? @map("duration_seconds")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  posts  PostMedia[]
+
+  @@index([tenantId, createdAt])
+  @@map("media_assets")
+}
+
+/// Append-only. Never updated or deleted.
+model AuditLog {
+  id        String   @id @default(uuid(7))
+  tenantId  String   @map("tenant_id")
+  actor     String
+  action    String
+  detail    Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@map("audit_log")
+}
+
+/// Keep-alive for the Supabase free tier, which pauses after 7 days of low activity.
+/// Written weekly by a Windows Task Scheduler job. See decisions/0002.
+model Heartbeat {
+  id     Int      @id @default(1)
+  beatAt DateTime @default(now()) @map("beat_at")
+  source String   @default("keepalive")
+
+  @@map("heartbeat")
+}

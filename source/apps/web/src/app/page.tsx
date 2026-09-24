@@ -1,0 +1,165 @@
+import { redirect } from 'next/navigation'
+
+import { CAPABILITIES } from '@social-publisher/core'
+import { db, health, queueStats } from '@social-publisher/db'
+
+import { logout } from './actions'
+import { currentSession } from '@/lib/auth'
+import { listConnections } from '@/lib/engine'
+import { Composer, type AccountOption } from '@/components/Composer'
+
+export const dynamic = 'force-dynamic'
+
+function Stat({ label, value, tone }: { label: string; value: string; tone?: 'ok' | 'warn' | 'bad' }) {
+  const colour = tone === 'ok' ? 'text-ok' : tone === 'warn' ? 'text-warn' : tone === 'bad' ? 'text-bad' : 'text-muted'
+  return (
+    <div className="flex justify-between border-b border-line py-2 text-[0.88rem] last:border-b-0">
+      <span>{label}</span>
+      <span className={colour}>{value}</span>
+    </div>
+  )
+}
+
+export default async function Dashboard() {
+  const session = await currentSession()
+  if (session === null) redirect('/login')
+
+  const [connections, dbState, queue, posts] = await Promise.all([
+    listConnections(session.tenantId),
+    health(),
+    queueStats(),
+    db().post.findMany({
+      where: { tenantId: session.tenantId },
+      orderBy: { createdAt: 'desc' },
+      take: 12,
+      include: { targets: { include: { connection: true } } },
+    }),
+  ])
+
+  const accounts: AccountOption[] = connections.map((c) => ({
+    id: c.id,
+    platform: c.platform,
+    displayName: c.displayName,
+    needsReauth: c.needsReauth,
+    maxTextLength: CAPABILITIES[c.platform].maxTextLength,
+    requiresMedia: CAPABILITIES[c.platform].minMediaCount > 0,
+  }))
+
+  return (
+    <div className="mx-auto max-w-[1100px] px-4 pb-16 pt-6">
+      <header className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-line pb-5">
+        <div className="text-lg font-bold tracking-tight">
+          Ads<span className="text-brand">Pilot</span>
+        </div>
+        <form action={logout}>
+          <button type="submit" className="btn-ghost">
+            Sign out
+          </button>
+        </form>
+      </header>
+
+      <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[1.4fr_1fr]">
+        <Composer accounts={accounts} />
+
+        <div className="grid gap-5">
+          <section className="card">
+            <h2 className="mb-1 text-base font-semibold">System</h2>
+            <p className="mb-3 text-[0.85rem] text-muted">Live state, not a cached summary.</p>
+            <Stat
+              label="Database"
+              value={dbState.reachable ? `reachable · ${dbState.latencyMs}ms` : 'unreachable'}
+              tone={dbState.reachable ? 'ok' : 'bad'}
+            />
+            <Stat
+              label="Keep-alive"
+              value={
+                dbState.heartbeatAgeDays === undefined
+                  ? 'never run'
+                  : `${dbState.heartbeatAgeDays}d ago${dbState.pauseRisk ? ' · pause risk' : ''}`
+              }
+              {...(dbState.pauseRisk ? { tone: 'warn' as const } : {})}
+            />
+            <Stat label="Scheduled" value={`${queue.queued} queued`} />
+            <Stat
+              label="Failed jobs"
+              value={String(queue.failed)}
+              {...(queue.failed > 0 ? { tone: 'bad' as const } : {})}
+            />
+            <Stat
+              label="Next run"
+              value={queue.nextRunAt === null ? 'nothing queued' : queue.nextRunAt.toLocaleString()}
+            />
+          </section>
+
+          <section className="card">
+            <h2 className="mb-1 text-base font-semibold">Accounts</h2>
+            <p className="mb-3 text-[0.85rem] text-muted">Connected via the Meta app.</p>
+            {accounts.length === 0 && <p className="py-2 text-[0.88rem] text-muted">Nothing connected yet.</p>}
+            {accounts.map((a) => (
+              <Stat
+                key={a.id}
+                label={a.displayName}
+                value={a.needsReauth ? 'needs reconnect' : 'ready'}
+                tone={a.needsReauth ? 'bad' : 'ok'}
+              />
+            ))}
+          </section>
+        </div>
+      </div>
+
+      <section className="card mt-5">
+        <h2 className="mb-1 text-base font-semibold">Recent posts</h2>
+        <p className="mb-3 text-[0.85rem] text-muted">
+          Every target tracked separately — partial success is normal.
+        </p>
+        {posts.length === 0 && <p className="py-2 text-[0.88rem] text-muted">Nothing posted yet.</p>}
+        {posts.map((post) => (
+          <article key={post.id} className="border-b border-line py-3.5 last:border-b-0">
+            <div className="text-[0.76rem] text-muted">{post.createdAt.toLocaleString()}</div>
+            <p className="my-1.5 whitespace-pre-wrap text-[0.88rem]">
+              {post.body.length > 180 ? `${post.body.slice(0, 180)}…` : post.body}
+            </p>
+            <div>
+              {post.targets.map((target) => (
+                <span
+                  key={target.id}
+                  className={`tag ${
+                    target.state === 'published'
+                      ? 'border-ok/35 text-ok'
+                      : target.state === 'failed'
+                        ? 'border-bad/35 text-bad'
+                        : target.state === 'scheduled'
+                          ? 'border-warn/35 text-warn'
+                          : ''
+                  }`}
+                >
+                  {target.connection.displayName} · {target.state}
+                  {target.platformUrl !== null && (
+                    <>
+                      {' '}
+                      <a
+                        href={target.platformUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="underline"
+                      >
+                        view
+                      </a>
+                    </>
+                  )}
+                </span>
+              ))}
+            </div>
+            {post.targets
+              .filter((t) => t.platformMessage !== null && t.state === 'failed')
+              .map((t) => (
+                <p key={`${t.id}-err`} className="mt-1.5 text-[0.8rem] text-bad">
+                  {t.connection.displayName}: {t.platformMessage}
+                </p>
+              ))}
+          </article>
+        ))}
+      </section>
+    </div>
+  )
+}

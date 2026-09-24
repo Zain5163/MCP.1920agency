@@ -1,0 +1,34 @@
+{
+  "name": "@social-publisher/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start -p 3000",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@social-publisher/adapters": "workspace:*",
+    "@social-publisher/config": "workspace:*",
+    "@social-publisher/core": "workspace:*",
+    "@social-publisher/db": "workspace:*",
+    "@social-publisher/media": "workspace:*",
+    "@social-publisher/publisher": "workspace:*",
+    "@social-publisher/vault": "workspace:*",
+    "next": "^15.1.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "server-only": "^0.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "^5.7.2",
+    "tailwindcss": "^4.0.0",
+    "@tailwindcss/postcss": "^4.0.0",
+    "postcss": "^8.4.49"
+  }
+}

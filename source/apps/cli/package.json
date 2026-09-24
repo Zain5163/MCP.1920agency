@@ -1,0 +1,26 @@
+{
+  "name": "@social-publisher/cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "connect": "node --experimental-strip-types src/connect.ts",
+    "status": "node --experimental-strip-types src/status.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "set-password": "node --experimental-strip-types src/set-db-password.ts",
+    "post": "node --experimental-strip-types src/post.ts"
+  },
+  "dependencies": {
+    "@social-publisher/adapters": "workspace:*",
+    "@social-publisher/config": "workspace:*",
+    "@social-publisher/core": "workspace:*",
+    "@social-publisher/db": "workspace:*",
+    "@social-publisher/vault": "workspace:*",
+    "@social-publisher/publisher": "workspace:*",
+    "@social-publisher/media": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "typescript": "^5.7.2"
+  }
+}

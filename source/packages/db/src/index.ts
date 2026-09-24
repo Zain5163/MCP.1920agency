@@ -1,0 +1,6 @@
+export * from './client.ts'
+export * from './queue.ts'
+export * from './credential-store.ts'
+export * from './tenant-scope.ts'
+export * from './admin-scope.ts'
+export { PrismaClient } from '@prisma/client'
