@@ -3,8 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
-import { FacebookOAuth } from '@social-publisher/adapters'
-import { optional, required } from '@social-publisher/config'
+import { flattenAccounts, type DiscoveredAccount } from '@social-publisher/adapters'
 import {
   db,
   disconnectAccount,
@@ -12,10 +11,18 @@ import {
   listProviderAuths,
   reconnectAccount,
 } from '@social-publisher/db'
-import { TokenVault, parseKey } from '@social-publisher/vault'
 
 import { currentUser } from '@/lib/auth'
-import { scope, tokenVault } from '@/lib/engine'
+import { providerFor, scope, tokenVault } from '@/lib/engine'
+
+/**
+ * Account management.
+ *
+ * Deliberately contains **no platform names**. Discovery goes through a Provider,
+ * so adding LinkedIn or TikTok means writing a provider, not editing this file.
+ * The architecture test in packages/core enforces that — it caught an earlier
+ * version of this file hardcoding Facebook and Instagram.
+ */
 
 export interface AccountsResult {
   readonly ok: boolean
@@ -24,13 +31,20 @@ export interface AccountsResult {
 }
 
 export interface AvailableAccount {
-  readonly platformAccountId: string
+  readonly externalId: string
   readonly name: string
   readonly platform: string
   readonly connected: boolean
-  readonly needsReauth: boolean
-  readonly connectionId: string | null
-  readonly hasInstagram: boolean
+  readonly linkedNames: readonly string[]
+}
+
+/**
+ * The provider's Platform and Prisma's generated enum are the same string union,
+ * but TypeScript treats them as distinct declarations across package boundaries.
+ * One narrow cast here beats loosening either type.
+ */
+function asPlatform<T extends string>(value: string): T {
+  return value as T
 }
 
 async function requireUser() {
@@ -39,166 +53,138 @@ async function requireUser() {
   return user
 }
 
-/**
- * Lists every Page the stored authorisation can reach, marking which are already
- * connected.
- *
- * Uses the saved long-lived user token rather than sending anyone back through
- * OAuth — that is the whole point of storing it.
- */
+/** Resolves the stored authorisation and its provider, or an explanation. */
+type Resolved =
+  | { readonly ok: true; readonly auth: Awaited<ReturnType<typeof listProviderAuths>>[number]; readonly provider: NonNullable<ReturnType<typeof providerFor>> }
+  | { readonly ok: false; readonly error: string }
+
+async function resolveAuth(tenantId: string): Promise<Resolved> {
+  const auths = await listProviderAuths(tenantId)
+  const usable = auths.find((a) => !a.needsReauth)
+
+  if (usable === undefined) {
+    return {
+      ok: false,
+      error:
+        auths.length > 0
+          ? 'The stored authorisation expired. Run the connect command again to renew it.'
+          : 'No authorisation stored yet. Run the connect command once — after that, accounts can be added here.',
+    }
+  }
+
+  const provider = providerFor(usable.provider)
+  if (provider === undefined) {
+    return { ok: false, error: `No provider is registered for "${usable.provider}".` }
+  }
+
+  const auth = await findProviderAuth(tenantId, usable.id)
+  if (auth === null) return { ok: false, error: 'Authorisation not found.' }
+
+  return { ok: true, auth: usable, provider }
+}
+
 export async function listAvailable(): Promise<{
   accounts: AvailableAccount[]
   error?: string
 }> {
   const user = await requireUser()
-  const auths = await listProviderAuths(user.tenantId)
-  const meta = auths.find((a) => a.provider === 'meta')
-
-  if (meta === undefined) {
-    return {
-      accounts: [],
-      error: 'No Meta authorisation stored yet. Run the connect command once to authorise.',
-    }
-  }
-  if (meta.needsReauth) {
-    return { accounts: [], error: 'The Meta authorisation expired. Run the connect command again.' }
-  }
-
-  const auth = await findProviderAuth(user.tenantId, meta.id)
-  if (auth === null) return { accounts: [], error: 'Authorisation not found.' }
+  const resolved = await resolveAuth(user.tenantId)
+  if (!resolved.ok) return { accounts: [], error: resolved.error }
 
   const existing = await scope(user.tenantId).connections()
 
   try {
-    const pages = await tokenVault().withCredential(
-      // The provider auth's credential lives under its own id in the vault.
-      auth.id,
+    const discovered = await tokenVault().withCredential(
+      resolved.auth.id,
       user.tenantId,
-      async (cred) => {
-        const oauth = new FacebookOAuth({
-          appId: required('META_APP_ID'),
-          appSecret: required('META_APP_SECRET'),
-          redirectUri: optional('META_REDIRECT_URI', 'http://localhost:8787/callback')!,
-          apiVersion: optional('META_API_VERSION', 'v25.0')!,
-        })
-        return await oauth.listPages(cred.accessToken)
-      },
+      async (cred) => await resolved.provider.discover(cred.accessToken),
     )
 
-    const accounts: AvailableAccount[] = []
-    for (const page of pages) {
-      const match = existing.find(
-        (c) => c.platform === 'facebook_page' && c.platformAccountId === page.id,
-      )
-      accounts.push({
-        platformAccountId: page.id,
-        name: page.name,
-        platform: 'facebook_page',
-        connected: match !== undefined && !match.needsReauth,
-        needsReauth: match?.needsReauth ?? false,
-        connectionId: match?.id ?? null,
-        hasInstagram: page.instagramAccountId !== undefined,
-      })
+    return {
+      accounts: discovered.map((account) => {
+        const match = existing.find(
+          (c) => c.platform === account.platform && c.platformAccountId === account.externalId,
+        )
+        return {
+          externalId: account.externalId,
+          name: account.displayName,
+          platform: account.platform,
+          connected: match !== undefined && !match.needsReauth,
+          linkedNames: (account.linked ?? []).map((l) => l.displayName),
+        }
+      }),
     }
-    return { accounts }
   } catch (error) {
     return {
       accounts: [],
-      error: `Could not reach Meta: ${error instanceof Error ? error.message : String(error)}`,
+      error: `Could not reach the provider: ${error instanceof Error ? error.message : String(error)}`,
     }
   }
 }
 
-/** Connects one Page (and its Instagram account, if it has one). */
+/** Connects one discovered account, plus anything linked to it. */
 export async function connectAccount(
   _prev: unknown,
   formData: FormData,
 ): Promise<AccountsResult> {
   const user = await requireUser()
-  const pageId = String(formData.get('pageId') ?? '')
-  if (pageId === '') return { ok: false, message: 'No account selected.' }
+  const externalId = String(formData.get('externalId') ?? '')
+  if (externalId === '') return { ok: false, message: 'No account selected.' }
 
-  const auths = await listProviderAuths(user.tenantId)
-  const meta = auths.find((a) => a.provider === 'meta')
-  if (meta === undefined) return { ok: false, message: 'No Meta authorisation stored.' }
-
-  const auth = await findProviderAuth(user.tenantId, meta.id)
-  if (auth === null) return { ok: false, message: 'Authorisation not found.' }
+  const resolved = await resolveAuth(user.tenantId)
+  if (!resolved.ok) return { ok: false, message: resolved.error }
 
   const vault = tokenVault()
 
   try {
-    const page = await vault.withCredential(auth.id, user.tenantId, async (cred) => {
-      const oauth = new FacebookOAuth({
-        appId: required('META_APP_ID'),
-        appSecret: required('META_APP_SECRET'),
-        redirectUri: optional('META_REDIRECT_URI', 'http://localhost:8787/callback')!,
-        apiVersion: optional('META_API_VERSION', 'v25.0')!,
-      })
-      const pages = await oauth.listPages(cred.accessToken)
-      return pages.find((p) => p.id === pageId) ?? null
-    })
+    const chosen = await vault.withCredential(
+      resolved.auth.id,
+      user.tenantId,
+      async (cred): Promise<DiscoveredAccount | null> => {
+        const discovered = await resolved.provider.discover(cred.accessToken)
+        return discovered.find((a) => a.externalId === externalId) ?? null
+      },
+    )
 
-    if (page === null) {
+    if (chosen === null) {
       return { ok: false, message: 'That account is no longer available on this authorisation.' }
     }
 
     const connected: string[] = []
 
-    const fb = await db().connection.upsert({
-      where: {
-        tenantId_platform_platformAccountId: {
-          tenantId: user.tenantId,
-          platform: 'facebook_page',
-          platformAccountId: page.id,
-        },
-      },
-      create: {
-        tenantId: user.tenantId,
-        platform: 'facebook_page',
-        platformAccountId: page.id,
-        displayName: page.name,
-        secretCiphertext: '',
-        providerAuthId: meta.id,
-        scopes: meta.scopes as string[],
-      },
-      update: { displayName: page.name, needsReauth: false, reauthReason: null, providerAuthId: meta.id },
-    })
-    await vault.store(fb.id, user.tenantId, { accessToken: page.accessToken })
-    connected.push(page.name)
-
-    // Instagram publishes with the PAGE token, so it needs no separate approval.
-    if (page.instagramAccountId !== undefined) {
-      const ig = await db().connection.upsert({
+    // The account and anything linked to it are stored together, because they
+    // share one credential and connecting them separately would be misleading.
+    for (const account of flattenAccounts([chosen])) {
+      const row = await db().connection.upsert({
         where: {
           tenantId_platform_platformAccountId: {
             tenantId: user.tenantId,
-            platform: 'instagram',
-            platformAccountId: page.instagramAccountId,
+            platform: asPlatform(account.platform),
+            platformAccountId: account.externalId,
           },
         },
         create: {
           tenantId: user.tenantId,
-          platform: 'instagram',
-          platformAccountId: page.instagramAccountId,
-          displayName: `${page.name} (Instagram)`,
+          platform: asPlatform(account.platform),
+          platformAccountId: account.externalId,
+          displayName: account.displayName,
           secretCiphertext: '',
-          providerAuthId: meta.id,
-          scopes: meta.scopes as string[],
+          providerAuthId: resolved.auth.id,
+          scopes: resolved.auth.scopes as string[],
         },
         update: {
-          displayName: `${page.name} (Instagram)`,
+          displayName: account.displayName,
           needsReauth: false,
           reauthReason: null,
-          providerAuthId: meta.id,
+          providerAuthId: resolved.auth.id,
         },
       })
-      await vault.store(ig.id, user.tenantId, { accessToken: page.accessToken })
-      connected.push(`${page.name} (Instagram)`)
+      await vault.store(row.id, user.tenantId, { accessToken: account.accessToken })
+      connected.push(account.displayName)
     }
 
     await scope(user.tenantId).record(`user:${user.email}`, 'account.connected', {
-      pageId: page.id,
+      externalId,
       connected,
     })
 

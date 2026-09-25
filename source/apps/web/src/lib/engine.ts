@@ -1,6 +1,12 @@
 import 'server-only'
 
-import { FacebookPageAdapter, InstagramAdapter } from '@social-publisher/adapters'
+import {
+  FacebookPageAdapter,
+  InstagramAdapter,
+  providerFor as lookupProvider,
+  registerMetaProvider,
+  type Provider,
+} from '@social-publisher/adapters'
 import { optional, required } from '@social-publisher/config'
 import type { Connection } from '@social-publisher/core'
 import { TenantScope, db, prismaCredentialStore } from '@social-publisher/db'
@@ -40,6 +46,30 @@ export function tokenVault(): TokenVault {
     })
   }
   return vault
+}
+
+/**
+ * Providers, registered once.
+ *
+ * Registration is the single place a platform is named for account discovery.
+ * Adding one means a line here and a provider file — nothing in the UI.
+ */
+let providersReady = false
+
+function ensureProviders(): void {
+  if (providersReady) return
+  registerMetaProvider({
+    appId: required('META_APP_ID'),
+    appSecret: required('META_APP_SECRET'),
+    redirectUri: optional('META_REDIRECT_URI', 'http://localhost:8787/callback')!,
+    apiVersion: optional('META_API_VERSION', 'v25.0')!,
+  })
+  providersReady = true
+}
+
+export function providerFor(key: string): Provider | undefined {
+  ensureProviders()
+  return lookupProvider(key)
 }
 
 export function mediaStore(): MediaStore {

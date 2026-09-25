@@ -23,7 +23,7 @@ item carries a status; nothing is "in progress" without being written here.
 | 0.3 | Verify platform limits | ✅ done — Facebook and Instagram only |
 | 0.4 | Rotate the exposed password | ✅ done |
 | 0.5 | Lock down the Data API / RLS | ✅ done — found a live exposure |
-| 1.1 | Adapter framework | 🟡 **partly done.** Publishing is decoupled and a test enforces it. **Connecting is not** — `connect.ts` hardcodes the Meta OAuth flow. Deferred by the owner 2026-09-25 in favour of visible progress; to be finished after tier 2. |
+| 1.1 | Adapter framework | ✅ **done.** Publishing and account discovery are both decoupled, enforced by an architecture test that scans the source. A `Provider` interface covers authorisation and discovery; `MetaProvider` implements it. Adding a platform is one provider + one adapter + one capability record. |
 | 1.2 | Connect multiple accounts | ✅ done — Accounts page; needs one re-run of connect to store the provider auth |
 | 1.3 | Account types beyond Pages | ⬜ not started |
 | 1.4 | Reconnect reusing authorisation | 🟡 partly done — disconnect/re-enable work from the Accounts page; a fully expired provider auth still needs the CLI |

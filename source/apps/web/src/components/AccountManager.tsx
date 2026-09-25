@@ -103,17 +103,18 @@ export function AccountManager({
 
         {notConnected.map((account) => (
           <form
-            key={account.platformAccountId}
+            key={account.externalId}
             action={action}
             className="flex flex-wrap items-center gap-3 border-b border-line py-3 last:border-b-0"
           >
-            <input type="hidden" name="pageId" value={account.platformAccountId} />
+            <input type="hidden" name="externalId" value={account.externalId} />
             <div className="min-w-0 flex-1">
               <div className="text-[0.9rem]">{account.name}</div>
               <div className="text-[0.76rem] text-muted">
-                Facebook Page
-                {/* Instagram publishes with the Page token, so it comes along free. */}
-                {account.hasInstagram && ' · Instagram linked, connects too'}
+                {account.platform.replace('_', ' ')}
+                {/* Linked accounts share one credential, so they connect together. */}
+                {account.linkedNames.length > 0 &&
+                  ` · also connects ${account.linkedNames.join(', ')}`}
               </div>
             </div>
             <button type="submit" className="btn" disabled={pending}>
