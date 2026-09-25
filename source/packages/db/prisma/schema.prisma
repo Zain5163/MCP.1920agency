@@ -341,6 +341,23 @@ model AuditLog {
   @@map("audit_log")
 }
 
+/// Proof-of-life for each background component.
+///
+/// Exists because a stopped worker and an empty queue look identical from the
+/// outside: no posts go out, and nothing reports an error. Without a heartbeat
+/// there is nothing to notice, so scheduled posts fail silently until a customer
+/// asks why nothing published.
+///
+/// Each component writes its name here on every run. The monitor reads the ages.
+model ServiceHeartbeat {
+  name   String   @id
+  beatAt DateTime @updatedAt @map("beat_at")
+  /// Free-form: last run counts, worker id, anything useful when diagnosing.
+  detail Json?
+
+  @@map("service_heartbeats")
+}
+
 /// Keep-alive for the Supabase free tier, which pauses after 7 days of low activity.
 /// Written weekly by a Windows Task Scheduler job. See decisions/0002.
 model Heartbeat {

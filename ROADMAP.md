@@ -19,8 +19,8 @@ _Nothing new should be built on top of a known defect._
 
 | # | Item | Why it is tier 0 |
 |---|---|---|
-| 0.1 | **Cancel/edit a scheduled post from the dashboard** | A post scheduled by mistake **will publish**. The capability exists in the MCP server and data layer; the UI has no button. This is unrecoverable once it fires. |
-| 0.2 | **Alert when the scheduler stops** | A silent worker looks identical to an empty queue. Every scheduled post fails silently and nobody finds out. |
+| ~~0.1~~ | ~~**Cancel a scheduled post from the dashboard**~~ **DONE 2026-09-25** | A post scheduled by mistake **will publish**. The capability exists in the MCP server and data layer; the UI has no button. This is unrecoverable once it fires. |
+| ~~0.2~~ | ~~**Alert when the scheduler stops**~~ **DONE 2026-09-25** | A silent worker looks identical to an empty queue. Every scheduled post fails silently and nobody finds out. |
 | 0.3 | **Verify platform limits against live docs** | Every entry in `capabilities.ts` is `verified: false` — set from knowledge, not checked. A wrong limit is a confusing publish failure. |
 | 0.4 | **Rotate the exposed database password** | Pasted into a chat transcript on 2026-09-24. |
 | 0.5 | **Postgres RLS behind the app-layer scoping** | Defence in depth. Application scoping is tested and correct; RLS catches the case where a future query bypasses it. |
@@ -37,6 +37,7 @@ wrong makes every later feature wrong in the same way._
 | 1.1 | **A platform adapter framework that makes adding a platform cheap** | **The real foundation for "any social media that exists".** Adding a platform should mean writing one adapter and one capability record — no changes to the UI, the queue, the vault or the publisher. Mostly true already; the remaining coupling needs finding and removing before a dozen platforms expose it. |
 | 1.2 | **Connect multiple accounts from the dashboard and from the AI** | One Meta login often administers several Pages and businesses. Today only one is linked and adding another means a command. Everything else is multiplied by this. |
 | 1.3 | **Account types beyond Pages** | Personal profiles, groups, channels, company pages. LinkedIn matters most — senior people post from their personal profile, and that is a different target type, not a different platform. |
+| 1.5 | **Plan and entitlement model** | Free / paid tiers, e.g. one flat plan at ~$20 covering everything. **Belongs here, not at billing time.** Entitlements are like `tenant_id`: one column now, a rewrite later. Every feature that will ever be gated needs something to ask, and features built before that exists get gating bolted on inconsistently. Billing itself can come much later — the *model* cannot. |
 | 1.4 | **Reconnect flow that reuses existing authorisation** | A token going stale must not mean starting from scratch. Already half-built: connections are marked `needs_reauth`, but nothing acts on it. |
 
 ---
@@ -100,6 +101,7 @@ TikTok, Amazon, and others._
 
 | # | Item | Notes |
 |---|---|---|
+| 5b.0 | **Merge `Meta-Ads-Publisher` into this MCP server** | Owner's decision, 2026-09-25: do not rebuild. That project is already account-agnostic, validated, and publishes paused. The work is porting its Python publishing logic into an adapter behind this engine's interfaces, so ads inherit the vault, tenant scoping, audit log and error catalogue rather than carrying their own. |
 | 5b.1 | **Meta Ads** | `..\..\Meta-Ads-Publisher` already exists, is account-agnostic, and publishes paused with a separate activation step. **Connect it rather than rebuild it.** Its API version is pinned at v23.0 and needs bumping to v25.0. |
 | 5b.2 | **Google Ads** | Per the inherited access research, the easiest of the majors: ~2–4 weeks for Basic access, gated on brand verification of the GCP project. |
 | 5b.3 | **TikTok Ads** | Audit plus business verification. 3–8 weeks. |

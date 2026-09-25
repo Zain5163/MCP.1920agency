@@ -12,6 +12,7 @@ import {
   disconnect,
   failJob,
   queueStats,
+  recordHeartbeat,
   reclaimStale,
   retryJob,
 } from '@social-publisher/db'
@@ -223,6 +224,10 @@ async function main(): Promise<void> {
   const reclaimed = await reclaimStale()
   if (reclaimed > 0) log(`reclaimed ${reclaimed} stale job(s) from a previous run`)
 
+  // Proof of life, written before any work. A worker that cannot even do this is
+  // not going to publish anything either, and the monitor should say so.
+  await recordHeartbeat('worker', { workerId: WORKER_ID, mode: values.once === true ? 'once' : 'loop' })
+
   const stats = await queueStats()
   log(
     `id=${WORKER_ID} queued=${stats.queued} due=${stats.dueNow} running=${stats.running} failed=${stats.failed}` +
@@ -232,6 +237,7 @@ async function main(): Promise<void> {
   if (values.once === true) {
     let processed = 0
     while (await processOne(service, vault)) processed += 1
+    await recordHeartbeat('worker', { workerId: WORKER_ID, mode: 'once', processed })
     log(`drained queue, processed ${processed} job(s)`)
     await disconnect()
     return
@@ -256,6 +262,9 @@ async function main(): Promise<void> {
       // A loop that dies on one bad job stops every future post, so keep going.
       log(`loop error (continuing): ${error instanceof Error ? error.message : String(error)}`)
     }
+    // Refresh proof-of-life each pass, not just at startup — a loop that has
+    // wedged mid-cycle must not keep looking healthy.
+    await recordHeartbeat('worker', { workerId: WORKER_ID, mode: 'loop' }).catch(() => {})
     if (!stopping) await new Promise((r) => setTimeout(r, intervalMs))
   }
 

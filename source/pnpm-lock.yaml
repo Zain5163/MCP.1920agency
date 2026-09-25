@@ -321,6 +321,9 @@ importers:
       '@social-publisher/publisher':
         specifier: workspace:*
         version: link:../../packages/publisher
+      '@social-publisher/telemetry':
+        specifier: workspace:*
+        version: link:../../packages/telemetry
       '@social-publisher/vault':
         specifier: workspace:*
         version: link:../../packages/vault

@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node --experimental-strip-types src/worker.ts",
     "once": "node --experimental-strip-types src/worker.ts --once",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "monitor": "node --experimental-strip-types src/monitor-cli.ts"
   },
   "dependencies": {
     "@social-publisher/adapters": "workspace:*",
@@ -15,7 +16,8 @@
     "@social-publisher/db": "workspace:*",
     "@social-publisher/media": "workspace:*",
     "@social-publisher/publisher": "workspace:*",
-    "@social-publisher/vault": "workspace:*"
+    "@social-publisher/vault": "workspace:*",
+    "@social-publisher/telemetry": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.9.0",

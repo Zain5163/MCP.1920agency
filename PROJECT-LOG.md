@@ -89,6 +89,18 @@ something was only compiled or only unit-tested, it says so.
   scheduling a real post, cancelling it, forcing its job due, and running the
   worker — which reported `queued=0` and published nothing.
 
+- **Tier 0.2 shipped: health monitoring.** Six checks — scheduler alive, overdue
+  posts, stalled jobs, broken connections, recent failures, database keep-alive.
+  Every problem reports what to do about it, not just that it happened.
+  **Verified by breaking it on purpose**: aged the worker heartbeat by 2 hours and
+  the keep-alive to 6.5 days, confirmed both raised CRITICAL with the right remedy
+  and exit code 2, then restored and confirmed it returned to healthy with exit 0.
+- `AdsPilot-Monitor` registered to run every 30 minutes. Runs **separately from the
+  worker on purpose** — a worker cannot be trusted to report that it is not running.
+- Roadmap updated: entitlement/plan model added at tier 1.5 (subscription tiers are
+  like `tenant_id` — cheap now, a rewrite later), and merging `Meta-Ads-Publisher`
+  rather than rebuilding it recorded as 5b.0.
+
 ---
 
 ## Verified live, not just tested
@@ -103,6 +115,7 @@ something was only compiled or only unit-tested, it says so.
 | Hosted MCP auth | 401 without a token, real data with one |
 | Tenant isolation | Two real tenants; cross-access refused |
 | Session security | Valid signature accepted, one flipped character rejected |
+| Health monitoring | Broke it deliberately; both failures caught with correct remedy and exit code |
 
 ## Test coverage
 
