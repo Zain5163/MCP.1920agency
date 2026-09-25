@@ -5,6 +5,7 @@ import {
   InstagramAdapter,
   ThreadsAdapter,
   PinterestAdapter,
+  LinkedInAdapter,
 } from '@social-publisher/adapters'
 import { optional, required } from '@social-publisher/config'
 import { backoffMs, type Connection, type MediaRef, type PostDraft } from '@social-publisher/core'
@@ -50,6 +51,8 @@ function buildService(): PublishService {
     new InstagramAdapter({ apiVersion, appSecret }),
     new ThreadsAdapter(),
     new PinterestAdapter(),
+    // LinkedIn uses its own API, its own token and its own version header.
+    new LinkedInAdapter(),
   ])
 }
 

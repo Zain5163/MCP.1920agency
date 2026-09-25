@@ -5,6 +5,7 @@ import {
   InstagramAdapter,
   ThreadsAdapter,
   PinterestAdapter,
+  LinkedInAdapter,
   providerFor as lookupProvider,
   registerMetaProvider,
   type Provider,
@@ -43,6 +44,8 @@ export function publishService(): PublishService {
       new ThreadsAdapter(),
       // Pinterest uses its own API and its own token, so no Meta config either.
       new PinterestAdapter(),
+    // LinkedIn uses its own API, its own token and its own version header.
+    new LinkedInAdapter(),
     ])
   }
   return service

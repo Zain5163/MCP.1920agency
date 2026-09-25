@@ -7,6 +7,7 @@ import {
   InstagramAdapter,
   ThreadsAdapter,
   PinterestAdapter,
+  LinkedInAdapter,
 } from '@social-publisher/adapters'
 import { mediaHostingReady, optional, required } from '@social-publisher/config'
 import type { Connection, MediaRef, Platform, PostDraft } from '@social-publisher/core'
@@ -107,6 +108,8 @@ async function main(): Promise<void> {
     new InstagramAdapter({ apiVersion, appSecret }),
     new ThreadsAdapter(),
     new PinterestAdapter(),
+    // LinkedIn uses its own API, its own token and its own version header.
+    new LinkedInAdapter(),
   ])
 
   const platforms = [...new Set(targets.map((t) => t.platform))]

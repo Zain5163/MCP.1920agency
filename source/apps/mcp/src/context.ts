@@ -3,6 +3,7 @@ import {
   InstagramAdapter,
   ThreadsAdapter,
   PinterestAdapter,
+  LinkedInAdapter,
 } from '@social-publisher/adapters'
 import { optional, required } from '@social-publisher/config'
 import { TenantScope, db, prismaCredentialStore } from '@social-publisher/db'
@@ -38,6 +39,8 @@ export function publishService(): PublishService {
       new ThreadsAdapter(),
       // Pinterest uses its own API and its own token, so no Meta config either.
       new PinterestAdapter(),
+    // LinkedIn uses its own API, its own token and its own version header.
+    new LinkedInAdapter(),
     ])
   }
   return service

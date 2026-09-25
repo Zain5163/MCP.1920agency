@@ -264,6 +264,48 @@ something was only compiled or only unit-tested, it says so.
   unlike every Meta flow here, and it refreshes with a separate refresh token
   unlike Threads which refreshes using the access token itself. Both are tested.
 
+### LinkedIn — built, unit-tested, never published for real
+
+- Adapter, provider, capability record and 32 tests. Typecheck clean across 13
+  workspaces, **371 tests across 10 suites, 0 failures.**
+- **The author is a URN, and the URN carries the account type.**
+  `urn:li:person:x` is a personal profile, `urn:li:organization:n` a company page.
+  `platform_account_id` holds the whole URN, so no account-type column was needed
+  — the same trick as Pinterest storing a board id. A bare id is rejected before
+  any call, because LinkedIn answers one with an opaque 422.
+- **⚠️ `commentary` is "little text", not plain text.** An unescaped reserved
+  character — `( ) [ ] { } @ # * _ ~ < > | \` — does **not** error. LinkedIn
+  drops the post from that character onward and still returns success. "Call us
+  (today) on..." publishes as "Call us". `escapeLittleText` handles it and four
+  tests cover it. **Unverified:** whether an escaped `#` still renders as a
+  clickable hashtag. If hashtags come out as plain text, that is the cause.
+- **LinkedIn is the only platform so far that will not fetch media.** Instagram,
+  Threads and Pinterest are given a URL. LinkedIn issues a one-time upload URL and
+  wants the bytes, so the adapter reads from disk or downloads first, then PUTs.
+- A created post returns **201 with an empty body**; the id is in the
+  `x-restli-id` response header. Every call needs `LinkedIn-Version` (YYYYMM,
+  retired after about a year) and `X-Restli-Protocol-Version: 2.0.0`.
+- **Organisation access is optional by design.** Without Community Management
+  approval the organisation lookup 403s, which is the *expected* state for a new
+  app — so it is swallowed and the tenant still gets their personal profile. A
+  missing approval loses company pages, never the whole connection. Organisation
+  scopes are only requested when `organizationAccess` is set, because asking
+  without approval makes the dialog refuse outright and blocks personal posting
+  too.
+- **Not implemented:** video (chunked upload with ETag tracking), and
+  `Provider.refresh` — LinkedIn needs a separate refresh token that the interface
+  cannot supply, and only approved apps get one at all. An unapproved app's token
+  dies at 60 days and needs reauthorisation. Pinterest has the same gap. Wiring it
+  in would make it look handled when it is not.
+
+### ⚠️ Found while doing this: three platforms can publish, and none can be connected
+
+Threads, Pinterest and LinkedIn each have a working adapter **and** provider, but
+`pnpm connect` still only runs Meta's OAuth dialog. Account *discovery* is fully
+provider-driven; account *authorisation* never was. Recorded in the roadmap as the
+next thing to build — one generic `pnpm connect <provider>` unblocks all three at
+once, and is worth more than a fourth adapter.
+
 ---
 
 ## Verified live, not just tested
@@ -283,6 +325,6 @@ something was only compiled or only unit-tested, it says so.
 
 ## Test coverage
 
-**286 tests across 13 workspaces, strict typecheck clean.** The database and auth
+**371 tests across 10 suites and 13 workspaces, strict typecheck clean.** The database and auth
 tests run against the real Supabase instance and clean up after themselves —
 cross-tenant isolation cannot be meaningfully proven against a mock.

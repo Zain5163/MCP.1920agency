@@ -207,11 +207,39 @@ export const CAPABILITIES: Readonly<Record<Platform, CapabilityRecord>> = {
     mediaKinds: ['image', 'video'],
     maxMediaCount: 20,
     minMediaCount: 0,
+    // Neither: LinkedIn is the only platform here that takes uploaded bytes and
+    // will not fetch a URL, so the adapter reads from disk or downloads first.
     requiresPublicMediaUrl: false,
     supportsNativeScheduling: false,
     allowsMixedMedia: false,
+    preview: {
+      label: 'LinkedIn',
+      accountLabel: 'LinkedIn Profile',
+      accent: '#0a66c2',
+      // The feed cuts at roughly 200 characters behind "see more".
+      captionTruncateAt: 200,
+      captionPosition: 'above',
+      mediaFit: 'original',
+      showsCarouselDots: true,
+      moreLabel: 'see more',
+    },
     verified: false,
-    notes: 'Organization posting requires Community Management API approval, which may not be granted.',
+    notes:
+      'The author is a full URN and the URN carries the account type: urn:li:person:x is a ' +
+      'personal profile, urn:li:organization:n a company page. platform_account_id holds the ' +
+      'whole URN. ' +
+      'WARNING: commentary is "little text", not plain text. An unescaped reserved character ' +
+      '( ) [ ] { } @ # * _ ~ < > | \\ does NOT error — LinkedIn drops the post from that ' +
+      'character onward and still reports success. escapeLittleText handles it; whether an ' +
+      'escaped # still renders as a clickable hashtag is unverified. ' +
+      'A created post returns 201 with an empty body; the id is in the x-restli-id header. ' +
+      'Every call needs LinkedIn-Version (YYYYMM, retired after about a year) and ' +
+      'X-Restli-Protocol-Version: 2.0.0. ' +
+      'Posting as a company page needs Community Management API approval, granted sparingly; ' +
+      'personal posting is self-serve via "Share on LinkedIn". Tokens last 60 days and only ' +
+      'approved apps get refresh tokens, so an unapproved app needs reauthorisation every ' +
+      '60 days. Video upload is chunked with ETag tracking and is NOT implemented. ' +
+      'Limits here are unverified.',
   },
 
   pinterest: {

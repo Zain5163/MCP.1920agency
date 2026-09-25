@@ -67,7 +67,7 @@ platforms it takes weeks.
 | Instagram | ✅ | none beyond the app | **publishing** |
 | Threads | ✅ | Meta app with the Threads use case — **no review** | waiting on app config |
 | **Pinterest** | ✅ | ⚠️ **Trial access = sandbox.** Pins are visible only to you until Standard Access, which needs a submitted video | adapter built, awaiting app credentials |
-| **LinkedIn** | ⬜ | Personal profile: straightforward. **Company pages need Community Management API approval, granted sparingly** | not started |
+| **LinkedIn** | ✅ | Personal profile: self-serve "Share on LinkedIn", **no review**. Company pages need Community Management API approval, granted sparingly | adapter built, awaiting app credentials |
 | **YouTube** | ⬜ | ⚠️ Audit for quota. Default is ~6 uploads/day **shared across all customers** | not started |
 | **TikTok** | ⬜ | ⚠️ Audit. **Until it passes, posts are private/self-only** | not started |
 | **X** | ⬜ | ⚠️ **Costs money** — pay-per-use, ~$0.20 per post containing a link | not started |
@@ -79,6 +79,18 @@ Two of these carry consequences worth deciding before building, not after:
 - **X is the only platform that costs per post.** At ~$0.20 for a post with a
   link, a customer posting daily costs about $6/month on X alone — which is why
   the pricing model was set to bring-your-own-key.
+
+### ⚠️ The blocker all three new platforms share: there is no way to authorise them
+
+Threads, Pinterest and LinkedIn all have a working adapter **and** a working
+provider — but `pnpm connect` still only knows how to run Meta's OAuth dialog.
+Account *discovery* is fully provider-driven; account *authorisation* is not.
+
+So the honest state is: three platforms can publish, and nobody can connect them.
+That is one generic `pnpm connect <provider>` command — build an auth URL from the
+named provider, catch the callback, store the authorisation — and it unblocks
+every platform at once rather than one at a time. **It is now worth more than the
+next adapter**, and it is the next thing to build.
 
 ---
 
