@@ -93,6 +93,45 @@ _Cheap once tier 1.1 is genuinely solid. Expensive if it is not._
 
 ---
 
+## Tier 5b — Paid advertising
+
+_Added 2026-09-25. Publish and manage **ads**, not just organic posts: Meta, Google,
+TikTok, Amazon, and others._
+
+| # | Item | Notes |
+|---|---|---|
+| 5b.1 | **Meta Ads** | `..\..\Meta-Ads-Publisher` already exists, is account-agnostic, and publishes paused with a separate activation step. **Connect it rather than rebuild it.** Its API version is pinned at v23.0 and needs bumping to v25.0. |
+| 5b.2 | **Google Ads** | Per the inherited access research, the easiest of the majors: ~2–4 weeks for Basic access, gated on brand verification of the GCP project. |
+| 5b.3 | **TikTok Ads** | Audit plus business verification. 3–8 weeks. |
+| 5b.4 | **Amazon Ads** | Marginal for a solo developer — the Tool Provider path needs Partner Network vetting. Weeks to months. |
+
+**Why ads are a tier of their own, not more adapters.**
+
+Organic publishing and paid advertising look similar and are not. Three differences
+decide the design:
+
+1. **Ads spend money.** A bug in organic publishing posts the wrong caption. A bug
+   in ads publishing spends real budget. `Meta-Ads-Publisher` already answers this
+   correctly — it publishes everything **paused**, and activation is a separate
+   command requiring the literal word `ACTIVATE`. That pattern should hold here.
+2. **The object model is deeper.** A post is content plus targets. An ad is
+   campaign → ad set → creative → ad, with budgets, schedules, audiences and
+   objectives. It does not fit `PostDraft` and should not be forced to.
+3. **Approval is harder and slower.** Ads permissions are a different, stricter
+   review than publishing permissions on every platform.
+
+**Prerequisite:** the money-safety rules need to exist before any ads code —
+mandatory paused creation, explicit activation, a spend ceiling, and an audit entry
+for anything that could cost money. Those belong in the deterministic layer, never
+in an AI decision. This is the single place where the "AI proposes, a deterministic
+validator authorises" principle from `..\..\Ads-Platform` matters most.
+
+_Sits at 5b rather than earlier because it inherits everything below it — accounts,
+scheduling, error handling, tenant isolation, audit. Building it before those are
+solid would mean building the riskiest feature on the weakest foundation._
+
+---
+
 ## Tier 6 — Design system
 
 | # | Item | Notes |

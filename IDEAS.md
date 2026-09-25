@@ -162,6 +162,19 @@ and quality control. Deserves its own research gate before any code, the way
 
 ---
 
+## H. Paid advertising
+
+Publish and manage ads through the same MCP server — Meta, Google, TikTok, Amazon
+and others. One prompt, ads live, same as posts.
+
+_Recorded as tier 5b in `ROADMAP.md`. It is deliberately a tier of its own rather
+than more adapters: ads spend real money, the object model is campaign → ad set →
+creative → ad rather than content → targets, and approval is stricter everywhere.
+`..\..\Meta-Ads-Publisher` already exists and publishes paused with a separate
+activation step — connect it rather than rebuild it._
+
+---
+
 ## Rough order I would suggest
 
 Not a decision — a starting point for one.
