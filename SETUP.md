@@ -62,23 +62,14 @@ Settings → Account type.
 
 ---
 
-## 4. Cloudflare R2 (media storage — free tier)
+## 4. Media storage — ✅ DONE (Supabase Storage)
 
-Needed because Instagram and TikTok *fetch* media from a public URL rather than
-accepting an upload.
+Needed because Instagram, Threads and TikTok *fetch* media from a public URL
+rather than accepting an upload.
 
-1. Sign up at **cloudflare.com**, go to **R2**.
-2. Create a bucket, e.g. `social-publisher-media`.
-3. Enable a **public access** custom domain for it (R2 → Settings → Public access).
-   A subdomain of a domain you already own is ideal, e.g. `media.yourdomain.com`.
-4. Create an **R2 API token** with read/write on that bucket. Note the access key ID,
-   secret access key and account ID.
-
-**Do you have a domain available for this?** If not, tell Claude — there is a fallback
-using the `r2.dev` development URL, which works but is rate-limited and not suitable
-beyond testing.
-
----
+Using **Supabase Storage**, not Cloudflare R2 — the account already exists and R2
+requires a payment card even on its free tier. A public bucket named `media` is
+configured and verified working.
 
 ## 5. The env file — OUTSIDE this workspace
 
@@ -98,11 +89,10 @@ SUPABASE_SERVICE_ROLE_KEY=...
 META_APP_ID=...
 META_APP_SECRET=...
 
-R2_ACCOUNT_ID=...
-R2_ACCESS_KEY_ID=...
-R2_SECRET_ACCESS_KEY=...
-R2_BUCKET=social-publisher-media
-R2_PUBLIC_BASE_URL=https://media.yourdomain.com
+SUPABASE_STORAGE_BUCKET=media
+
+APP_PASSWORD=...          # dashboard sign-in, superseded by real accounts
+SLACK_WEBHOOK_URL=...     # optional, for health alerts
 
 # Generate with:  node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 VAULT_MASTER_KEY=...
@@ -112,7 +102,7 @@ Tell Claude when this file exists. **Do not paste its contents into chat.**
 
 ---
 
-## 6. Optional, quick wins with no approval at all
+## 7. Optional, no approval needed
 
 These work in minutes and are useful for testing the pipeline end to end before Meta
 approves anything:
@@ -159,15 +149,15 @@ platform here whose connections go stale on their own if nothing refreshes them.
 
 ## Status
 
-| Step | Blocks | Done? |
+| Step | Blocks | Status |
 |---|---|---|
 | 1. Business Verification | Serving anyone but yourself | ✅ 2026-09-21 (1920 Agency) |
-| 2. Meta App | Facebook + Instagram, even your own | ☐ |
-| 3. Supabase | All persistence | ☐ |
-| 4. Cloudflare R2 | Instagram, TikTok | ☐ |
-| 5. Env file | Running anything locally | ☐ |
-| 6. Bluesky/Telegram/Discord | Nothing — pure upside | ☐ |
+| 2. Meta App | Facebook + Instagram | ✅ app `SMMM-Agent`, connected and publishing |
+| 3. Supabase | All persistence | ✅ migrated, keep-alive running |
+| 4. Media storage | Instagram, Threads | ✅ Supabase Storage, public bucket `media` |
+| 5. Env file | Running anything | ✅ at `%USERPROFILE%\.social-publisher\.env` |
+| 6. Threads | Posting to Threads | ☐ needs its own Meta app use case and credentials |
+| 7. Other platforms | Nothing yet | ☐ optional |
 
-**Also confirmed 2026-09-21:** a spare domain and subdomain are available for R2 media
-hosting, and an Instagram Business/Creator account is already linked to a Facebook Page.
-Both prerequisites are satisfied.
+**Live as of 2026-09-25:** Facebook Page and Instagram both publishing, six real
+posts sent, scheduler and monitor running as Windows scheduled tasks.
