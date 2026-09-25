@@ -25,7 +25,7 @@ item carries a status; nothing is "in progress" without being written here.
 | 0.5 | Lock down the Data API / RLS | ✅ done — found a live exposure |
 | 1.1 | Adapter framework | ✅ **done.** Publishing and account discovery are both decoupled, enforced by an architecture test that scans the source. A `Provider` interface covers authorisation and discovery; `MetaProvider` implements it. Adding a platform is one provider + one adapter + one capability record. |
 | 1.2 | Connect multiple accounts | ✅ done — Accounts page; needs one re-run of connect to store the provider auth |
-| 1.3 | Account types beyond Pages | 🔵 **next** — back to finishing tier 1 |
+| 1.3 | Account types beyond Pages | ⬜ not started |
 | 1.4 | Reconnect reusing authorisation | 🟡 partly done — disconnect/re-enable work from the Accounts page; a fully expired provider auth still needs the CLI |
 | 1.5 | Plan / entitlement model | ⬜ not started |
 | 2.1 | Carousels in the UI | ✅ done — ordered picker with thumbnails, reorder and per-platform limits |
@@ -125,6 +125,7 @@ _Cheap once tier 1.1 is genuinely solid. Expensive if it is not._
 
 | # | Item | Notes |
 |---|---|---|
+| 5.1a | **Threads** | 🟡 adapter and provider built and tested; needs a Meta app with the Threads use case and its own credentials before it can publish. **Correction:** this was estimated as nearly free because "it is Meta" — wrong. Threads has its own host, OAuth, scopes and token lifecycle. |
 | 5.1 | **More social platforms** | LinkedIn, X, TikTok, YouTube, Threads, Pinterest, and whatever comes next. Each is an adapter plus a capability record. Approval difficulty varies enormously — TikTok and LinkedIn company pages are the hard ones. |
 | 5.2 | **Websites and CMS** | WordPress, Shopify, custom sites. A new **category**, not another social adapter: different auth, different content shape, different success criteria. |
 | 5.3 | **Email marketing** | Explicitly deferred by the owner. Recorded so it is not lost. |

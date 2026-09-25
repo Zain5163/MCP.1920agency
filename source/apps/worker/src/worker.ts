@@ -1,6 +1,10 @@
 import { parseArgs } from 'node:util'
 
-import { FacebookPageAdapter, InstagramAdapter } from '@social-publisher/adapters'
+import {
+  FacebookPageAdapter,
+  InstagramAdapter,
+  ThreadsAdapter,
+} from '@social-publisher/adapters'
 import { optional, required } from '@social-publisher/config'
 import { backoffMs, type Connection, type MediaRef, type PostDraft } from '@social-publisher/core'
 import {
@@ -43,6 +47,7 @@ function buildService(): PublishService {
   return new PublishService([
     new FacebookPageAdapter({ apiVersion, appSecret }),
     new InstagramAdapter({ apiVersion, appSecret }),
+    new ThreadsAdapter(),
   ])
 }
 

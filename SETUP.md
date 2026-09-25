@@ -128,6 +128,35 @@ the Meta paperwork is still moving.
 
 ---
 
+## 6. Threads — a SEPARATE authorisation (optional)
+
+Threads is Meta, but it is **not** the same API as Facebook and Instagram. It has
+its own host (`graph.threads.net`), its own OAuth, and needs a Meta app configured
+with the **Threads use case**. An existing Facebook authorisation does not cover it.
+
+1. **developers.facebook.com** → your app (or a new one) → **Add use case** →
+   **Threads API**
+2. Request the permissions `threads_basic` and `threads_content_publish`
+3. Under the Threads use case settings, add this redirect URI:
+   ```
+   http://localhost:8787/threads/callback
+   ```
+4. Copy the **Threads App ID** and **Threads App Secret** — these are *not* the
+   same as your Facebook app id and secret
+5. Add to the env file:
+   ```
+   THREADS_APP_ID=
+   THREADS_APP_SECRET=
+   THREADS_REDIRECT_URI=http://localhost:8787/threads/callback
+   ```
+
+**One operational difference worth knowing:** a Threads token lasts 60 days and
+**must be refreshed** between 24 hours and 60 days after issue. A Facebook Page
+token does not expire while the app stays installed, so Threads is the first
+platform here whose connections go stale on their own if nothing refreshes them.
+
+---
+
 ## Status
 
 | Step | Blocks | Done? |

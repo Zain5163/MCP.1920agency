@@ -1,4 +1,8 @@
-import { FacebookPageAdapter, InstagramAdapter } from '@social-publisher/adapters'
+import {
+  FacebookPageAdapter,
+  InstagramAdapter,
+  ThreadsAdapter,
+} from '@social-publisher/adapters'
 import { optional, required } from '@social-publisher/config'
 import { TenantScope, db, prismaCredentialStore } from '@social-publisher/db'
 import { PublishService, type TargetSpec } from '@social-publisher/publisher'
@@ -29,6 +33,8 @@ export function publishService(): PublishService {
     service = new PublishService([
       new FacebookPageAdapter({ apiVersion, appSecret }),
       new InstagramAdapter({ apiVersion, appSecret }),
+      // Threads uses its own API host and its own token, so it takes no Meta config.
+      new ThreadsAdapter(),
     ])
   }
   return service

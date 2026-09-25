@@ -96,7 +96,25 @@ export const CAPABILITIES: Readonly<Record<Platform, CapabilityRecord>> = {
     requiresPublicMediaUrl: true,
     supportsNativeScheduling: false,
     allowsMixedMedia: true,
+    preview: {
+      label: 'Threads',
+      accountLabel: 'Threads',
+      accent: '#000000',
+      // Threads shows the whole 500 characters, so nothing is ever cut.
+      captionTruncateAt: 500,
+      captionPosition: 'above',
+      mediaFit: 'original',
+      showsCarouselDots: true,
+      moreLabel: 'more',
+    },
     verified: false,
+    notes:
+      'NOT the Facebook Graph API. Lives at graph.threads.net with its own OAuth, its own ' +
+      'scopes (threads_basic, threads_content_publish) and a Meta app configured for the ' +
+      'Threads use case. A Threads long-lived token lasts 60 days and MUST be refreshed ' +
+      'between 24h and 60d, unlike a Facebook Page token which does not expire while the ' +
+      'app stays installed — so these connections go stale if nothing refreshes them. ' +
+      'Unlike Instagram it can post text alone. Limits here are unverified.',
   },
 
   bluesky: {

@@ -2,7 +2,11 @@ import { readFileSync, existsSync, statSync } from 'node:fs'
 import { extname } from 'node:path'
 import { parseArgs } from 'node:util'
 
-import { FacebookPageAdapter, InstagramAdapter } from '@social-publisher/adapters'
+import {
+  FacebookPageAdapter,
+  InstagramAdapter,
+  ThreadsAdapter,
+} from '@social-publisher/adapters'
 import { mediaHostingReady, optional, required } from '@social-publisher/config'
 import type { Connection, MediaRef, Platform, PostDraft } from '@social-publisher/core'
 import { db, disconnect } from '@social-publisher/db'
@@ -100,6 +104,7 @@ async function main(): Promise<void> {
   const service = new PublishService([
     new FacebookPageAdapter({ apiVersion, appSecret }),
     new InstagramAdapter({ apiVersion, appSecret }),
+    new ThreadsAdapter(),
   ])
 
   const platforms = [...new Set(targets.map((t) => t.platform))]
