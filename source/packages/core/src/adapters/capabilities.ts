@@ -31,6 +31,7 @@ export const CAPABILITIES: Readonly<Record<Platform, CapabilityRecord>> = {
     allowsMixedMedia: false,
     preview: {
       label: 'Facebook',
+      accountLabel: 'Facebook Page',
       accent: '#1877f2',
       // Facebook shows far more text than Instagram before cutting.
       captionTruncateAt: 400,
@@ -64,6 +65,7 @@ export const CAPABILITIES: Readonly<Record<Platform, CapabilityRecord>> = {
     allowsMixedMedia: true,
     preview: {
       label: 'Instagram',
+      accountLabel: 'Instagram',
       accent: '#e1306c',
       // Instagram cuts at roughly 125 characters, which is why a caption that
       // reads fine on Facebook can lose its point here.

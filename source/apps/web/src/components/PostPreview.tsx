@@ -19,6 +19,7 @@ import type { PickedFile } from '@/components/MediaPicker'
 
 export interface PreviewStyle {
   readonly label: string
+  readonly accountLabel: string
   readonly accent: string
   readonly captionTruncateAt: number
   readonly captionPosition: 'above' | 'below'
@@ -45,6 +46,15 @@ export function PostPreview({
   media: readonly PickedFile[]
 }) {
   const [active, setActive] = useState(0)
+  /**
+   * Which carousel slide is showing.
+   *
+   * Previewing only the first image is close to useless for a carousel — the
+   * whole point is checking each slide crops correctly and reads in order. Reset
+   * when the media changes so a stale index cannot point past the end.
+   */
+  const [slide, setSlide] = useState(0)
+  const currentSlide = Math.min(slide, Math.max(0, media.length - 1))
 
   if (targets.length === 0) {
     return (
@@ -122,7 +132,9 @@ export function PostPreview({
           </div>
           <div className="min-w-0">
             <div className="truncate text-[0.85rem] font-semibold">{target.accountName}</div>
-            <div className="text-[0.72rem] text-muted">Just now</div>
+            <div className="text-[0.72rem] text-muted">
+              {style.accountLabel} · Just now
+            </div>
           </div>
         </div>
 
@@ -130,19 +142,44 @@ export function PostPreview({
 
         {media.length > 0 && (
           <div className="relative bg-black">
-            <MediaFrame item={media[0]!} fit={style.mediaFit} />
+            <MediaFrame item={media[currentSlide]!} fit={style.mediaFit} />
 
             {media.length > 1 && (
               <>
                 <div className="absolute right-2 top-2 rounded-full bg-black/70 px-2 py-0.5 text-[0.72rem] text-white">
-                  1/{media.length}
+                  {currentSlide + 1}/{media.length}
                 </div>
+
+                <button
+                  type="button"
+                  onClick={() => setSlide(Math.max(0, currentSlide - 1))}
+                  disabled={currentSlide === 0}
+                  aria-label="Previous slide"
+                  className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/60 px-2.5 py-1.5 text-white disabled:opacity-0"
+                >
+                  ‹
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSlide(Math.min(media.length - 1, currentSlide + 1))}
+                  disabled={currentSlide === media.length - 1}
+                  aria-label="Next slide"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/60 px-2.5 py-1.5 text-white disabled:opacity-0"
+                >
+                  ›
+                </button>
+
                 {style.showsCarouselDots && (
-                  <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1">
+                  <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1.5">
                     {media.map((m, i) => (
-                      <span
+                      <button
                         key={m.id}
-                        className={`h-1.5 w-1.5 rounded-full ${i === 0 ? 'bg-white' : 'bg-white/40'}`}
+                        type="button"
+                        onClick={() => setSlide(i)}
+                        aria-label={`Slide ${i + 1}`}
+                        className={`h-1.5 w-1.5 rounded-full ${
+                          i === currentSlide ? 'bg-white' : 'bg-white/40'
+                        }`}
                       />
                     ))}
                   </div>
@@ -154,6 +191,32 @@ export function PostPreview({
 
         {style.captionPosition === 'below' && caption}
       </div>
+
+      {media.length > 1 && (
+        <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1">
+          {media.map((m, i) => (
+            <button
+              key={m.id}
+              type="button"
+              onClick={() => setSlide(i)}
+              aria-label={`Show slide ${i + 1}`}
+              className={`relative h-12 w-12 shrink-0 overflow-hidden rounded border-2 ${
+                i === currentSlide ? 'border-brand' : 'border-transparent opacity-60'
+              }`}
+            >
+              {m.kind === 'video' ? (
+                <video src={m.previewUrl} className="h-full w-full object-cover" muted />
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={m.previewUrl} alt="" className="h-full w-full object-cover" />
+              )}
+              <span className="absolute bottom-0 right-0 bg-black/70 px-1 text-[0.62rem] text-white">
+                {i + 1}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
 
       {isTruncated && (
         <p className="mt-2.5 text-[0.78rem] text-warn">

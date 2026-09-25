@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 
+import { CAPABILITIES } from '@social-publisher/core'
+
 import { logout } from '../actions'
 import { listAvailable } from './actions'
 import { currentUser } from '@/lib/auth'
@@ -17,6 +19,9 @@ export default async function AccountsPage() {
   const connected: ConnectedRow[] = connections.map((c) => ({
     id: c.id,
     platform: c.platform,
+    platformLabel:
+      CAPABILITIES[c.platform].preview?.accountLabel ?? c.platform.replace('_', ' '),
+    platformAccent: CAPABILITIES[c.platform].preview?.accent,
     displayName: c.displayName,
     needsReauth: c.needsReauth,
     reauthReason: c.reauthReason,

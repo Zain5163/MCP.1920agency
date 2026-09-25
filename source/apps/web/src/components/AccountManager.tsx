@@ -9,10 +9,13 @@ import {
   type AccountsResult,
   type AvailableAccount,
 } from '@/app/accounts/actions'
+import { PlatformBadge, humanisePlatform } from '@/components/PlatformBadge'
 
 export interface ConnectedRow {
   readonly id: string
   readonly platform: string
+  readonly platformLabel: string
+  readonly platformAccent?: string | undefined
   readonly displayName: string
   readonly needsReauth: boolean
   readonly reauthReason: string | null
@@ -52,9 +55,11 @@ export function AccountManager({
             className="flex flex-wrap items-center gap-3 border-b border-line py-3 last:border-b-0"
           >
             <div className="min-w-0 flex-1">
-              <div className="text-[0.9rem]">{account.displayName}</div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="truncate text-[0.9rem]">{account.displayName}</span>
+                <PlatformBadge label={account.platformLabel} accent={account.platformAccent} />
+              </div>
               <div className="text-[0.76rem] text-muted">
-                {account.platform.replace('_', ' ')}
                 {account.needsReauth && (
                   <span className="text-bad">
                     {' · '}
@@ -109,9 +114,11 @@ export function AccountManager({
           >
             <input type="hidden" name="externalId" value={account.externalId} />
             <div className="min-w-0 flex-1">
-              <div className="text-[0.9rem]">{account.name}</div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="truncate text-[0.9rem]">{account.name}</span>
+                <PlatformBadge label={humanisePlatform(account.platform)} />
+              </div>
               <div className="text-[0.76rem] text-muted">
-                {account.platform.replace('_', ' ')}
                 {/* Linked accounts share one credential, so they connect together. */}
                 {account.linkedNames.length > 0 &&
                   ` · also connects ${account.linkedNames.join(', ')}`}

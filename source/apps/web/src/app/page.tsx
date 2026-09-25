@@ -10,6 +10,7 @@ import { currentUser } from '@/lib/auth'
 import { listConnections, scope } from '@/lib/engine'
 import { formatDateTime } from '@/lib/format'
 import { Composer, type AccountOption } from '@/components/Composer'
+import { PlatformBadge, humanisePlatform } from '@/components/PlatformBadge'
 
 export const dynamic = 'force-dynamic'
 
@@ -107,12 +108,21 @@ export default async function Dashboard() {
             <p className="mb-3 text-[0.85rem] text-muted">Connected via the Meta app.</p>
             {accounts.length === 0 && <p className="py-2 text-[0.88rem] text-muted">Nothing connected yet.</p>}
             {accounts.map((a) => (
-              <Stat
+              <div
                 key={a.id}
-                label={a.displayName}
-                value={a.needsReauth ? 'needs reconnect' : 'ready'}
-                tone={a.needsReauth ? 'bad' : 'ok'}
-              />
+                className="flex items-center justify-between gap-3 border-b border-line py-2 text-[0.88rem] last:border-b-0"
+              >
+                <span className="flex min-w-0 flex-wrap items-center gap-2">
+                  <span className="truncate">{a.displayName}</span>
+                  <PlatformBadge
+                    label={a.preview?.accountLabel ?? humanisePlatform(a.platform)}
+                    accent={a.preview?.accent}
+                  />
+                </span>
+                <span className={a.needsReauth ? 'text-bad' : 'text-ok'}>
+                  {a.needsReauth ? 'needs reconnect' : 'ready'}
+                </span>
+              </div>
             ))}
           </section>
         </div>
@@ -144,7 +154,12 @@ export default async function Dashboard() {
                           : ''
                   }`}
                 >
-                  {target.connection.displayName} · {target.state}
+                  {target.connection.displayName}
+                  {' · '}
+                  {CAPABILITIES[target.connection.platform].preview?.accountLabel ??
+                    humanisePlatform(target.connection.platform)}
+                  {' · '}
+                  {target.state}
                   {target.platformUrl !== null && (
                     <>
                       {' '}
@@ -169,9 +184,16 @@ export default async function Dashboard() {
                   className="mt-2 flex flex-wrap items-center gap-3 rounded-lg border border-bad/25 bg-bad/5 px-3 py-2"
                 >
                   <div className="min-w-0 flex-1">
-                    <div className="text-[0.82rem] text-bad">
-                      {t.connection.displayName}
-                      {t.platformMessage !== null && `: ${t.platformMessage}`}
+                    <div className="flex flex-wrap items-center gap-2 text-[0.82rem] text-bad">
+                      <span>{t.connection.displayName}</span>
+                      <PlatformBadge
+                        label={
+                          CAPABILITIES[t.connection.platform].preview?.accountLabel ??
+                          humanisePlatform(t.connection.platform)
+                        }
+                        accent={CAPABILITIES[t.connection.platform].preview?.accent}
+                      />
+                      {t.platformMessage !== null && <span>{t.platformMessage}</span>}
                     </div>
                     {t.state === 'needs_reauth' && (
                       <div className="text-[0.76rem] text-muted">

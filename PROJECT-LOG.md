@@ -205,6 +205,20 @@ something was only compiled or only unit-tested, it says so.
   Tested against the real database, including that another tenant cannot retry
   someone else's target.
 
+- **Dashboard clarity, from owner feedback on the live UI.** Two real gaps:
+
+  **Accounts were ambiguous.** "1920 Agency" appeared with no indication of which
+  platform it was, in the accounts panel, the account picker, published tags,
+  scheduled rows and failure rows. Added a platform badge everywhere an account is
+  named, with the label as capability data (`accountLabel`: "Facebook Page",
+  "Instagram") so a new platform gets a badge by adding data rather than editing
+  the UI. Tests assert every previewable platform declares one and that labels are
+  distinct — a shared label would defeat the purpose.
+
+  **The preview only ever showed the first image.** Useless for a carousel, where
+  the point is checking each slide crops correctly and reads in order. Added
+  arrows, clickable dots, a thumbnail strip, and a live "2/3" counter.
+
 ---
 
 ## Verified live, not just tested

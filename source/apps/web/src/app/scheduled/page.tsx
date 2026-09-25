@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 
+import { CAPABILITIES } from '@social-publisher/core'
 import { db } from '@social-publisher/db'
 
 import { logout } from '../actions'
@@ -35,6 +36,10 @@ export default async function ScheduledPage() {
     body: t.post.body,
     accountName: t.connection.displayName,
     platform: t.connection.platform,
+    platformLabel:
+      CAPABILITIES[t.connection.platform].preview?.accountLabel ??
+      t.connection.platform.replace('_', ' '),
+    platformAccent: CAPABILITIES[t.connection.platform].preview?.accent,
     scheduledFor: (t.scheduledFor ?? t.createdAt).toISOString(),
     state: t.state,
     mediaCount: t.post._count.media,

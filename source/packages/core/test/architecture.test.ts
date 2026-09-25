@@ -200,3 +200,26 @@ describe('preview data', () => {
     )
   })
 })
+
+describe('account labelling', () => {
+  test('every platform with a preview declares what its accounts are called', async () => {
+    // "1920 Agency" alone is ambiguous once the same brand exists on several
+    // platforms, which it always does. Every account needs a badge.
+    const { CAPABILITIES } = await import('../src/adapters/capabilities.ts')
+    for (const [platform, caps] of Object.entries(CAPABILITIES)) {
+      if (caps.preview === undefined) continue
+      assert.ok(
+        caps.preview.accountLabel.length > 0,
+        `${platform}: preview needs an accountLabel, e.g. "Facebook Page"`,
+      )
+    }
+  })
+
+  test('account labels are distinct, so a badge identifies the platform', async () => {
+    const { CAPABILITIES } = await import('../src/adapters/capabilities.ts')
+    const labels = Object.values(CAPABILITIES)
+      .map((c) => c.preview?.accountLabel)
+      .filter((l): l is string => l !== undefined)
+    assert.equal(new Set(labels).size, labels.length, 'two platforms share an account label')
+  })
+})

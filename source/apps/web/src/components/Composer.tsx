@@ -6,6 +6,7 @@ import { createPost, type ActionResult } from '@/app/actions'
 import { MediaPicker, type PickedFile } from '@/components/MediaPicker'
 import { PostPreview, type PreviewStyle, type PreviewTarget } from '@/components/PostPreview'
 import { PerPlatformText, type PlatformTextTarget } from '@/components/PerPlatformText'
+import { PlatformBadge, humanisePlatform } from '@/components/PlatformBadge'
 import { countGraphemes } from '@/lib/text'
 
 export interface AccountOption {
@@ -172,10 +173,11 @@ export function Composer({ accounts }: { accounts: readonly AccountOption[] }) {
                 disabled={account.needsReauth}
                 onChange={() => toggle(account.platform)}
               />
-              <span>{account.displayName}</span>
-              <span className="text-[0.72rem] uppercase tracking-wide text-muted">
-                {account.platform.replace('_', ' ')}
-              </span>
+              <span className="truncate">{account.displayName}</span>
+              <PlatformBadge
+                label={account.preview?.accountLabel ?? humanisePlatform(account.platform)}
+                accent={account.preview?.accent}
+              />
               {account.needsReauth && (
                 <span className="ml-auto rounded-full border border-bad/40 px-2 py-0.5 text-[0.7rem] text-bad">
                   reconnect

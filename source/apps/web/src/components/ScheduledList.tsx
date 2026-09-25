@@ -4,6 +4,7 @@ import { useActionState, useState } from 'react'
 
 import { cancelScheduled, type CancelResult } from '@/app/scheduled/actions'
 import { formatDateTime } from '@/lib/format'
+import { PlatformBadge, humanisePlatform } from '@/components/PlatformBadge'
 
 export interface ScheduledItem {
   readonly targetId: string
@@ -11,6 +12,8 @@ export interface ScheduledItem {
   readonly body: string
   readonly accountName: string
   readonly platform: string
+  readonly platformLabel: string
+  readonly platformAccent?: string | undefined
   readonly scheduledFor: string
   readonly state: string
   readonly mediaCount: number
@@ -79,9 +82,12 @@ export function ScheduledList({ items }: { items: readonly ScheduledItem[] }) {
                 className="flex flex-wrap items-center gap-3 rounded-lg border border-line bg-surface-2 px-3 py-2"
               >
                 <div className="min-w-0 flex-1">
-                  <div className="text-[0.88rem]">{target.accountName}</div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="truncate text-[0.88rem]">{target.accountName}</span>
+                    <PlatformBadge label={target.platformLabel} accent={target.platformAccent} />
+                  </div>
                   <div className="text-[0.76rem] text-muted">
-                    {target.platform.replace('_', ' ')} · {formatDateTime(target.scheduledFor)}
+                    {formatDateTime(target.scheduledFor)}
                   </div>
                 </div>
 

@@ -55,6 +55,13 @@ export interface Capabilities {
 export interface PreviewStyle {
   /** Name shown in the preview tab. */
   readonly label: string
+  /**
+   * What an account on this platform is called, e.g. "Facebook Page",
+   * "Instagram", "LinkedIn Page". Shown as a badge next to every account name so
+   * it is never ambiguous which one a post is going to — especially once several
+   * platforms carry the same brand name.
+   */
+  readonly accountLabel: string
   /** Brand colour, for the tab indicator only. */
   readonly accent: string
   /**
