@@ -1,0 +1,183 @@
+# AdsPilot — Ideas and future direction
+
+Captured 2026-09-25 from the owner. This is the **idea backlog**, not a commitment
+and not a schedule. `NEXT-STEPS.md` holds what is actually being worked on;
+anything here moves there only when it is chosen.
+
+Notes in _italics_ are mine — what already exists, what a thing depends on, and
+where I think something is larger than it looks. The ideas themselves are recorded
+as given.
+
+---
+
+## The guiding idea
+
+> Give one MCP server to a person or a company and they no longer need to go
+> anywhere else — and no longer need to hire a whole team.
+
+The worked example, in the owner's own words: someone who needs to publish blogs to
+WordPress *and* a custom site, post carousels, static images and video to social,
+upload to YouTube, manage a LinkedIn personal profile *and* several company pages —
+and who finds article writing and caption writing the hardest part.
+
+**Everything should be shaped so platform algorithms pick it up.** Not as a
+feature to switch on, but as the default behaviour of anything the system produces.
+
+**Sequencing principle, stated explicitly:** build it for internal use first and get
+the foundation solid. Everything else comes after that.
+
+---
+
+## A. Composing and preview
+
+### A1. Platform preview — "see it before it posts"
+Show exactly how a post will look on each platform before publishing, the way Ads
+Manager previews an ad. Click a platform icon, see that platform's rendering.
+
+_Probably the highest-value item here. It catches the mistakes that validation
+cannot — a caption that reads badly after Instagram truncates it, a logo that sits
+under the Facebook overlay, an image cropped wrongly by one platform. Each preview
+is a faithful mock of that platform's layout, so it is real work per platform, but
+it pays back on every single post._
+
+### A2. Carousels
+Multiple images and videos in one post.
+
+- **Selection order is post order** — the first file picked is the first card
+- Show each selected file separately, and how many are selected
+- Applies to images and video
+
+_The Instagram adapter already builds carousels and respects order; the gap is
+entirely in the UI. Worth pairing with A1, because carousel order is exactly the
+thing people get wrong and a preview makes obvious._
+
+---
+
+## B. Content generation
+
+### B1. Caption from image
+User uploads an image with no text. The system looks at the image and writes the
+caption and description from what it sees.
+
+### B2. Rewrite
+A button to regenerate a caption or description that is not right, rather than
+accepting the first attempt or writing it by hand.
+
+### B3. Algorithm optimisation
+Rework a caption for what each platform's algorithm rewards — length, hashtags,
+hooks, formatting — per platform rather than one caption everywhere.
+
+### B4. Trending topics
+Suggest what to post about from what is trending (e.g. Google Trends), so the user
+starts from a live topic rather than a blank box.
+
+### B5. Article and blog writing
+Long-form for websites, not just social captions.
+
+_These are the pieces `decisions/0001` flagged as the most likely to disappoint.
+Generic AI captions are why people switch these features off. The mitigation is
+that everything here is **assistive and editable** — B2 exists precisely because
+the first draft often will not be right. Worth building B1 and B2 together; B1 on
+its own invites publishing whatever the model produced._
+
+---
+
+## C. Scheduling and management
+
+### C1. Edit or delete a scheduled post
+Right now a scheduled post cannot be changed or cancelled from the dashboard. If
+something is queued by mistake, it goes out.
+
+_Partly built: `cancel_scheduled_post` exists in the MCP server and `cancelTarget`
+in the data layer. **The dashboard has no button for it.** Editing a queued post
+does not exist at all. This is the smallest real gap on this whole list and should
+probably be done first._
+
+---
+
+## D. Analytics and reporting
+
+### D1. Cross-platform performance
+Likes, comments, clicks, impressions, CTR — per post and per platform.
+
+### D2. Ranking and charts
+Bar charts and graphs showing which platform performs best, and which posts do.
+
+_Needs read access to each platform's insights API, which is a different permission
+set from publishing — Facebook and Instagram both require additional scopes and,
+for other people's accounts, more App Review. Worth knowing before it is promised
+to a customer._
+
+---
+
+## E. Accounts and connections
+
+### E1. Connect more pages, easily
+One Meta account often administers several Pages and businesses. Today only one
+Page is connected, and connecting more means re-running a command.
+
+Should be possible **from the dashboard, or by asking the AI** — reusing the
+existing authorisation rather than starting a fresh OAuth flow each time.
+
+_The `connect` flow already fetches every Page the user administers; it just needs
+a UI to pick which ones to link. Genuinely small._
+
+### E2. Personal profiles, not just Pages
+LinkedIn especially — senior people post from their personal profile, and that is
+often where the reach is. Also groups, channels and company pages as distinct
+target types.
+
+_Note: LinkedIn personal posting is the **easier** LinkedIn permission. Company
+pages need Community Management API approval, which LinkedIn grants sparingly._
+
+### E3. YouTube
+Video upload as a first-class target.
+
+---
+
+## F. Beyond social
+
+### F1. Publish to websites and CMS
+One click posts to social **and** the user's own website: WordPress, Shopify, other
+CMS, and custom sites (including ones deployed from GitHub).
+
+### F2. Email marketing
+Through the same MCP server. **Explicitly deferred** — noted so it is not forgotten,
+not to be built now.
+
+---
+
+## G. Design system
+
+Each client gets a design system, generated with AI from whatever brand material
+they have. Templates to start from, which they can then extend themselves.
+
+Shipped as **default skills in the MCP server**, so a customer's own AI can use the
+design system — and users can write their own skills on top.
+
+_The largest item on this list by a wide margin. "Generate on-brand images from a
+design system" is a product in itself: brand extraction, templating, rendering,
+and quality control. Deserves its own research gate before any code, the way
+`Ads-Platform` was gated._
+
+---
+
+## Rough order I would suggest
+
+Not a decision — a starting point for one.
+
+| | Why |
+|---|---|
+| 1. **C1** edit/cancel scheduled posts | Smallest real gap. A mistake is currently unrecoverable. |
+| 2. **E1** connect more pages | Small, and immediately useful — several businesses are waiting on it. |
+| 3. **A2 + A1** carousels and preview | The adapters already support carousels; preview is what makes them safe. |
+| 4. **B1 + B2** caption from image, with rewrite | Test whether AI content is good enough *before* committing to more of it. |
+| 5. **D1/D2** analytics | Needs new permissions; worth starting the access work early even if built later. |
+| 6. **E2/E3** LinkedIn, YouTube | New adapters, engine already supports them. |
+| 7. **F1** WordPress and CMS | A new category, not just another adapter. |
+| 8. **G** design system | Largest. Gate it before building. |
+
+The consistent theme: **the engine already supports most of this.** Carousels,
+scheduling, multi-platform and cancellation all exist underneath. A surprising
+amount of this list is interface work over machinery that is already written and
+tested — which is the payoff from keeping one engine behind several doors.

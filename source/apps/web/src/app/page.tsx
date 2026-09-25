@@ -7,6 +7,7 @@ import { health, queueStats } from '@social-publisher/db'
 import { logout } from './actions'
 import { currentUser } from '@/lib/auth'
 import { listConnections, scope } from '@/lib/engine'
+import { formatDateTime } from '@/lib/format'
 import { Composer, type AccountOption } from '@/components/Composer'
 
 export const dynamic = 'force-dynamic'
@@ -88,7 +89,7 @@ export default async function Dashboard() {
             />
             <Stat
               label="Next run"
-              value={queue.nextRunAt === null ? 'nothing queued' : queue.nextRunAt.toLocaleString()}
+              value={queue.nextRunAt === null ? 'nothing queued' : formatDateTime(queue.nextRunAt)}
             />
           </section>
 
@@ -116,7 +117,7 @@ export default async function Dashboard() {
         {posts.length === 0 && <p className="py-2 text-[0.88rem] text-muted">Nothing posted yet.</p>}
         {posts.map((post) => (
           <article key={post.id} className="border-b border-line py-3.5 last:border-b-0">
-            <div className="text-[0.76rem] text-muted">{post.createdAt.toLocaleString()}</div>
+            <div className="text-[0.76rem] text-muted">{formatDateTime(post.createdAt)}</div>
             <p className="my-1.5 whitespace-pre-wrap text-[0.88rem]">
               {post.body.length > 180 ? `${post.body.slice(0, 180)}…` : post.body}
             </p>

@@ -3,6 +3,7 @@
 import { useActionState, useState } from 'react'
 
 import { createToken, revoke, type TokenResult } from '@/app/tokens/actions'
+import { formatDate, formatDateTime } from '@/lib/format'
 
 export interface TokenRow {
   readonly id: string
@@ -125,12 +126,12 @@ export function TokenManager({ tokens, mcpUrl }: { tokens: readonly TokenRow[]; 
               <div className="text-[0.76rem] text-muted">
                 <code>{token.prefix}…</code>
                 {' · created '}
-                {new Date(token.createdAt).toLocaleDateString()}
+                {formatDate(token.createdAt)}
                 {token.lastUsedAt === null
                   ? ' · never used'
-                  : ` · last used ${new Date(token.lastUsedAt).toLocaleString()}`}
+                  : ` · last used ${formatDateTime(token.lastUsedAt)}`}
                 {token.expiresAt !== null &&
-                  ` · expires ${new Date(token.expiresAt).toLocaleDateString()}`}
+                  ` · expires ${formatDate(token.expiresAt)}`}
               </div>
             </div>
             <form action={revoke}>

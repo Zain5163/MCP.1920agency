@@ -1,0 +1,10 @@
+# Keep the folders and the README, ignore the media itself.
+*
+!.gitignore
+!README.md
+!to-post/
+!posted/
+to-post/*
+posted/*
+!to-post/.gitkeep
+!posted/.gitkeep

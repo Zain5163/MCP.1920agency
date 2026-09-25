@@ -10,6 +10,7 @@ import { authenticate } from '@social-publisher/auth'
 
 import { currentUser, endSession, startSession } from '@/lib/auth'
 import { listConnections, mediaStore, publishService, scope, targetFor } from '@/lib/engine'
+import { formatDateTime } from '@/lib/format'
 
 export interface ActionResult {
   readonly ok: boolean
@@ -162,7 +163,7 @@ export async function createPost(_prev: unknown, formData: FormData): Promise<Ac
     revalidatePath('/')
     return {
       ok: true,
-      message: `Scheduled for ${scheduledFor.toLocaleString()} across ${targets.length} account(s).`,
+      message: `Scheduled for ${formatDateTime(scheduledFor)} across ${targets.length} account(s).`,
     }
   }
 

@@ -69,6 +69,22 @@ Never mix the two — an internal log in front of a customer is an information l
 
 ---
 
+## Idea backlog
+
+`IDEAS.md` holds the owner's future direction, captured 2026-09-25: platform
+previews, carousels in the UI, AI captions from images, cross-platform analytics,
+connecting multiple Pages, LinkedIn personal profiles, YouTube, WordPress/CMS
+publishing, and a per-client design system.
+
+Nothing there is committed. Items move into this file when chosen.
+
+The one item from that list that is a **current defect rather than a future
+feature**: a scheduled post cannot be edited or cancelled from the dashboard. The
+capability exists in the MCP server and the data layer; the UI has no button for
+it. Until it does, a mistakenly scheduled post will publish.
+
+---
+
 ## Improvements worth making
 
 **Correctness**
