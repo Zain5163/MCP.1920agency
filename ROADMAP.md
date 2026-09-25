@@ -21,8 +21,8 @@ _Nothing new should be built on top of a known defect._
 |---|---|---|
 | ~~0.1~~ | ~~**Cancel a scheduled post from the dashboard**~~ **DONE 2026-09-25** | A post scheduled by mistake **will publish**. The capability exists in the MCP server and data layer; the UI has no button. This is unrecoverable once it fires. |
 | ~~0.2~~ | ~~**Alert when the scheduler stops**~~ **DONE 2026-09-25** | A silent worker looks identical to an empty queue. Every scheduled post fails silently and nobody finds out. |
-| 0.3 | **Verify platform limits against live docs** | Every entry in `capabilities.ts` is `verified: false` — set from knowledge, not checked. A wrong limit is a confusing publish failure. |
-| 0.4 | **Rotate the exposed database password** | Pasted into a chat transcript on 2026-09-24. |
+| ~~0.3~~ | ~~**Verify platform limits against live docs**~~ **DONE 2026-09-25** | Facebook and Instagram verified. Found three errors: Instagram's rate limit is **100/24h not 50**, aspect ratio must be **4:5 to 1.91:1** and was not checked at all, and the docs say **JPEG only** though PNG demonstrably works. Other platforms remain `verified: false` until used. |
+| ~~0.4~~ | ~~**Rotate the exposed database password**~~ **DONE 2026-09-25** | Rotated by the owner; connection verified afterwards. |
 | ~~0.5~~ | ~~**Postgres RLS behind the app-layer scoping**~~ **DONE 2026-09-25** | **Found a live critical hole while doing it:** `anon` and `authenticated` had full read/write on every table, including encrypted credentials, password hashes and token hashes — and the `anon` key is public by design. Grants revoked, RLS enabled on all 13 tables. |
 
 ---

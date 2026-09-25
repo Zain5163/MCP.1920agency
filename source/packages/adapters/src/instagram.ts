@@ -221,7 +221,7 @@ export class InstagramAdapter implements PlatformAdapter {
     }
   }
 
-  /** Remaining posts in the rolling 24h window. Instagram allows 50. */
+  /** Remaining posts in the rolling 24h window. Instagram allows 100 (verified 2026-09-25). */
   async remainingQuota(ctx: PublishContext): Promise<number | undefined> {
     try {
       const params = new URLSearchParams({ fields: 'quota_usage,config' })
@@ -232,7 +232,8 @@ export class InstagramAdapter implements PlatformAdapter {
       )
       const row = info.data?.[0]
       if (row?.quota_usage === undefined) return undefined
-      return (row.config?.quota_total ?? 50) - row.quota_usage
+      // 100, not 50 — the 50 figure is stale and widely repeated.
+      return (row.config?.quota_total ?? 100) - row.quota_usage
     } catch {
       // Advisory only — never let a quota check block a publish.
       return undefined

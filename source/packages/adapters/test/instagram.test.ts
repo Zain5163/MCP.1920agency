@@ -273,10 +273,10 @@ describe('errors', () => {
 describe('quota', () => {
   test('reports remaining posts in the 24h window', async () => {
     const { fetchImpl } = mockGraph([
-      { body: { data: [{ quota_usage: 12, config: { quota_total: 50 } }] } },
+      { body: { data: [{ quota_usage: 12, config: { quota_total: 100 } }] } },
     ])
     const ig = new InstagramAdapter({ fetch: fetchImpl })
-    assert.equal(await ig.remainingQuota(ctx()), 38)
+    assert.equal(await ig.remainingQuota(ctx()), 88)
   })
 
   test('never lets a quota lookup failure block publishing', async () => {

@@ -207,3 +207,81 @@ describe('validateAgainstCapabilities', () => {
     assert.ok(errorCodes(result).length >= 2)
   })
 })
+
+describe('aspect ratio', () => {
+  const sized = (w: number, h: number): MediaRef => image({ width: w, height: h })
+
+  test('accepts a square image on Instagram', () => {
+    const result = validateAgainstCapabilities(
+      draft({ body: 'hi', media: [sized(1080, 1080)] }),
+      'instagram',
+      capabilitiesFor('instagram'),
+    )
+    assert.ok(!errorCodes(result).includes('aspect_ratio_unsupported'))
+  })
+
+  test('accepts 4:5 portrait and 1.91:1 landscape, the documented bounds', () => {
+    for (const [w, h] of [[1080, 1350], [1080, 566]] as const) {
+      const result = validateAgainstCapabilities(
+        draft({ body: 'hi', media: [sized(w, h)] }),
+        'instagram',
+        capabilitiesFor('instagram'),
+      )
+      assert.ok(
+        !errorCodes(result).includes('aspect_ratio_unsupported'),
+        `${w}x${h} should be accepted`,
+      )
+    }
+  })
+
+  test('rejects a too-tall image', () => {
+    // Instagram fails container creation for these with an error that reads like
+    // a permissions problem, so catching it here is the whole point.
+    const result = validateAgainstCapabilities(
+      draft({ body: 'hi', media: [sized(500, 1500)] }),
+      'instagram',
+      capabilitiesFor('instagram'),
+    )
+    assert.ok(errorCodes(result).includes('aspect_ratio_unsupported'))
+  })
+
+  test('rejects a too-wide image', () => {
+    const result = validateAgainstCapabilities(
+      draft({ body: 'hi', media: [sized(2000, 500)] }),
+      'instagram',
+      capabilitiesFor('instagram'),
+    )
+    assert.ok(errorCodes(result).includes('aspect_ratio_unsupported'))
+  })
+
+  test('says what the image is and what the limit is', () => {
+    const result = validateAgainstCapabilities(
+      draft({ body: 'hi', media: [sized(2000, 500)] }),
+      'instagram',
+      capabilitiesFor('instagram'),
+    )
+    const issue = result.issues.find((i) => i.code === 'aspect_ratio_unsupported')!
+    assert.match(issue.message, /2000x500/)
+    assert.match(issue.message, /4\.00:1/)
+  })
+
+  test('warns rather than blocking when dimensions are unknown', () => {
+    // A wrongly-rejected valid post is worse than a late failure.
+    const result = validateAgainstCapabilities(
+      draft({ body: 'hi', media: [image()] }),
+      'instagram',
+      capabilitiesFor('instagram'),
+    )
+    assert.ok(!errorCodes(result).includes('aspect_ratio_unsupported'))
+    assert.ok(result.issues.some((i) => i.code === 'unknown_dimensions'))
+  })
+
+  test('does not apply to platforms with no declared range', () => {
+    const result = validateAgainstCapabilities(
+      draft({ media: [sized(4000, 200)] }),
+      'facebook_page',
+      capabilitiesFor('facebook_page'),
+    )
+    assert.ok(!errorCodes(result).includes('aspect_ratio_unsupported'))
+  })
+})

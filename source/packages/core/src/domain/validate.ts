@@ -123,6 +123,45 @@ export function validateAgainstCapabilities(
   }
 
   /**
+   * Aspect ratio.
+   *
+   * Instagram rejects anything outside 4:5 to 1.91:1 when the container is
+   * created, and the error it returns reads like a permissions problem rather
+   * than a shape problem. Catching it here turns a confusing platform failure
+   * into a clear instruction before anything is queued.
+   *
+   * Only checked when dimensions are known — an unknown size warns rather than
+   * blocking, because a wrongly-rejected valid post is worse than a late failure.
+   */
+  if (caps.aspectRatioMin !== undefined || caps.aspectRatioMax !== undefined) {
+    for (const item of media) {
+      if (item.width === undefined || item.height === undefined || item.height === 0) {
+        if (media.length > 0) {
+          add(
+            'warning',
+            'unknown_dimensions',
+            'Image dimensions are unknown, so the aspect ratio could not be checked before publishing.',
+          )
+        }
+        break
+      }
+
+      const ratio = item.width / item.height
+      const min = caps.aspectRatioMin ?? 0
+      const max = caps.aspectRatioMax ?? Infinity
+
+      if (ratio < min || ratio > max) {
+        add(
+          'error',
+          'aspect_ratio_unsupported',
+          `${item.width}x${item.height} is ${ratio.toFixed(2)}:1, outside this platform's accepted range ` +
+            `(${min.toFixed(2)}:1 to ${max.toFixed(2)}:1). Crop it to square, portrait 4:5, or landscape 1.91:1.`,
+        )
+      }
+    }
+  }
+
+  /**
    * Platforms that fetch media cannot be handed a URL that is not yet live. This
    * is checked here rather than at publish time so the failure is visible while
    * the user is still looking at the composer.

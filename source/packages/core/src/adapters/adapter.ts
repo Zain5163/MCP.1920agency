@@ -22,6 +22,13 @@ export interface Capabilities {
   readonly minMediaCount: number
   readonly videoMaxSeconds?: number
   readonly videoMinSeconds?: number
+  /**
+   * Accepted width/height range. Instagram rejects anything outside 4:5 (0.8)
+   * to 1.91:1 at container creation, with an error that reads like a permissions
+   * problem rather than a shape problem.
+   */
+  readonly aspectRatioMin?: number
+  readonly aspectRatioMax?: number
   readonly maxImageBytes?: number
   readonly maxVideoBytes?: number
   /**

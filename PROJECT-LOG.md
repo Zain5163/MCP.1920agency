@@ -113,6 +113,28 @@ something was only compiled or only unit-tested, it says so.
   Verified after: zero grants remain, all 13 tables have RLS, and the application,
   media uploads and all 286 tests still pass.
 
+- **Tier 0.4 done:** database password rotated by the owner after its exposure in a
+  chat transcript. Connection verified afterwards; both social accounts intact.
+- **Tier 0.3 done: platform limits verified against live documentation.** Facebook
+  and Instagram now carry a verification date rather than `false`. Three errors found:
+  - Instagram's publishing rate limit is **100 posts per 24h, not 50** — the 50
+    figure is stale and widely repeated. Corrected in the adapter's quota default.
+  - Instagram requires an aspect ratio between **4:5 and 1.91:1**, and **we were not
+    checking it at all**. Outside that range, container creation fails with an error
+    that reads like a permissions problem. Now validated before anything is queued,
+    with the image's actual dimensions and the accepted range in the message.
+  - Meta's docs state **JPEG only** for Instagram, listing PNG as unsupported — yet a
+    PNG published successfully on 2026-09-25. Recorded rather than enforced: rejecting
+    something that demonstrably works would be worse than the documented risk.
+  - Facebook's text limit is widely cited as 63,206 but Meta publishes no exact
+    figure, and secondary sources also say 50,000. Left as-is and noted as
+    approximate — it is far beyond any realistic caption either way.
+
+  Unknown dimensions **warn rather than block**, because wrongly rejecting a valid
+  post is worse than a late failure.
+
+**Tier 0 is complete.**
+
 ---
 
 ## Verified live, not just tested

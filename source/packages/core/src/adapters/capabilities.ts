@@ -4,14 +4,14 @@ import type { Capabilities } from './adapter.ts'
 /**
  * Per-platform limits.
  *
- * ⚠️ VERIFY BEFORE FIRST LIVE USE. These values are set from knowledge, not
- * checked against live documentation — the same caution `..\Meta-Ads-Publisher`
- * applies to its pinned Graph API version. Platforms change limits quietly and a
- * stale number here becomes a confusing publish failure.
+ * `verified` carries the date each platform's numbers were last checked against
+ * live documentation, or `false` if they are still only from knowledge. Platforms
+ * change limits quietly, and a stale number here becomes a confusing publish
+ * failure rather than a clear one — so these are worth rechecking periodically,
+ * the same way the pinned Graph API version is.
  *
- * Verification status is tracked per platform in the `verified` field. Anything
- * still `false` must be confirmed against official docs before that platform
- * leaves Wave 1 testing.
+ * Facebook and Instagram were verified 2026-09-25. Everything else is unverified
+ * and must be checked before that platform is used for real.
  */
 
 export interface CapabilityRecord extends Capabilities {
@@ -29,10 +29,13 @@ export const CAPABILITIES: Readonly<Record<Platform, CapabilityRecord>> = {
     requiresPublicMediaUrl: false,
     supportsNativeScheduling: true,
     allowsMixedMedia: false,
-    verified: false,
+    verified: '2026-09-25',
     notes:
-      'Native scheduling has a minimum lead time (documented ~10 minutes) and a maximum horizon. ' +
-      'Confirm both before relying on platform-side scheduling instead of our own queue.',
+      'Accepts JPG, PNG, GIF and MP4. Text limit is the widely-cited 63,206; Meta does not ' +
+      'publish an exact figure and secondary sources also quote 50,000, so treat it as ' +
+      'approximate — it is far beyond any realistic caption either way. Native scheduling ' +
+      'needs published=false plus scheduled_publish_time, with a minimum lead time of about ' +
+      '10 minutes; our own queue is used instead, so that path is untested.',
   },
 
   instagram: {
@@ -42,14 +45,23 @@ export const CAPABILITIES: Readonly<Record<Platform, CapabilityRecord>> = {
     minMediaCount: 1,
     videoMinSeconds: 3,
     videoMaxSeconds: 900,
+    // 4:5 portrait (0.8) to 1.91:1 landscape. Outside this, container creation
+    // fails with an error that reads like a permissions problem.
+    aspectRatioMin: 0.8,
+    aspectRatioMax: 1.91,
     requiresPublicMediaUrl: true,
     supportsNativeScheduling: false,
     allowsMixedMedia: true,
-    verified: false,
+    verified: '2026-09-25',
     notes:
-      'Cannot post text alone — hence minMediaCount 1. Publishing is a two-step create-then-publish ' +
-      'container flow, and the media URL must stay reachable across both steps. ' +
-      'Rate limit is documented around 50 published posts per 24h per account.',
+      'Cannot post text alone — hence minMediaCount 1. Two-step create-then-publish container ' +
+      'flow; the media URL must stay reachable across both steps. Rate limit is 100 published ' +
+      'posts per 24h (NOT 50 — that figure is stale), and a carousel counts as one. Reels up ' +
+      'to 15 minutes. ' +
+      'DOCS SAY JPEG ONLY — PNG, WebP and GIF are listed as unsupported. In practice a PNG ' +
+      'published successfully on 2026-09-25, so the restriction is not enforced as documented. ' +
+      'Not blocking PNG here, because rejecting something that demonstrably works would be ' +
+      'worse than the documented risk. Revisit if a PNG ever fails.',
   },
 
   threads: {
