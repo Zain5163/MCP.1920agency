@@ -79,14 +79,19 @@ export async function createPost(_prev: unknown, formData: FormData): Promise<Ac
   const service = publishService()
 
   /**
-   * Upload when any target fetches media by URL, and always for scheduled posts —
-   * the worker runs in another process and rebuilds the draft from the database,
-   * so it cannot rely on anything held only in this request.
+   * Media from the browser is ALWAYS hosted.
+   *
+   * The CLI can hand Facebook a local file path, but the browser has bytes in
+   * memory and no path the adapter could read. An earlier version tried to skip
+   * hosting for Facebook-only posts and produced media with neither a URL nor a
+   * path — which validation correctly rejected, but only at submit time.
+   *
+   * Hosting everything also makes the immediate and scheduled paths identical,
+   * which removes a whole class of "works now, fails when scheduled".
+   *
+   * Order is preserved throughout: files arrive in the order the picker shows,
+   * and that order becomes the carousel order.
    */
-  const needsHosting =
-    scheduledFor !== undefined ||
-    platforms.some((p) => service.adapterFor(p)?.capabilities.requiresPublicMediaUrl === true)
-
   const media: MediaRef[] = []
   const stored: Array<{ key: string; publicUrl: string; mime: string; bytes: number }> = []
 
@@ -96,12 +101,6 @@ export async function createPost(_prev: unknown, formData: FormData): Promise<Ac
       const bytes = new Uint8Array(await file.arrayBuffer())
       const kind: MediaRef['kind'] = file.type.startsWith('video/') ? 'video' : 'image'
 
-      if (!needsHosting) {
-        // Facebook-only immediate post: no need to host anything.
-        media.push({ id: `m${index}`, kind, mime: file.type, bytes: bytes.length, localPath: undefined })
-        continue
-      }
-
       const uploaded = await store.upload(bytes, { mime: file.type, tenantId })
       if (!(await store.isPubliclyReachable(uploaded.publicUrl))) {
         return {
@@ -109,7 +108,13 @@ export async function createPost(_prev: unknown, formData: FormData): Promise<Ac
           message: 'Uploaded media is not publicly reachable — check the storage bucket is public.',
         }
       }
-      media.push({ id: `m${index}`, kind, mime: file.type, bytes: bytes.length, publicUrl: uploaded.publicUrl })
+      media.push({
+        id: `m${index}`,
+        kind,
+        mime: file.type,
+        bytes: bytes.length,
+        publicUrl: uploaded.publicUrl,
+      })
       stored.push({ key: uploaded.key, publicUrl: uploaded.publicUrl, mime: file.type, bytes: bytes.length })
     }
   }

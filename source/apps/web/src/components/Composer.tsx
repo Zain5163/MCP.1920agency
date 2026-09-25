@@ -3,6 +3,7 @@
 import { useActionState, useState } from 'react'
 
 import { createPost, type ActionResult } from '@/app/actions'
+import { MediaPicker, type PickedFile } from '@/components/MediaPicker'
 
 export interface AccountOption {
   readonly id: string
@@ -12,6 +13,7 @@ export interface AccountOption {
   /** Character limit, so the counter matches whichever selected platform is strictest. */
   readonly maxTextLength: number
   readonly requiresMedia: boolean
+  readonly maxMediaCount: number
 }
 
 export function Composer({ accounts }: { accounts: readonly AccountOption[] }) {
@@ -19,6 +21,7 @@ export function Composer({ accounts }: { accounts: readonly AccountOption[] }) {
   const [selected, setSelected] = useState<string[]>(() => [...new Set(ready.map((a) => a.platform))])
   const [body, setBody] = useState('')
   const [scheduling, setScheduling] = useState(false)
+  const [media, setMedia] = useState<readonly PickedFile[]>([])
   const [state, action, pending] = useActionState<ActionResult | null, FormData>(createPost, null)
 
   const toggle = (platform: string): void => {
@@ -37,6 +40,14 @@ export function Composer({ accounts }: { accounts: readonly AccountOption[] }) {
   const limit = chosen.length > 0 ? Math.min(...chosen.map((a) => a.maxTextLength)) : Infinity
   const over = length > limit
   const needsMedia = chosen.some((a) => a.requiresMedia)
+
+  /**
+   * The strictest limit across the chosen platforms governs, the same way the
+   * character counter does. Offering 20 slots when one selected platform allows
+   * 10 would just move the failure to publish time.
+   */
+  const maxMedia = chosen.length > 0 ? Math.min(...chosen.map((a) => a.maxMediaCount)) : 10
+  const missingMedia = needsMedia && media.length === 0
 
   return (
     <form action={action} className="card">
@@ -65,17 +76,12 @@ export function Composer({ accounts }: { accounts: readonly AccountOption[] }) {
       </div>
 
       <div className="mb-4">
-        <label htmlFor="media" className="field-label">
-          Image or video{needsMedia ? ' (required for Instagram)' : ''}
-        </label>
-        <input
-          id="media"
-          name="media"
-          type="file"
-          accept="image/*,video/*"
-          multiple
-          className="file:mr-3 file:cursor-pointer file:rounded-md file:border-0 file:bg-surface file:px-3 file:py-1.5 file:text-[0.85rem] file:text-ink"
-        />
+        <MediaPicker maxFiles={maxMedia} required={needsMedia} onChange={setMedia} />
+        {missingMedia && (
+          <p className="mt-1.5 text-[0.78rem] text-warn">
+            One of the selected accounts cannot post text on its own — add an image or video.
+          </p>
+        )}
       </div>
 
       <div className="mb-4">
@@ -130,7 +136,11 @@ export function Composer({ accounts }: { accounts: readonly AccountOption[] }) {
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <button type="submit" className="btn" disabled={pending || over || selected.length === 0}>
+        <button
+          type="submit"
+          className="btn"
+          disabled={pending || over || selected.length === 0 || missingMedia}
+        >
           {pending ? 'Working…' : scheduling ? 'Schedule post' : 'Publish now'}
         </button>
         {!scheduling && (

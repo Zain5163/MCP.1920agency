@@ -28,8 +28,8 @@ item carries a status; nothing is "in progress" without being written here.
 | 1.3 | Account types beyond Pages | ⬜ not started |
 | 1.4 | Reconnect reusing authorisation | 🟡 partly done — disconnect/re-enable work from the Accounts page; a fully expired provider auth still needs the CLI |
 | 1.5 | Plan / entitlement model | ⬜ not started |
-| 2.1 | Carousels in the UI | 🔵 **next** |
-| 2.2 | Platform preview | ⬜ not started — **pulled forward after 1.2** |
+| 2.1 | Carousels in the UI | ✅ done — ordered picker with thumbnails, reorder and per-platform limits |
+| 2.2 | Platform preview | 🔵 **next** |
 | 2.3 | Per-platform text in the UI | ⬜ not started |
 | 2.4 | Retry a failed target | ⬜ not started |
 | 3.x | Analytics and charts | ⬜ not started — needs new permissions |

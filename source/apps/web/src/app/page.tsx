@@ -40,6 +40,7 @@ export default async function Dashboard() {
     needsReauth: c.needsReauth,
     maxTextLength: CAPABILITIES[c.platform].maxTextLength,
     requiresMedia: CAPABILITIES[c.platform].minMediaCount > 0,
+    maxMediaCount: CAPABILITIES[c.platform].maxMediaCount,
   }))
 
   return (

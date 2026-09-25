@@ -285,3 +285,46 @@ describe('quota', () => {
     assert.equal(await ig.remainingQuota(ctx()), undefined)
   })
 })
+
+describe('carousel ordering', () => {
+  test('children are created and attached in the order given', async () => {
+    // The order the composer shows must be the order Instagram receives. This is
+    // the one thing people get wrong about carousels, and it is invisible until
+    // the post is already live.
+    const { fetchImpl, calls } = mockGraph([
+      { body: { id: 'child-1' } },
+      { body: { id: 'child-2' } },
+      { body: { id: 'child-3' } },
+      FINISHED,
+      FINISHED,
+      FINISHED,
+      { body: { id: 'parent' } },
+      FINISHED,
+      { body: { id: 'published' } },
+    ])
+    const ig = new InstagramAdapter({ fetch: fetchImpl, sleep: async () => {}, pollIntervalMs: 1 })
+
+    await ig.publish(
+      ctx(),
+      draft({
+        media: ['first', 'second', 'third'].map((name) =>
+          img({ id: name, publicUrl: `https://media.example.com/${name}.jpg` }),
+        ),
+      }),
+    )
+
+    const children = calls
+      .filter((c) => c.params.is_carousel_item === 'true')
+      .map((c) => c.params.image_url)
+
+    assert.deepEqual(children, [
+      'https://media.example.com/first.jpg',
+      'https://media.example.com/second.jpg',
+      'https://media.example.com/third.jpg',
+    ])
+
+    const parent = calls.find((c) => c.params.media_type === 'CAROUSEL')
+    assert.ok(parent !== undefined)
+    assert.equal(parent.params.children, 'child-1,child-2,child-3')
+  })
+})

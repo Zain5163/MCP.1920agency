@@ -135,6 +135,26 @@ something was only compiled or only unit-tested, it says so.
 
 **Tier 0 is complete.**
 
+- **Tier 1.2 and 1.1 shipped together.** Added `ProviderAuth` so the long-lived
+  user token is stored, letting the dashboard list and connect Pages without
+  another trip through OAuth. **The architecture test then caught the Accounts
+  page I had just written hardcoding `facebook_page` and `instagram`** — the
+  tempting fix was an allowlist entry, which is the erosion the test exists to
+  stop. Built the `Provider` abstraction instead, closing 1.1 early. Adding a
+  platform is now one provider, one adapter, one capability record.
+  *Also worth recording: 1.2 was committed before the tests were checked and had
+  two failures. The "verify before claiming done" rule is this project's own and
+  it was broken.*
+- **Tier 2.1 shipped: carousels in the UI.** An ordered picker with thumbnails,
+  move up/down, per-item removal, and a live count against the strictest limit of
+  the selected platforms. Order shown is order published — proven by a test that
+  asserts the child containers reach Instagram in the given sequence.
+  Found and fixed a latent bug on the way: the web action skipped hosting for
+  Facebook-only posts and produced media with neither a URL nor a file path. The
+  browser has bytes in memory and no path an adapter could read, so media from the
+  dashboard is now always hosted — which also makes the immediate and scheduled
+  paths identical.
+
 ---
 
 ## Verified live, not just tested
