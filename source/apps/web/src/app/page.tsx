@@ -49,6 +49,9 @@ export default async function Dashboard() {
           <span className="text-lg font-bold tracking-tight">
             Ads<span className="text-brand">Pilot</span>
           </span>
+          <Link href="/scheduled" className="text-[0.85rem] text-muted no-underline hover:text-ink">
+            Scheduled
+          </Link>
           <Link href="/tokens" className="text-[0.85rem] text-muted no-underline hover:text-ink">
             API tokens
           </Link>

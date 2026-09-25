@@ -40,6 +40,9 @@ export default async function TokensPage() {
           <Link href="/" className="text-[0.85rem] text-muted no-underline hover:text-ink">
             Dashboard
           </Link>
+          <Link href="/scheduled" className="text-[0.85rem] text-muted no-underline hover:text-ink">
+            Scheduled
+          </Link>
           <span className="text-[0.85rem] text-ink">API tokens</span>
         </div>
         <form action={logout}>
