@@ -61,6 +61,20 @@ export async function createPost(_prev: unknown, formData: FormData): Promise<Ac
   const body = String(formData.get('body') ?? '').trim()
   const platforms = formData.getAll('platforms').map(String) as Platform[]
   const scheduleAt = String(formData.get('scheduleAt') ?? '').trim()
+
+  /**
+   * Per-platform captions arrive as `override:<platform>` fields. A blank one
+   * means "use the shared text", so blanks are dropped rather than stored as
+   * empty strings — otherwise an empty override would publish an empty caption.
+   */
+  const overrides: Record<string, { body: string }> = {}
+  for (const [key, value] of formData.entries()) {
+    if (!key.startsWith('override:')) continue
+    const text = String(value).trim()
+    if (text === '') continue
+    overrides[key.slice('override:'.length)] = { body: text }
+  }
+  const hasOverrides = Object.keys(overrides).length > 0
   const files = formData.getAll('media').filter((f): f is File => f instanceof File && f.size > 0)
 
   if (platforms.length === 0) return { ok: false, message: 'Pick at least one account.' }
@@ -119,7 +133,11 @@ export async function createPost(_prev: unknown, formData: FormData): Promise<Ac
     }
   }
 
-  const draft: PostDraft = { body, media }
+  const draft: PostDraft = {
+    body,
+    media,
+    ...(hasOverrides ? { overrides: overrides as PostDraft['overrides'] } : {}),
+  }
 
   const validation = service.validate(draft, platforms)
   if (!validation.ok) {
@@ -135,7 +153,12 @@ export async function createPost(_prev: unknown, formData: FormData): Promise<Ac
   // silently publishing to the subset that happens to be ours.
   await tenant.requireConnections(targets.map((t) => t.id))
 
-  const post = await tenant.createPost({ body, createdBy: 'web' })
+  const post = await tenant.createPost({
+    body,
+    createdBy: 'web',
+    // Persisted so the worker publishes the same per-platform text later.
+    ...(hasOverrides ? { overrides } : {}),
+  })
 
   for (const [position, item] of stored.entries()) {
     const asset = await db().mediaAsset.create({

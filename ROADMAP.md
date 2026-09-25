@@ -30,8 +30,8 @@ item carries a status; nothing is "in progress" without being written here.
 | 1.5 | Plan / entitlement model | ⬜ not started |
 | 2.1 | Carousels in the UI | ✅ done — ordered picker with thumbnails, reorder and per-platform limits |
 | 2.2 | Platform preview | ✅ done — per-platform tabs showing truncation and crop, driven by capability data not platform names |
-| 2.3 | Per-platform text in the UI | 🔵 **next** — the preview now makes the need obvious |
-| 2.4 | Retry a failed target | ⬜ not started |
+| 2.3 | Per-platform text in the UI | ✅ done — opt-in per platform, blank means use the shared text |
+| 2.4 | Retry a failed target | 🔵 **next** — last item in tier 2 |
 | 3.x | Analytics and charts | ⬜ not started — needs new permissions |
 | 4.x | AI captions and optimisation | ⬜ not started |
 | 5.x | More platforms, CMS | ⬜ not started |

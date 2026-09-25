@@ -5,6 +5,8 @@ import { useActionState, useState } from 'react'
 import { createPost, type ActionResult } from '@/app/actions'
 import { MediaPicker, type PickedFile } from '@/components/MediaPicker'
 import { PostPreview, type PreviewStyle, type PreviewTarget } from '@/components/PostPreview'
+import { PerPlatformText, type PlatformTextTarget } from '@/components/PerPlatformText'
+import { countGraphemes } from '@/lib/text'
 
 export interface AccountOption {
   readonly id: string
@@ -25,6 +27,8 @@ export function Composer({ accounts }: { accounts: readonly AccountOption[] }) {
   const [body, setBody] = useState('')
   const [scheduling, setScheduling] = useState(false)
   const [media, setMedia] = useState<readonly PickedFile[]>([])
+  const [perPlatform, setPerPlatform] = useState(false)
+  const [overrides, setOverrides] = useState<Record<string, string>>({})
   const [state, action, pending] = useActionState<ActionResult | null, FormData>(createPost, null)
 
   const toggle = (platform: string): void => {
@@ -55,7 +59,34 @@ export function Composer({ accounts }: { accounts: readonly AccountOption[] }) {
   // One preview per selected account that has preview data.
   const previewTargets: PreviewTarget[] = chosen
     .filter((a) => a.preview !== undefined)
-    .map((a) => ({ platform: a.platform, accountName: a.displayName, style: a.preview! }))
+    .map((a) => ({
+      platform: a.platform,
+      accountName: a.displayName,
+      style: a.preview!,
+      // The preview shows what will actually publish for that platform.
+      body: overrides[a.platform]?.trim() !== '' ? overrides[a.platform] : undefined,
+    }))
+
+  // One entry per distinct platform, not per account: an override applies to the
+  // platform, and two Pages on the same platform share it.
+  const textTargets: PlatformTextTarget[] = [...new Map(chosen.map((a) => [a.platform, a])).values()].map(
+    (a) => ({
+      platform: a.platform,
+      label: a.preview?.label ?? a.platform.replace('_', ' '),
+      accent: a.preview?.accent ?? '#7c5cff',
+      maxTextLength: a.maxTextLength,
+      truncateAt: a.preview?.captionTruncateAt,
+    }),
+  )
+
+  /**
+   * An override that is too long blocks publishing, exactly like the shared text.
+   * Without this the button would look fine and the server would refuse.
+   */
+  const overrideTooLong = textTargets.some((t) => {
+    const value = overrides[t.platform]
+    return value !== undefined && value.trim() !== '' && countGraphemes(value) > t.maxTextLength
+  })
 
   return (
     <div className="grid gap-5">
@@ -83,6 +114,31 @@ export function Composer({ accounts }: { accounts: readonly AccountOption[] }) {
           {over ? ` — ${length - limit} over the limit` : ''}
         </div>
       </div>
+
+      {textTargets.length > 1 && (
+        <div className="mb-4">
+          <label className="flex cursor-pointer items-center gap-2 text-[0.88rem]">
+            <input
+              type="checkbox"
+              checked={perPlatform}
+              onChange={(e) => setPerPlatform(e.target.checked)}
+            />
+            Write a different caption per platform
+          </label>
+          {perPlatform && (
+            <div className="mt-3">
+              <PerPlatformText
+                targets={textTargets}
+                sharedBody={body}
+                overrides={overrides}
+                onChange={(platform, value) =>
+                  setOverrides((prev) => ({ ...prev, [platform]: value }))
+                }
+              />
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="mb-4">
         <MediaPicker maxFiles={maxMedia} required={needsMedia} onChange={setMedia} />
@@ -148,7 +204,7 @@ export function Composer({ accounts }: { accounts: readonly AccountOption[] }) {
         <button
           type="submit"
           className="btn"
-          disabled={pending || over || selected.length === 0 || missingMedia}
+          disabled={pending || over || overrideTooLong || selected.length === 0 || missingMedia}
         >
           {pending ? 'Working…' : scheduling ? 'Schedule post' : 'Publish now'}
         </button>
@@ -180,12 +236,4 @@ export function Composer({ accounts }: { accounts: readonly AccountOption[] }) {
       <PostPreview targets={previewTargets} body={body} media={media} />
     </div>
   )
-}
-
-function countGraphemes(text: string): number {
-  const Segmenter = (Intl as { Segmenter?: typeof Intl.Segmenter }).Segmenter
-  if (Segmenter === undefined) return [...text].length
-  let count = 0
-  for (const _ of new Segmenter('en', { granularity: 'grapheme' }).segment(text)) count += 1
-  return count
 }

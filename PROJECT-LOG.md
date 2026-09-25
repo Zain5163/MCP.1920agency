@@ -169,6 +169,20 @@ something was only compiled or only unit-tested, it says so.
   Facebook at ~400.** A caption that reads well on one can lose its point on the
   other, and nothing in validation catches that.
 
+- **Tier 2.3 shipped: per-platform captions.** One caption everywhere was governed
+  by the strictest limit, so the platform with the most room got the shortest post
+  — and the preview had just made visible that the *same* words land differently
+  where Instagram cuts at ~125 characters and Facebook at ~400.
+
+  Overrides are opt-in per platform and blank means "use the shared text", so the
+  common case stays one box. The preview shows whichever text will actually
+  publish, and the publish button blocks on an over-length override rather than
+  letting the server refuse it.
+
+  The engine already supported `overrides`; this made them reachable. Tests assert
+  each platform validates against its own text, that an over-length override still
+  fails, and that a platform without one falls back correctly.
+
 ---
 
 ## Verified live, not just tested

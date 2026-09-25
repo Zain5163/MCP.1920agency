@@ -31,6 +31,8 @@ export interface PreviewTarget {
   readonly platform: string
   readonly accountName: string
   readonly style: PreviewStyle
+  /** Overrides the shared text for this platform, when one has been written. */
+  readonly body?: string | undefined
 }
 
 export function PostPreview({
@@ -58,12 +60,14 @@ export function PostPreview({
   const target = targets[Math.min(active, targets.length - 1)]!
   const { style } = target
 
-  const truncated = truncate(body, style.captionTruncateAt)
-  const isTruncated = truncated.length < body.length
+  // Show what will actually publish here, not the shared text.
+  const text = target.body ?? body
+  const truncated = truncate(text, style.captionTruncateAt)
+  const isTruncated = truncated.length < text.length
 
   const caption = (
     <div className="px-3 py-2.5 text-[0.85rem] leading-relaxed">
-      {body.trim() === '' ? (
+      {text.trim() === '' ? (
         <span className="text-muted">No text</span>
       ) : (
         <>
@@ -85,6 +89,10 @@ export function PostPreview({
       <p className="mb-3 text-[0.85rem] text-muted">
         Approximate. Shows where text is cut and how media is cropped.
       </p>
+
+      {target.body !== undefined && (
+        <p className="mb-2 text-[0.76rem] text-brand">Showing this platform's own caption.</p>
+      )}
 
       <div className="mb-3 flex flex-wrap gap-1.5">
         {targets.map((t, index) => (

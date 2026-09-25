@@ -285,3 +285,42 @@ describe('aspect ratio', () => {
     assert.ok(!errorCodes(result).includes('aspect_ratio_unsupported'))
   })
 })
+
+describe('per-platform overrides end to end', () => {
+  test('each platform validates against its own text', () => {
+    // The point of overrides: a long Facebook caption must not make an Instagram
+    // post invalid when Instagram has its own shorter one.
+    const d = draft({
+      body: 'a'.repeat(2500),
+      media: [image()],
+      overrides: { instagram: { body: 'short and punchy' } },
+    })
+
+    const ig = validateAgainstCapabilities(d, 'instagram', capabilitiesFor('instagram'))
+    assert.equal(ig.ok, true, 'Instagram should validate against its override')
+
+    const fb = validateAgainstCapabilities(d, 'facebook_page', capabilitiesFor('facebook_page'))
+    assert.equal(fb.ok, true, 'Facebook allows the long shared text')
+  })
+
+  test('an override that is itself too long still fails', () => {
+    const d = draft({
+      body: 'fine',
+      media: [image()],
+      overrides: { instagram: { body: 'x'.repeat(2500) } },
+    })
+    const result = validateAgainstCapabilities(d, 'instagram', capabilitiesFor('instagram'))
+    assert.equal(result.ok, false)
+    assert.ok(errorCodes(result).includes('text_too_long'))
+  })
+
+  test('a platform with no override falls back to the shared text', () => {
+    const d = draft({
+      body: 'shared',
+      media: [image()],
+      overrides: { instagram: { body: 'instagram only' } },
+    })
+    assert.equal(bodyForPlatform(d, 'instagram'), 'instagram only')
+    assert.equal(bodyForPlatform(d, 'facebook_page'), 'shared')
+  })
+})
