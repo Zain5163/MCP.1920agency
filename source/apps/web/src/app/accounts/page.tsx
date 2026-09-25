@@ -1,34 +1,29 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 
-import { listTokens } from '@social-publisher/auth'
-import { optional } from '@social-publisher/config'
-
 import { logout } from '../actions'
+import { listAvailable } from './actions'
 import { currentUser } from '@/lib/auth'
-import { TokenManager, type TokenRow } from '@/components/TokenManager'
+import { scope } from '@/lib/engine'
+import { AccountManager, type ConnectedRow } from '@/components/AccountManager'
 
 export const dynamic = 'force-dynamic'
 
-export default async function TokensPage() {
+export default async function AccountsPage() {
   const user = await currentUser()
   if (user === null) redirect('/login')
 
-  const tokens = await listTokens(user.id)
-
-  // Dates are serialised because this crosses into a client component, where a
-  // Date object would not survive the boundary intact.
-  const rows: TokenRow[] = tokens.map((t) => ({
-    id: t.id,
-    name: t.name,
-    prefix: t.prefix,
-    lastUsedAt: t.lastUsedAt?.toISOString() ?? null,
-    expiresAt: t.expiresAt?.toISOString() ?? null,
-    revokedAt: t.revokedAt?.toISOString() ?? null,
-    createdAt: t.createdAt.toISOString(),
+  const connections = await scope(user.tenantId).connections()
+  const connected: ConnectedRow[] = connections.map((c) => ({
+    id: c.id,
+    platform: c.platform,
+    displayName: c.displayName,
+    needsReauth: c.needsReauth,
+    reauthReason: c.reauthReason,
   }))
 
-  const mcpUrl = optional('MCP_PUBLIC_URL', 'http://localhost:8080/mcp')!
+  // Reaches out to Meta, so it can fail independently of the page rendering.
+  const { accounts, error } = await listAvailable()
 
   return (
     <div className="mx-auto max-w-[800px] px-4 pb-16 pt-6">
@@ -40,13 +35,13 @@ export default async function TokensPage() {
           <Link href="/" className="text-[0.85rem] text-muted no-underline hover:text-ink">
             Dashboard
           </Link>
-          <Link href="/accounts" className="text-[0.85rem] text-muted no-underline hover:text-ink">
-            Accounts
-          </Link>
+          <span className="text-[0.85rem] text-ink">Accounts</span>
           <Link href="/scheduled" className="text-[0.85rem] text-muted no-underline hover:text-ink">
             Scheduled
           </Link>
-          <span className="text-[0.85rem] text-ink">API tokens</span>
+          <Link href="/tokens" className="text-[0.85rem] text-muted no-underline hover:text-ink">
+            API tokens
+          </Link>
         </div>
         <form action={logout}>
           <button type="submit" className="btn-ghost">
@@ -55,7 +50,11 @@ export default async function TokensPage() {
         </form>
       </header>
 
-      <TokenManager tokens={rows} mcpUrl={mcpUrl} />
+      <AccountManager
+        available={accounts}
+        connected={connected}
+        {...(error !== undefined ? { loadError: error } : {})}
+      />
     </div>
   )
 }

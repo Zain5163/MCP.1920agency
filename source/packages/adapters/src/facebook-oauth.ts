@@ -164,13 +164,15 @@ export class FacebookOAuth {
     isValid: boolean
     scopes: string[]
     expiresAt?: Date
+    /** The Meta user who authorised. Identifies the same person reconnecting. */
+    userId?: string
   }> {
     const url = new URL(`${GRAPH_BASE}/${this.#config.apiVersion}/debug_token`)
     url.searchParams.set('input_token', token)
 
     const appToken = `${this.#config.appId}|${this.#config.appSecret}`
     const data = await this.#get<{
-      data?: { is_valid?: boolean; scopes?: string[]; expires_at?: number }
+      data?: { is_valid?: boolean; scopes?: string[]; expires_at?: number; user_id?: string }
     }>(url, appToken)
 
     const info = data.data ?? {}
@@ -183,6 +185,7 @@ export class FacebookOAuth {
       isValid: info.is_valid === true,
       scopes: info.scopes ?? [],
       ...(expiresAt !== undefined ? { expiresAt } : {}),
+      ...(info.user_id !== undefined ? { userId: info.user_id } : {}),
     }
   }
 

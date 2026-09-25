@@ -137,14 +137,56 @@ model Tenant {
   name      String
   createdAt DateTime @default(now()) @map("created_at")
 
-  users        User[]
-  apiTokens    ApiToken[]
+  users         User[]
+  apiTokens     ApiToken[]
+  providerAuths ProviderAuth[]
   connections  Connection[]
   posts        Post[]
   mediaAssets  MediaAsset[]
   auditEntries AuditLog[]
 
   @@map("tenants")
+}
+
+/// A single authorisation with a provider, from which many accounts hang.
+///
+/// Exists so that connecting a second Facebook Page does not mean a second trip
+/// through OAuth. One Meta login administers many Pages; storing the long-lived
+/// USER token here lets us list them on demand and connect or disconnect each one
+/// independently.
+///
+/// Also the seam for tier 1.1: a provider is "one OAuth flow plus a way to list
+/// what it can reach", which is exactly what a second platform will need.
+model ProviderAuth {
+  id       String @id @default(uuid(7))
+  tenantId String @map("tenant_id")
+
+  /// 'meta', and later 'linkedin', 'google', 'tiktok'.
+  provider String
+  /// The provider's own id for the person who authorised. Lets us detect the
+  /// same human reconnecting rather than creating a duplicate.
+  externalUserId String  @map("external_user_id")
+  displayName    String? @map("display_name")
+
+  /// The long-lived user token, encrypted by packages/vault like any other.
+  secretCiphertext String @map("secret_ciphertext")
+  keyVersion       Int    @default(1) @map("key_version")
+
+  scopes    String[]  @default([])
+  expiresAt DateTime? @map("expires_at")
+
+  needsReauth  Boolean @default(false) @map("needs_reauth")
+  reauthReason String? @map("reauth_reason")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  connections Connection[]
+
+  @@unique([tenantId, provider, externalUserId])
+  @@index([tenantId])
+  @@map("provider_auths")
 }
 
 /// One connected social account.
@@ -172,12 +214,17 @@ model Connection {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  targets Target[]
+  /// Null for accounts connected before provider auths existed.
+  providerAuthId String? @map("provider_auth_id")
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  providerAuth ProviderAuth? @relation(fields: [providerAuthId], references: [id], onDelete: SetNull)
+  targets      Target[]
 
   /// Reconnecting the same account must update the existing row, not create a duplicate.
   @@unique([tenantId, platform, platformAccountId])
   @@index([tenantId, needsReauth])
+  @@index([providerAuthId])
   @@map("connections")
 }
 

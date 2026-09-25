@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process'
 
 import { FacebookOAuth, buildAuthUrl, createState } from '@social-publisher/adapters'
 import { checkConfig, optional, required } from '@social-publisher/config'
-import { db, disconnect, health } from '@social-publisher/db'
+import { db, disconnect, health, saveProviderAuth } from '@social-publisher/db'
 import { TokenVault, parseKey } from '@social-publisher/vault'
 
 import { waitForCallback } from './callback-server.ts'
@@ -91,6 +91,29 @@ async function main(): Promise<void> {
     store: prismaCredentialStore(),
   })
 
+  /**
+   * Store the long-lived USER token, not just the page tokens.
+   *
+   * This is what lets the dashboard list and connect further Pages later without
+   * sending anyone back through OAuth. Without it, connecting a second Page means
+   * repeating this whole flow.
+   */
+  const providerAuth = await saveProviderAuth({
+    tenantId: tenant.id,
+    provider: 'meta',
+    externalUserId: info.userId ?? 'unknown',
+    secretCiphertext: '',
+    keyVersion: 1,
+    scopes: info.scopes,
+    ...(longLived.expiresAt !== undefined ? { expiresAt: longLived.expiresAt } : {}),
+  })
+  await vault.store(providerAuth.id, tenant.id, {
+    accessToken: longLived.accessToken,
+    ...(longLived.expiresAt !== undefined ? { expiresAt: longLived.expiresAt } : {}),
+  })
+  console.log(`
+    authorisation saved — further Pages can be connected from the dashboard`)
+
   console.log('')
   for (const page of pages) {
     const connection = await db().connection.upsert({
@@ -108,11 +131,13 @@ async function main(): Promise<void> {
         displayName: page.name,
         // Placeholder: replaced immediately below by the vault, which owns encryption.
         secretCiphertext: '',
+        providerAuthId: providerAuth.id,
         scopes: info.scopes,
         needsReauth: false,
       },
       update: {
         displayName: page.name,
+        providerAuthId: providerAuth.id,
         scopes: info.scopes,
         needsReauth: false,
         reauthReason: null,

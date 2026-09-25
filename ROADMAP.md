@@ -11,6 +11,43 @@ Two rules apply at every tier, not just at the end:
 2. **Nothing moves up a tier while the tier below has a known defect.** A missing
    feature is a gap; a broken foundation is a liability.
 
+## Status at a glance
+
+Updated 2026-09-25. **This table is the source of truth for what is done.** Every
+item carries a status; nothing is "in progress" without being written here.
+
+| Tier | Item | Status |
+|---|---|---|
+| 0.1 | Cancel a scheduled post | ✅ done |
+| 0.2 | Alert when the scheduler stops | ✅ done |
+| 0.3 | Verify platform limits | ✅ done — Facebook and Instagram only |
+| 0.4 | Rotate the exposed password | ✅ done |
+| 0.5 | Lock down the Data API / RLS | ✅ done — found a live exposure |
+| 1.1 | Adapter framework | 🟡 **partly done.** Publishing is decoupled and a test enforces it. **Connecting is not** — `connect.ts` hardcodes the Meta OAuth flow. Deferred by the owner 2026-09-25 in favour of visible progress; to be finished after tier 2. |
+| 1.2 | Connect multiple accounts | ✅ done — Accounts page; needs one re-run of connect to store the provider auth |
+| 1.3 | Account types beyond Pages | ⬜ not started |
+| 1.4 | Reconnect reusing authorisation | 🟡 partly done — disconnect/re-enable work from the Accounts page; a fully expired provider auth still needs the CLI |
+| 1.5 | Plan / entitlement model | ⬜ not started |
+| 2.1 | Carousels in the UI | 🔵 **next** |
+| 2.2 | Platform preview | ⬜ not started — **pulled forward after 1.2** |
+| 2.3 | Per-platform text in the UI | ⬜ not started |
+| 2.4 | Retry a failed target | ⬜ not started |
+| 3.x | Analytics and charts | ⬜ not started — needs new permissions |
+| 4.x | AI captions and optimisation | ⬜ not started |
+| 5.x | More platforms, CMS | ⬜ not started |
+| 5b.x | Paid advertising | ⬜ not started |
+| 6.1 | Design system | ⬜ not started — gate with research first |
+
+**Ordering change, recorded 2026-09-25.** The owner observed that the dashboard had
+not visibly changed despite tier 0 being complete — correctly, since tier 0 and 1
+are infrastructure. Agreed order is now: **1.2, then tier 2 (carousels and
+preview), then back to 1.1 and 1.3–1.5.**
+
+This bends the bottom-up rule deliberately, and the reason it is safe: the
+genuinely load-bearing parts — tenant scoping, the adapter contract, the
+entitlement *model* — are either done or a single column. What remains in tier 1
+is additive, not structural.
+
 ---
 
 ## Tier 0 — Fix what is already broken

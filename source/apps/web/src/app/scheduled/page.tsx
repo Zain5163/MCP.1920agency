@@ -50,6 +50,9 @@ export default async function ScheduledPage() {
           <Link href="/" className="text-[0.85rem] text-muted no-underline hover:text-ink">
             Dashboard
           </Link>
+          <Link href="/accounts" className="text-[0.85rem] text-muted no-underline hover:text-ink">
+            Accounts
+          </Link>
           <span className="text-[0.85rem] text-ink">Scheduled</span>
           <Link href="/tokens" className="text-[0.85rem] text-muted no-underline hover:text-ink">
             API tokens
