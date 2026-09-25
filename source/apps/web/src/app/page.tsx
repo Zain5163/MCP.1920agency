@@ -5,6 +5,7 @@ import { CAPABILITIES } from '@social-publisher/core'
 import { health, queueStats } from '@social-publisher/db'
 
 import { logout } from './actions'
+import { retryTarget } from './retry-actions'
 import { currentUser } from '@/lib/auth'
 import { listConnections, scope } from '@/lib/engine'
 import { formatDateTime } from '@/lib/format'
@@ -161,11 +162,32 @@ export default async function Dashboard() {
               ))}
             </div>
             {post.targets
-              .filter((t) => t.platformMessage !== null && t.state === 'failed')
+              .filter((t) => t.state === 'failed' || t.state === 'needs_reauth')
               .map((t) => (
-                <p key={`${t.id}-err`} className="mt-1.5 text-[0.8rem] text-bad">
-                  {t.connection.displayName}: {t.platformMessage}
-                </p>
+                <div
+                  key={`${t.id}-err`}
+                  className="mt-2 flex flex-wrap items-center gap-3 rounded-lg border border-bad/25 bg-bad/5 px-3 py-2"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[0.82rem] text-bad">
+                      {t.connection.displayName}
+                      {t.platformMessage !== null && `: ${t.platformMessage}`}
+                    </div>
+                    {t.state === 'needs_reauth' && (
+                      <div className="text-[0.76rem] text-muted">
+                        Reconnect this account first, then retry.
+                      </div>
+                    )}
+                  </div>
+                  {/* Only failures get a retry button — a published target must
+                      never be re-run, or it posts twice. */}
+                  <form action={retryTarget}>
+                    <input type="hidden" name="targetId" value={t.id} />
+                    <button type="submit" className="btn-ghost text-[0.8rem]">
+                      Retry
+                    </button>
+                  </form>
+                </div>
               ))}
           </article>
         ))}

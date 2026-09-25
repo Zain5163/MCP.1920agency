@@ -2,7 +2,13 @@ import { spawn } from 'node:child_process'
 
 import { FacebookOAuth, buildAuthUrl, createState } from '@social-publisher/adapters'
 import { checkConfig, optional, required } from '@social-publisher/config'
-import { db, disconnect, health, saveProviderAuth } from '@social-publisher/db'
+import {
+  db,
+  disconnect,
+  health,
+  providerAuthCredentialStore,
+  saveProviderAuth,
+} from '@social-publisher/db'
 import { TokenVault, parseKey } from '@social-publisher/vault'
 
 import { waitForCallback } from './callback-server.ts'
@@ -107,7 +113,14 @@ async function main(): Promise<void> {
     scopes: info.scopes,
     ...(longLived.expiresAt !== undefined ? { expiresAt: longLived.expiresAt } : {}),
   })
-  await vault.store(providerAuth.id, tenant.id, {
+  // A provider auth lives in its own table, so it needs its own store. Using the
+  // connection store here silently saved nothing.
+  const authVault = new TokenVault({
+    kek: parseKey(required('VAULT_MASTER_KEY'), 'VAULT_MASTER_KEY'),
+    keyVersion: 1,
+    store: providerAuthCredentialStore(),
+  })
+  await authVault.store(providerAuth.id, tenant.id, {
     accessToken: longLived.accessToken,
     ...(longLived.expiresAt !== undefined ? { expiresAt: longLived.expiresAt } : {}),
   })
@@ -168,11 +181,13 @@ async function main(): Promise<void> {
           platformAccountId: page.instagramAccountId,
           displayName: `${page.name} (Instagram)`,
           secretCiphertext: '',
+          providerAuthId: providerAuth.id,
           scopes: info.scopes,
           needsReauth: false,
         },
         update: {
           displayName: `${page.name} (Instagram)`,
+          providerAuthId: providerAuth.id,
           scopes: info.scopes,
           needsReauth: false,
           reauthReason: null,

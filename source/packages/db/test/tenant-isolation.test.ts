@@ -223,3 +223,108 @@ describe('writes are stamped with the owning tenant', () => {
     assert.equal(entry.tenantId, bobTenantId)
   })
 })
+
+describe('retrying a failed target', () => {
+  test('a failed target is queued again with a clean slate', async () => {
+    const post = await alice.createPost({ body: `retry test ${tag}`, createdBy: 'test' })
+    const target = await db().target.create({
+      data: {
+        tenantId: aliceTenantId,
+        postId: post.id,
+        connectionId: aliceConnectionId,
+        state: 'failed',
+        attempts: 4,
+        failureClass: 'permanent',
+        platformMessage: 'aspect ratio unsupported',
+        idempotencyKey: `retry-${tag}`,
+      },
+    })
+
+    assert.equal(await alice.retryTarget(target.id), 'queued')
+
+    const after = await db().target.findUnique({ where: { id: target.id } })
+    assert.equal(after!.state, 'scheduled')
+    // Attempts reset so the retry gets a full backoff budget, and the old error
+    // is cleared so a stale message cannot be mistaken for a new one.
+    assert.equal(after!.attempts, 0)
+    assert.equal(after!.platformMessage, null)
+    assert.equal(after!.failureClass, null)
+
+    const job = await db().job.findFirst({ where: { targetId: target.id } })
+    assert.ok(job !== null, 'a job must exist for the worker to pick up')
+    assert.equal(job.state, 'queued')
+  })
+
+  test('a published target is never retried', async () => {
+    // Re-running a successful publish posts a second copy, which is worse than
+    // any failure it might be fixing.
+    const post = await alice.createPost({ body: `published ${tag}`, createdBy: 'test' })
+    const target = await db().target.create({
+      data: {
+        tenantId: aliceTenantId,
+        postId: post.id,
+        connectionId: aliceConnectionId,
+        state: 'published',
+        platformPostId: 'already_out_123',
+        idempotencyKey: `published-${tag}`,
+      },
+    })
+
+    assert.equal(await alice.retryTarget(target.id), 'already_published')
+    const after = await db().target.findUnique({ where: { id: target.id } })
+    assert.equal(after!.state, 'published', 'state must be untouched')
+  })
+
+  test('a target carrying a platform post id is never retried, whatever its state', async () => {
+    // The idempotency guard matters more than the state column: if the platform
+    // accepted it, it went out.
+    const post = await alice.createPost({ body: `half ${tag}`, createdBy: 'test' })
+    const target = await db().target.create({
+      data: {
+        tenantId: aliceTenantId,
+        postId: post.id,
+        connectionId: aliceConnectionId,
+        state: 'failed',
+        platformPostId: 'went_out_anyway',
+        idempotencyKey: `half-${tag}`,
+      },
+    })
+    assert.equal(await alice.retryTarget(target.id), 'already_published')
+  })
+
+  test("Bob cannot retry Alice's failed target", async () => {
+    const post = await alice.createPost({ body: `bob retry ${tag}`, createdBy: 'test' })
+    const target = await db().target.create({
+      data: {
+        tenantId: aliceTenantId,
+        postId: post.id,
+        connectionId: aliceConnectionId,
+        state: 'failed',
+        idempotencyKey: `bobretry-${tag}`,
+      },
+    })
+
+    assert.equal(await bob.retryTarget(target.id), 'not_found')
+    const after = await db().target.findUnique({ where: { id: target.id } })
+    assert.equal(after!.state, 'failed', 'Bob must not have changed it')
+  })
+
+  test('repeated retries reuse one job rather than piling them up', async () => {
+    const post = await alice.createPost({ body: `repeat ${tag}`, createdBy: 'test' })
+    const target = await db().target.create({
+      data: {
+        tenantId: aliceTenantId,
+        postId: post.id,
+        connectionId: aliceConnectionId,
+        state: 'failed',
+        idempotencyKey: `repeat-${tag}`,
+      },
+    })
+
+    await alice.retryTarget(target.id)
+    await db().target.update({ where: { id: target.id }, data: { state: 'failed' } })
+    await alice.retryTarget(target.id)
+
+    assert.equal(await db().job.count({ where: { targetId: target.id } }), 1)
+  })
+})

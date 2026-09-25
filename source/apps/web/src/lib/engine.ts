@@ -9,7 +9,12 @@ import {
 } from '@social-publisher/adapters'
 import { optional, required } from '@social-publisher/config'
 import type { Connection } from '@social-publisher/core'
-import { TenantScope, db, prismaCredentialStore } from '@social-publisher/db'
+import {
+  TenantScope,
+  db,
+  prismaCredentialStore,
+  providerAuthCredentialStore,
+} from '@social-publisher/db'
 import { MediaStore } from '@social-publisher/media'
 import { PublishService, type TargetSpec } from '@social-publisher/publisher'
 import { TokenVault, parseKey } from '@social-publisher/vault'
@@ -70,6 +75,23 @@ function ensureProviders(): void {
 export function providerFor(key: string): Provider | undefined {
   ensureProviders()
   return lookupProvider(key)
+}
+
+/**
+ * A separate vault for provider authorisations, because their credential lives in
+ * a different table. Sharing the connection vault silently wrote nothing.
+ */
+let authVault: TokenVault | undefined
+
+export function providerAuthVault(): TokenVault {
+  if (authVault === undefined) {
+    authVault = new TokenVault({
+      kek: parseKey(required('VAULT_MASTER_KEY'), 'VAULT_MASTER_KEY'),
+      keyVersion: 1,
+      store: providerAuthCredentialStore(),
+    })
+  }
+  return authVault
 }
 
 export function mediaStore(): MediaStore {

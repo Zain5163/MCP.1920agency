@@ -183,6 +183,28 @@ something was only compiled or only unit-tested, it says so.
   each platform validates against its own text, that an over-length override still
   fails, and that a platform without one falls back correctly.
 
+- **Bug found by testing rather than assuming.** The owner re-authorised, and the
+  provider auth row existed but held no credential. Cause: the vault's store only
+  knows how to read and write `connections`, and a provider authorisation lives in
+  its own table — so `connect.ts` created the row and then threw trying to save the
+  token. Fixed with a separate `providerAuthCredentialStore`. Two explicit stores
+  rather than one that guesses which table an id belongs to, because guessing costs
+  a query on every credential read and quietly does the wrong thing on a collision.
+  Verified afterwards by discovering real Pages through the stored authorisation.
+
+- **Tier 2.4 shipped: retry a failed target. Tier 2 is complete.** A permanent
+  failure previously meant recreating the whole post.
+
+  Retry resets attempts and clears the recorded error, so the retry gets a full
+  backoff budget and a stale message cannot be mistaken for a new one. It reuses
+  the existing job row rather than accumulating one per attempt.
+
+  **A published target is never retried** — including one that failed but carries a
+  platform post id, because if the platform accepted it, it went out. Re-running
+  would post a second copy, which is worse than the failure it might be fixing.
+  Tested against the real database, including that another tenant cannot retry
+  someone else's target.
+
 ---
 
 ## Verified live, not just tested

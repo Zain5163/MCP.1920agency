@@ -13,7 +13,7 @@ import {
 } from '@social-publisher/db'
 
 import { currentUser } from '@/lib/auth'
-import { providerFor, scope, tokenVault } from '@/lib/engine'
+import { providerAuthVault, providerFor, scope, tokenVault } from '@/lib/engine'
 
 /**
  * Account management.
@@ -94,7 +94,7 @@ export async function listAvailable(): Promise<{
   const existing = await scope(user.tenantId).connections()
 
   try {
-    const discovered = await tokenVault().withCredential(
+    const discovered = await providerAuthVault().withCredential(
       resolved.auth.id,
       user.tenantId,
       async (cred) => await resolved.provider.discover(cred.accessToken),
@@ -134,10 +134,11 @@ export async function connectAccount(
   const resolved = await resolveAuth(user.tenantId)
   if (!resolved.ok) return { ok: false, message: resolved.error }
 
+  const authVault = providerAuthVault()
   const vault = tokenVault()
 
   try {
-    const chosen = await vault.withCredential(
+    const chosen = await authVault.withCredential(
       resolved.auth.id,
       user.tenantId,
       async (cred): Promise<DiscoveredAccount | null> => {

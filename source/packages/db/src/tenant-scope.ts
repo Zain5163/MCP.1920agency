@@ -146,6 +146,66 @@ export class TenantScope {
     return true
   }
 
+  /**
+   * Queues a failed target to be tried again.
+   *
+   * Only `failed` and `needs_reauth` targets are retryable. A published target is
+   * deliberately excluded: re-running it would post a second copy, which is worse
+   * than any failure it might be fixing.
+   *
+   * Attempts are reset so the retry gets a full backoff budget rather than
+   * immediately exhausting whatever remained from the original run.
+   */
+  async retryTarget(targetId: string): Promise<'queued' | 'not_found' | 'already_published'> {
+    const target = await db().target.findFirst({
+      where: { id: targetId, tenantId: this.tenantId },
+      select: { id: true, state: true, platformPostId: true },
+    })
+
+    if (target === null) return 'not_found'
+
+    // The idempotency guard, restated here: a recorded platform post id means it
+    // went out, whatever the state column says.
+    if (target.platformPostId !== null || target.state === 'published') {
+      return 'already_published'
+    }
+    if (target.state !== 'failed' && target.state !== 'needs_reauth') return 'not_found'
+
+    await db().target.update({
+      where: { id: target.id },
+      data: {
+        state: 'scheduled',
+        attempts: 0,
+        failureClass: null,
+        errorCode: null,
+        platformMessage: null,
+      },
+    })
+
+    // Reuse the existing job row if there is one, so a target never accumulates
+    // duplicate jobs across repeated retries.
+    const existing = await db().job.findFirst({ where: { targetId: target.id } })
+    if (existing !== null) {
+      await db().job.update({
+        where: { id: existing.id },
+        data: {
+          state: 'queued',
+          runAfter: new Date(),
+          attempts: 0,
+          lockedAt: null,
+          lockedBy: null,
+          lastError: null,
+        },
+      })
+    } else {
+      await db().job.create({
+        data: { tenantId: this.tenantId, targetId: target.id, runAfter: new Date() },
+      })
+    }
+
+    return 'queued'
+  }
+
   // ---- media ---------------------------------------------------------------
 
   async mediaAssets(limit = 50) {
