@@ -15,6 +15,7 @@ export const PLATFORMS = [
   'youtube',
   'tiktok',
   'linkedin',
+  'pinterest',
   'x',
 ] as const
 

@@ -38,6 +38,7 @@ enum Platform {
   youtube
   tiktok
   linkedin
+  pinterest
   x
 }
 

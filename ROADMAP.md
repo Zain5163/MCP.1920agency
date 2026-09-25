@@ -24,7 +24,7 @@ item carries a status; nothing is "in progress" without being written here.
 | 0.4 | Rotate the exposed password | ✅ done |
 | 0.5 | Lock down the Data API / RLS | ✅ done — found a live exposure |
 | 1.1 | Adapter framework | ✅ **done.** Publishing and account discovery are both decoupled, enforced by an architecture test that scans the source. A `Provider` interface covers authorisation and discovery; `MetaProvider` implements it. Adding a platform is one provider + one adapter + one capability record. |
-| 1.2 | Connect multiple accounts | ✅ done — Accounts page; needs one re-run of connect to store the provider auth |
+| 1.2 | Connect several accounts **from one authorisation** | ✅ done — e.g. five Facebook Pages from one Meta login, connected in the dashboard. **This is NOT "all platforms"** — see the platform track below. |
 | 1.3 | Account types beyond Pages | ⬜ not started |
 | 1.4 | Reconnect reusing authorisation | ✅ done — daily refresh task renews expiring authorisations; monitor warns before expiry and after; disconnect/re-enable from the Accounts page |
 | 1.5 | Plan / entitlement model | 🔵 **next** — last item in tier 1 |
@@ -47,6 +47,38 @@ This bends the bottom-up rule deliberately, and the reason it is safe: the
 genuinely load-bearing parts — tenant scoping, the adapter contract, the
 entitlement *model* — are either done or a single column. What remains in tier 1
 is additive, not structural.
+
+## Platform track — the separate thing
+
+Adding a **platform** is different work from connecting several accounts within
+one. This table is the honest state of each, and it is deliberately separate so
+"multiple accounts" can never again be read as "all platforms".
+
+Every platform has two costs. **Build** is the adapter and provider — that is
+mine and it is now fast, because the framework holds. **Access** is approval,
+audit or money — that is the owner's, it cannot be hurried, and for several
+platforms it takes weeks.
+
+**The approvals should start now, in parallel**, because they are the long pole.
+
+| Platform | Build | Access needed | Status |
+|---|---|---|---|
+| Facebook Pages | ✅ | none beyond the app | **publishing** |
+| Instagram | ✅ | none beyond the app | **publishing** |
+| Threads | ✅ | Meta app with the Threads use case — **no review** | waiting on app config |
+| **Pinterest** | ✅ | ⚠️ **Trial access = sandbox.** Pins are visible only to you until Standard Access, which needs a submitted video | adapter built, awaiting app credentials |
+| **LinkedIn** | ⬜ | Personal profile: straightforward. **Company pages need Community Management API approval, granted sparingly** | not started |
+| **YouTube** | ⬜ | ⚠️ Audit for quota. Default is ~6 uploads/day **shared across all customers** | not started |
+| **TikTok** | ⬜ | ⚠️ Audit. **Until it passes, posts are private/self-only** | not started |
+| **X** | ⬜ | ⚠️ **Costs money** — pay-per-use, ~$0.20 per post containing a link | not started |
+
+Two of these carry consequences worth deciding before building, not after:
+
+- **YouTube's quota is per project, not per customer.** 10,000 units a day at
+  1,600 per upload is about six uploads *in total*, until an audit raises it.
+- **X is the only platform that costs per post.** At ~$0.20 for a post with a
+  link, a customer posting daily costs about $6/month on X alone — which is why
+  the pricing model was set to bring-your-own-key.
 
 ---
 

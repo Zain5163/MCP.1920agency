@@ -4,6 +4,7 @@ import {
   FacebookPageAdapter,
   InstagramAdapter,
   ThreadsAdapter,
+  PinterestAdapter,
   providerFor as lookupProvider,
   registerMetaProvider,
   type Provider,
@@ -40,6 +41,8 @@ export function publishService(): PublishService {
       new InstagramAdapter({ apiVersion, appSecret }),
       // Threads uses its own API host and its own token, so it takes no Meta config.
       new ThreadsAdapter(),
+      // Pinterest uses its own API and its own token, so no Meta config either.
+      new PinterestAdapter(),
     ])
   }
   return service

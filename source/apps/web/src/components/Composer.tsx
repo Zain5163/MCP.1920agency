@@ -24,7 +24,15 @@ export interface AccountOption {
 
 export function Composer({ accounts }: { accounts: readonly AccountOption[] }) {
   const ready = accounts.filter((a) => !a.needsReauth)
-  const [selected, setSelected] = useState<string[]>(() => [...new Set(ready.map((a) => a.platform))])
+  /**
+   * Selection is per ACCOUNT, not per platform.
+   *
+   * Selecting by platform meant connecting three Facebook Pages and having no way
+   * to post to just one. It becomes actively wrong for platforms like Pinterest
+   * where one authorisation yields many boards — posting the same pin to every
+   * board is spam, not a feature.
+   */
+  const [selected, setSelected] = useState<string[]>(() => ready.map((a) => a.id))
   const [body, setBody] = useState('')
   const [scheduling, setScheduling] = useState(false)
   const [media, setMedia] = useState<readonly PickedFile[]>([])
@@ -32,9 +40,9 @@ export function Composer({ accounts }: { accounts: readonly AccountOption[] }) {
   const [overrides, setOverrides] = useState<Record<string, string>>({})
   const [state, action, pending] = useActionState<ActionResult | null, FormData>(createPost, null)
 
-  const toggle = (platform: string): void => {
+  const toggle = (accountId: string): void => {
     setSelected((prev) =>
-      prev.includes(platform) ? prev.filter((p) => p !== platform) : [...prev, platform],
+      prev.includes(accountId) ? prev.filter((id) => id !== accountId) : [...prev, accountId],
     )
   }
 
@@ -44,7 +52,7 @@ export function Composer({ accounts }: { accounts: readonly AccountOption[] }) {
    * counter tells the user something false.
    */
   const length = countGraphemes(body)
-  const chosen = accounts.filter((a) => selected.includes(a.platform))
+  const chosen = accounts.filter((a) => selected.includes(a.id))
   const limit = chosen.length > 0 ? Math.min(...chosen.map((a) => a.maxTextLength)) : Infinity
   const over = length > limit
   const needsMedia = chosen.some((a) => a.requiresMedia)
@@ -58,6 +66,8 @@ export function Composer({ accounts }: { accounts: readonly AccountOption[] }) {
   const missingMedia = needsMedia && media.length === 0
 
   // One preview per selected account that has preview data.
+  // One preview per selected ACCOUNT — two Facebook Pages are two previews,
+  // because the account name shown differs even when the rendering does not.
   const previewTargets: PreviewTarget[] = chosen
     .filter((a) => a.preview !== undefined)
     .map((a) => ({
@@ -151,7 +161,20 @@ export function Composer({ accounts }: { accounts: readonly AccountOption[] }) {
       </div>
 
       <div className="mb-4">
-        <span className="field-label">Post to</span>
+        <div className="mb-1.5 flex items-baseline justify-between">
+          <span className="field-label mb-0">Post to</span>
+          {ready.length > 1 && (
+            <button
+              type="button"
+              onClick={() =>
+                setSelected(selected.length === ready.length ? [] : ready.map((a) => a.id))
+              }
+              className="text-[0.76rem] text-muted hover:text-ink"
+            >
+              {selected.length === ready.length ? 'Clear all' : 'Select all'}
+            </button>
+          )}
+        </div>
         <div className="flex flex-col gap-2">
           {accounts.length === 0 && (
             <p className="py-2 text-[0.88rem] text-muted">
@@ -167,11 +190,11 @@ export function Composer({ accounts }: { accounts: readonly AccountOption[] }) {
             >
               <input
                 type="checkbox"
-                name="platforms"
-                value={account.platform}
-                checked={selected.includes(account.platform)}
+                name="accounts"
+                value={account.id}
+                checked={selected.includes(account.id)}
                 disabled={account.needsReauth}
-                onChange={() => toggle(account.platform)}
+                onChange={() => toggle(account.id)}
               />
               <span className="truncate">{account.displayName}</span>
               <PlatformBadge

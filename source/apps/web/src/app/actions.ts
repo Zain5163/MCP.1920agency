@@ -59,7 +59,8 @@ export async function createPost(_prev: unknown, formData: FormData): Promise<Ac
   const tenantId = await requireSession()
 
   const body = String(formData.get('body') ?? '').trim()
-  const platforms = formData.getAll('platforms').map(String) as Platform[]
+  // Connection ids, not platform names — see the note in Composer.
+  const accountIds = formData.getAll('accounts').map(String)
   const scheduleAt = String(formData.get('scheduleAt') ?? '').trim()
 
   /**
@@ -77,7 +78,7 @@ export async function createPost(_prev: unknown, formData: FormData): Promise<Ac
   const hasOverrides = Object.keys(overrides).length > 0
   const files = formData.getAll('media').filter((f): f is File => f instanceof File && f.size > 0)
 
-  if (platforms.length === 0) return { ok: false, message: 'Pick at least one account.' }
+  if (accountIds.length === 0) return { ok: false, message: 'Pick at least one account.' }
   if (body === '' && files.length === 0) return { ok: false, message: 'Add some text or an image.' }
 
   const scheduledFor = scheduleAt === '' ? undefined : new Date(scheduleAt)
@@ -87,8 +88,11 @@ export async function createPost(_prev: unknown, formData: FormData): Promise<Ac
   }
 
   const connections = await listConnections(tenantId)
-  const targets = connections.filter((c) => platforms.includes(c.platform) && !c.needsReauth)
+  const targets = connections.filter((c) => accountIds.includes(c.id) && !c.needsReauth)
   if (targets.length === 0) return { ok: false, message: 'None of those accounts are connected and ready.' }
+
+  // Validation is still per platform — two Pages share one set of rules.
+  const platforms = [...new Set(targets.map((t) => t.platform))] as Platform[]
 
   const service = publishService()
 

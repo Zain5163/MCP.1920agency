@@ -214,6 +214,38 @@ export const CAPABILITIES: Readonly<Record<Platform, CapabilityRecord>> = {
     notes: 'Organization posting requires Community Management API approval, which may not be granted.',
   },
 
+  pinterest: {
+    // Pinterest splits text into a 100-char title and an 800-char description.
+    // One body covers both: first line becomes the title, the rest the description.
+    maxTextLength: 800,
+    mediaKinds: ['image', 'video'],
+    maxMediaCount: 1,
+    // There is no text-only pin at all.
+    minMediaCount: 1,
+    requiresPublicMediaUrl: true,
+    supportsNativeScheduling: false,
+    allowsMixedMedia: false,
+    preview: {
+      label: 'Pinterest',
+      accountLabel: 'Pinterest Board',
+      accent: '#e60023',
+      captionTruncateAt: 100,
+      captionPosition: 'below',
+      mediaFit: 'original',
+      showsCarouselDots: false,
+      moreLabel: 'more',
+    },
+    verified: false,
+    notes:
+      'A pin belongs to a BOARD, not an account — each board is its own connection, so ' +
+      'platform_account_id holds the board id. ' +
+      'WARNING: under Trial access, pins are sandbox entities visible only to their creator. ' +
+      'Everything reports success — an id comes back and the URL resolves — while nobody ' +
+      'else can see the pin. Standard Access needs a submitted video of the app in use. ' +
+      'Tokens expire and are renewed with a separate refresh token, unlike Threads which ' +
+      'refreshes using the access token itself. Limits here are unverified.',
+  },
+
   x: {
     maxTextLength: 280,
     mediaKinds: ['image', 'video'],

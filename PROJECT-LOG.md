@@ -238,6 +238,32 @@ something was only compiled or only unit-tested, it says so.
   (refresh reported EXPIRED and exited 1), then restored and confirmed all seven
   checks green.
 
+- **Account selection changed from per-platform to per-account.** Selecting by
+  platform meant connecting three Facebook Pages and having no way to post to just
+  one. Pinterest made it actively wrong — one authorisation yields many boards, and
+  posting the same pin to every board is spam rather than reach. Now each account
+  is selected individually, with select-all for convenience. Validation stays per
+  platform, since two Pages share one set of rules.
+
+- **Pinterest built.** A pin belongs to a **board**, not an account, so each board
+  is its own connection and `platform_account_id` holds the board id. Modelling it
+  the other way — one connection per profile, board chosen per post — would have
+  needed a board field on every draft and interface in the system.
+
+  Pinterest also splits text into a 100-character title and an 800-character
+  description where our drafts have one body. The first line becomes the title and
+  the rest the description, which is how people write anyway.
+
+  ⚠️ **Recorded prominently because it is the dangerous one:** under Pinterest's
+  **Trial access**, pins are sandbox entities visible only to their creator.
+  Everything reports success — an id comes back, the URL resolves — while nobody
+  else can see the pin. Standard Access requires a submitted video of the app in
+  use.
+
+  Its OAuth also authenticates with HTTP Basic rather than a secret in the body,
+  unlike every Meta flow here, and it refreshes with a separate refresh token
+  unlike Threads which refreshes using the access token itself. Both are tested.
+
 ---
 
 ## Verified live, not just tested

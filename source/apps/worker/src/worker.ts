@@ -4,6 +4,7 @@ import {
   FacebookPageAdapter,
   InstagramAdapter,
   ThreadsAdapter,
+  PinterestAdapter,
 } from '@social-publisher/adapters'
 import { optional, required } from '@social-publisher/config'
 import { backoffMs, type Connection, type MediaRef, type PostDraft } from '@social-publisher/core'
@@ -48,6 +49,7 @@ function buildService(): PublishService {
     new FacebookPageAdapter({ apiVersion, appSecret }),
     new InstagramAdapter({ apiVersion, appSecret }),
     new ThreadsAdapter(),
+    new PinterestAdapter(),
   ])
 }
 

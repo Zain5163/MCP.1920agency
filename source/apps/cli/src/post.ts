@@ -6,6 +6,7 @@ import {
   FacebookPageAdapter,
   InstagramAdapter,
   ThreadsAdapter,
+  PinterestAdapter,
 } from '@social-publisher/adapters'
 import { mediaHostingReady, optional, required } from '@social-publisher/config'
 import type { Connection, MediaRef, Platform, PostDraft } from '@social-publisher/core'
@@ -105,6 +106,7 @@ async function main(): Promise<void> {
     new FacebookPageAdapter({ apiVersion, appSecret }),
     new InstagramAdapter({ apiVersion, appSecret }),
     new ThreadsAdapter(),
+    new PinterestAdapter(),
   ])
 
   const platforms = [...new Set(targets.map((t) => t.platform))]
