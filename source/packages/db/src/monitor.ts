@@ -1,4 +1,5 @@
 import { db } from './client.ts'
+import { expiredProviderAuths, expiringProviderAuths } from './credential-refresh.ts'
 
 /**
  * Self-checks.
@@ -216,6 +217,45 @@ export async function checkDatabaseKeepAlive(): Promise<HealthCheck> {
   return { name: 'keep-alive', severity: 'ok', summary: `Keep-alive ran ${days.toFixed(1)} days ago.` }
 }
 
+/**
+ * Authorisations about to expire.
+ *
+ * Separate from checkConnections, which catches credentials already known to be
+ * broken. This catches the ones that are working today and will stop on their
+ * own — the failure that gives no warning unless something looks for it.
+ */
+export async function checkCredentialExpiry(): Promise<HealthCheck> {
+  const [expired, expiring] = await Promise.all([
+    expiredProviderAuths(),
+    expiringProviderAuths(7),
+  ])
+
+  if (expired.length > 0) {
+    return {
+      name: 'credential-expiry',
+      severity: 'critical',
+      summary: `${expired.length} authorisation(s) have expired: ${expired.map((e) => e.provider).join(', ')}`,
+      action:
+        'Refresh cannot recover these — run the connect command for that platform to authorise again.',
+      detail: { providers: expired.map((e) => e.provider) },
+    }
+  }
+
+  if (expiring.length > 0) {
+    const soonest = expiring[0]!
+    return {
+      name: 'credential-expiry',
+      severity: 'warning',
+      summary: `${soonest.provider} authorisation expires in ${soonest.daysLeft} day(s).`,
+      action:
+        'The refresh task should renew this automatically. If it keeps counting down, check that AdsPilot-Refresh is enabled and what its last run reported.',
+      detail: { provider: soonest.provider, daysLeft: soonest.daysLeft },
+    }
+  }
+
+  return { name: 'credential-expiry', severity: 'ok', summary: 'No authorisations expiring soon.' }
+}
+
 const RANK: Record<Severity, number> = { ok: 0, warning: 1, critical: 2 }
 
 /**
@@ -227,7 +267,15 @@ const RANK: Record<Severity, number> = { ok: 0, warning: 1, critical: 2 }
  */
 export async function runHealthChecks(): Promise<HealthReport> {
   const checks = await Promise.all(
-    [checkWorker, checkOverdueJobs, checkStuckJobs, checkConnections, checkFailures, checkDatabaseKeepAlive].map(
+    [
+      checkWorker,
+      checkOverdueJobs,
+      checkStuckJobs,
+      checkConnections,
+      checkCredentialExpiry,
+      checkFailures,
+      checkDatabaseKeepAlive,
+    ].map(
       async (check): Promise<HealthCheck> => {
         try {
           return await check()

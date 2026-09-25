@@ -192,10 +192,19 @@ export class ThreadsProvider implements Provider {
   }
 
   /**
+   * Threads tokens must be refreshed between 24 hours and 60 days after issue.
+   * Outside that window the token is simply dead.
+   */
+  async refresh(currentToken: string): Promise<{ accessToken: string; expiresAt: Date }> {
+    return await new ThreadsOAuth(this.#config).refresh(currentToken)
+  }
+
+  /**
    * One authorisation is one Threads account — there is no equivalent of
    * choosing between several Pages. Returning an array anyway keeps the Provider
    * contract uniform, which is what lets the UI stay platform-agnostic.
    */
+
   async discover(userAccessToken: string): Promise<DiscoveredAccount[]> {
     const oauth = new ThreadsOAuth(this.#config)
     const profile = await oauth.profile(userAccessToken)

@@ -47,6 +47,20 @@ export interface Provider {
 
   /** Every account this authorisation can reach, connected or not. */
   discover(userAccessToken: string): Promise<DiscoveredAccount[]>
+
+  /**
+   * Extends a credential that is approaching expiry.
+   *
+   * Optional, because platforms differ fundamentally here. A Facebook Page token
+   * lives as long as the app stays installed and has nothing to refresh. A
+   * Threads token dies after 60 days and **must** be refreshed inside a window —
+   * miss it and the connection is gone, needing full reauthorisation.
+   *
+   * A provider that omits this is declaring "my credentials do not expire on
+   * their own", which the refresh runner treats as nothing to do rather than as
+   * a failure.
+   */
+  refresh?(currentToken: string): Promise<{ accessToken: string; expiresAt: Date }>
 }
 
 const REGISTRY = new Map<string, Provider>()

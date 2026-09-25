@@ -219,6 +219,25 @@ something was only compiled or only unit-tested, it says so.
   the point is checking each slide crops correctly and reads in order. Added
   arrows, clickable dots, a thumbnail strip, and a live "2/3" counter.
 
+- **Tier 1.4 shipped: automatic credential refresh.** Threads made this concrete —
+  its tokens last 60 days and can only be refreshed inside a window, after which
+  the connection is gone entirely and the customer must reauthorise. Nothing about
+  that failure is loud: posts simply start failing weeks later.
+
+  `Provider.refresh` is optional, so a provider that omits it is declaring "my
+  credentials do not expire" — which the runner treats as nothing to do rather
+  than a failure. Meta correctly skips; Threads implements it.
+
+  A failed refresh does **not** immediately mark the account dead. There are days
+  left and the next run may succeed, so disabling a working account over one
+  transient network error would be worse than the problem.
+
+  The monitor gained a seventh check, and `AdsPilot-Refresh` runs daily at 04:00.
+  **Verified by simulation**: set the authorisation to expire in 5 days (monitor
+  raised a warning, refresh correctly skipped Meta), then to 2 days past expiry
+  (refresh reported EXPIRED and exited 1), then restored and confirmed all seven
+  checks green.
+
 ---
 
 ## Verified live, not just tested

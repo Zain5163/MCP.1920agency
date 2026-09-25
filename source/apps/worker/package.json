@@ -7,7 +7,8 @@
     "start": "node --experimental-strip-types src/worker.ts",
     "once": "node --experimental-strip-types src/worker.ts --once",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "monitor": "node --experimental-strip-types src/monitor-cli.ts"
+    "monitor": "node --experimental-strip-types src/monitor-cli.ts",
+    "refresh": "node --experimental-strip-types src/refresh-cli.ts"
   },
   "dependencies": {
     "@social-publisher/adapters": "workspace:*",
