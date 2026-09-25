@@ -157,3 +157,46 @@ describe('every platform is fully declared', () => {
     }
   })
 })
+
+describe('preview data', () => {
+  test('every platform with a preview declares sensible values', async () => {
+    const { CAPABILITIES } = await import('../src/adapters/capabilities.ts')
+
+    for (const [platform, caps] of Object.entries(CAPABILITIES)) {
+      const preview = caps.preview
+      if (preview === undefined) continue
+
+      assert.ok(preview.label.length > 0, `${platform}: preview needs a label`)
+      assert.match(preview.accent, /^#[0-9a-f]{6}$/i, `${platform}: accent must be a hex colour`)
+      assert.ok(preview.moreLabel.length > 0, `${platform}: needs a "more" label`)
+
+      // A truncation point beyond the platform's own text limit would never fire,
+      // which means the preview would silently stop warning about long captions.
+      assert.ok(
+        preview.captionTruncateAt > 0 && preview.captionTruncateAt <= caps.maxTextLength,
+        `${platform}: captionTruncateAt (${preview.captionTruncateAt}) must be within maxTextLength (${caps.maxTextLength})`,
+      )
+    }
+  })
+
+  test('the platforms that publish today all have previews', async () => {
+    // A connected platform with no preview silently shows nothing, which looks
+    // like a bug rather than a missing feature.
+    const { CAPABILITIES } = await import('../src/adapters/capabilities.ts')
+    for (const platform of ['facebook_page', 'instagram'] as const) {
+      assert.ok(CAPABILITIES[platform].preview !== undefined, `${platform} has no preview data`)
+    }
+  })
+
+  test('platforms differ in where they cut the caption', async () => {
+    // The whole point of the preview: a caption that reads well on one platform
+    // can lose its point on another.
+    const { CAPABILITIES } = await import('../src/adapters/capabilities.ts')
+    const fb = CAPABILITIES.facebook_page.preview!
+    const ig = CAPABILITIES.instagram.preview!
+    assert.ok(
+      ig.captionTruncateAt < fb.captionTruncateAt,
+      'Instagram truncates earlier than Facebook — if this ever inverts, check the sources',
+    )
+  })
+})

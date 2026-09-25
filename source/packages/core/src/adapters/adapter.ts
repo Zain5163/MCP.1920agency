@@ -41,6 +41,39 @@ export interface Capabilities {
   readonly supportsNativeScheduling: boolean
   /** Mixing images and video in one post. Most platforms disallow it. */
   readonly allowsMixedMedia: boolean
+  /** How the preview should render this platform. Absent means no preview yet. */
+  readonly preview?: PreviewStyle
+}
+
+/**
+ * How a post renders on this platform.
+ *
+ * Preview is inherently platform-specific, but the UI must not branch on platform
+ * names — so the differences live here as data. A preview component reads these
+ * and draws the right thing without knowing which platform it is looking at.
+ */
+export interface PreviewStyle {
+  /** Name shown in the preview tab. */
+  readonly label: string
+  /** Brand colour, for the tab indicator only. */
+  readonly accent: string
+  /**
+   * Characters shown before the caption is cut with a "more" link. Instagram
+   * truncates far earlier than Facebook, which changes how a caption should be
+   * written — and that is invisible until it is published.
+   */
+  readonly captionTruncateAt: number
+  /** Where the caption sits relative to the media. */
+  readonly captionPosition: 'above' | 'below'
+  /**
+   * How media is displayed. 'square' crops to 1:1, which is what makes a wrongly
+   * shaped image obvious before it goes out.
+   */
+  readonly mediaFit: 'square' | 'original'
+  /** Whether multiple media show as a swipeable carousel with dots. */
+  readonly showsCarouselDots: boolean
+  /** Text of the expand link, e.g. "more" or "See more". */
+  readonly moreLabel: string
 }
 
 export interface ValidationIssue {

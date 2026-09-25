@@ -4,6 +4,7 @@ import { useActionState, useState } from 'react'
 
 import { createPost, type ActionResult } from '@/app/actions'
 import { MediaPicker, type PickedFile } from '@/components/MediaPicker'
+import { PostPreview, type PreviewStyle, type PreviewTarget } from '@/components/PostPreview'
 
 export interface AccountOption {
   readonly id: string
@@ -14,6 +15,8 @@ export interface AccountOption {
   readonly maxTextLength: number
   readonly requiresMedia: boolean
   readonly maxMediaCount: number
+  /** Absent when the platform has no preview data yet. */
+  readonly preview?: PreviewStyle | undefined
 }
 
 export function Composer({ accounts }: { accounts: readonly AccountOption[] }) {
@@ -49,7 +52,13 @@ export function Composer({ accounts }: { accounts: readonly AccountOption[] }) {
   const maxMedia = chosen.length > 0 ? Math.min(...chosen.map((a) => a.maxMediaCount)) : 10
   const missingMedia = needsMedia && media.length === 0
 
+  // One preview per selected account that has preview data.
+  const previewTargets: PreviewTarget[] = chosen
+    .filter((a) => a.preview !== undefined)
+    .map((a) => ({ platform: a.platform, accountName: a.displayName, style: a.preview! }))
+
   return (
+    <div className="grid gap-5">
     <form action={action} className="card">
       <h2 className="mb-1 text-base font-semibold">New post</h2>
       <p className="mb-5 text-[0.85rem] text-muted">
@@ -167,6 +176,9 @@ export function Composer({ accounts }: { accounts: readonly AccountOption[] }) {
         </div>
       )}
     </form>
+
+      <PostPreview targets={previewTargets} body={body} media={media} />
+    </div>
   )
 }
 

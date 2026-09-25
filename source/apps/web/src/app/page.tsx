@@ -41,6 +41,7 @@ export default async function Dashboard() {
     maxTextLength: CAPABILITIES[c.platform].maxTextLength,
     requiresMedia: CAPABILITIES[c.platform].minMediaCount > 0,
     maxMediaCount: CAPABILITIES[c.platform].maxMediaCount,
+    preview: CAPABILITIES[c.platform].preview,
   }))
 
   return (

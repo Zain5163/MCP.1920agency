@@ -155,6 +155,20 @@ something was only compiled or only unit-tested, it says so.
   dashboard is now always hosted — which also makes the immediate and scheduled
   paths identical.
 
+- **Tier 2.2 shipped: platform preview.** Tabs per selected account showing how the
+  post will actually look — where the caption is cut, how media is cropped, and
+  carousel position.
+
+  The design problem was that preview is inherently platform-specific while the
+  architecture test forbids platform names in the UI. Resolved by making the
+  differences **data**: a `PreviewStyle` on each capability record carries the
+  truncation point, caption position, media fit and accent colour. The preview
+  component renders from that and never learns which platform it is drawing.
+
+  Worth knowing what it reveals: **Instagram cuts a caption at ~125 characters,
+  Facebook at ~400.** A caption that reads well on one can lose its point on the
+  other, and nothing in validation catches that.
+
 ---
 
 ## Verified live, not just tested

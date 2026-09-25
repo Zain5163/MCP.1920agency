@@ -29,6 +29,16 @@ export const CAPABILITIES: Readonly<Record<Platform, CapabilityRecord>> = {
     requiresPublicMediaUrl: false,
     supportsNativeScheduling: true,
     allowsMixedMedia: false,
+    preview: {
+      label: 'Facebook',
+      accent: '#1877f2',
+      // Facebook shows far more text than Instagram before cutting.
+      captionTruncateAt: 400,
+      captionPosition: 'above',
+      mediaFit: 'original',
+      showsCarouselDots: false,
+      moreLabel: 'See more',
+    },
     verified: '2026-09-25',
     notes:
       'Accepts JPG, PNG, GIF and MP4. Text limit is the widely-cited 63,206; Meta does not ' +
@@ -52,6 +62,17 @@ export const CAPABILITIES: Readonly<Record<Platform, CapabilityRecord>> = {
     requiresPublicMediaUrl: true,
     supportsNativeScheduling: false,
     allowsMixedMedia: true,
+    preview: {
+      label: 'Instagram',
+      accent: '#e1306c',
+      // Instagram cuts at roughly 125 characters, which is why a caption that
+      // reads fine on Facebook can lose its point here.
+      captionTruncateAt: 125,
+      captionPosition: 'below',
+      mediaFit: 'square',
+      showsCarouselDots: true,
+      moreLabel: 'more',
+    },
     verified: '2026-09-25',
     notes:
       'Cannot post text alone — hence minMediaCount 1. Two-step create-then-publish container ' +
