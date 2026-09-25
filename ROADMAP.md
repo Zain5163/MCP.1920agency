@@ -23,7 +23,7 @@ _Nothing new should be built on top of a known defect._
 | ~~0.2~~ | ~~**Alert when the scheduler stops**~~ **DONE 2026-09-25** | A silent worker looks identical to an empty queue. Every scheduled post fails silently and nobody finds out. |
 | 0.3 | **Verify platform limits against live docs** | Every entry in `capabilities.ts` is `verified: false` — set from knowledge, not checked. A wrong limit is a confusing publish failure. |
 | 0.4 | **Rotate the exposed database password** | Pasted into a chat transcript on 2026-09-24. |
-| 0.5 | **Postgres RLS behind the app-layer scoping** | Defence in depth. Application scoping is tested and correct; RLS catches the case where a future query bypasses it. |
+| ~~0.5~~ | ~~**Postgres RLS behind the app-layer scoping**~~ **DONE 2026-09-25** | **Found a live critical hole while doing it:** `anon` and `authenticated` had full read/write on every table, including encrypted credentials, password hashes and token hashes — and the `anon` key is public by design. Grants revoked, RLS enabled on all 13 tables. |
 
 ---
 

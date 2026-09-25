@@ -101,6 +101,18 @@ something was only compiled or only unit-tested, it says so.
   like `tenant_id` — cheap now, a rewrite later), and merging `Meta-Ads-Publisher`
   rather than rebuilding it recorded as 5b.0.
 
+- **Tier 0.5 shipped: Data API locked down.** While enabling RLS, found a **live
+  critical exposure**: Prisma creates tables in the `public` schema, Supabase grants
+  `anon` and `authenticated` full privileges there by default, and PostgREST serves
+  them over HTTPS. The `anon` key is public by design — it is meant to be embedded
+  in browser JavaScript. Anyone holding it could read and write `connections`
+  (encrypted OAuth credentials), `users` (password hashes) and `api_tokens`.
+  Confirmed by querying `information_schema.role_table_grants`: both roles held
+  ALL privileges on every table. Grants revoked, default privileges revoked so new
+  tables do not inherit them, and RLS enabled on all 13 tables as a second layer.
+  Verified after: zero grants remain, all 13 tables have RLS, and the application,
+  media uploads and all 286 tests still pass.
+
 ---
 
 ## Verified live, not just tested
@@ -116,6 +128,7 @@ something was only compiled or only unit-tested, it says so.
 | Tenant isolation | Two real tenants; cross-access refused |
 | Session security | Valid signature accepted, one flipped character rejected |
 | Health monitoring | Broke it deliberately; both failures caught with correct remedy and exit code |
+| Data API lockdown | Grants queried before and after; zero remain, RLS on all 13 tables, app unaffected |
 
 ## Test coverage
 
