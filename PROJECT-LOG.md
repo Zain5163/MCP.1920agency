@@ -298,6 +298,33 @@ something was only compiled or only unit-tested, it says so.
   dies at 60 days and needs reauthorisation. Pinterest has the same gap. Wiring it
   in would make it look handled when it is not.
 
+### 2026-09-26 — LinkedIn app created; three unknowns closed from the real console
+
+Owner created the LinkedIn app **Mysmadspilot** and sent the Settings, Auth and
+Products screens. Those resolved three things that had been guesses:
+
+- **Page association is done.** The app is verified against *1920Agency™ Digital
+  Marketing Agency* as of 2026-09-26. The "Standalone app" label is an app *type*,
+  not an absence of a Page — an earlier concern that turned out to be nothing.
+- **Access token TTL is 2 months (5,184,000 seconds)**, stated in the console.
+  That is exactly the fallback already coded in `refreshWithToken`, so the
+  assumption was right. No refresh product is offered on a self-serve app, so
+  **a LinkedIn connection must be reauthorised every 60 days**. There is nothing
+  to build that avoids this.
+- **Community Management API cannot even be requested.** Its button is *disabled*
+  on a verified app with a real company Page — not "apply and wait". Company-page
+  posting is therefore not merely unapproved, it is unreachable on this app.
+
+**Consequence to be honest about: LinkedIn posting will be as the owner
+personally, not as the 1920 Agency page.** The adapter supports organisation URNs
+and will work the day access exists; nothing needs rewriting. But the feature the
+agency actually wants is not available today.
+
+Reported and NOT verified: that Community Management and Sign In with OpenID
+Connect cannot coexist on one app. If true, company-page posting needs a *second*
+LinkedIn app rather than another product on this one. Recorded rather than acted
+on, because acting on an unverified constraint is how the Threads mistake happened.
+
 ### ⚠️ Found while doing this: three platforms can publish, and none can be connected
 
 Threads, Pinterest and LinkedIn each have a working adapter **and** provider, but

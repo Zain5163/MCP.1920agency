@@ -235,11 +235,20 @@ export const CAPABILITIES: Readonly<Record<Platform, CapabilityRecord>> = {
       'A created post returns 201 with an empty body; the id is in the x-restli-id header. ' +
       'Every call needs LinkedIn-Version (YYYYMM, retired after about a year) and ' +
       'X-Restli-Protocol-Version: 2.0.0. ' +
-      'Posting as a company page needs Community Management API approval, granted sparingly; ' +
-      'personal posting is self-serve via "Share on LinkedIn". Tokens last 60 days and only ' +
-      'approved apps get refresh tokens, so an unapproved app needs reauthorisation every ' +
-      '60 days. Video upload is chunked with ETag tracking and is NOT implemented. ' +
-      'Limits here are unverified.',
+      'TWO self-serve products are needed, not one: "Share on LinkedIn" grants w_member_social, ' +
+      'and "Sign In with LinkedIn using OpenID Connect" grants openid/profile and /v2/userinfo. ' +
+      'Without the second, discovery cannot identify the authorising member and there is no ' +
+      'person URN to author the post as. ' +
+      'CONFIRMED against a real app console 2026-09-26: access token TTL is 2 months ' +
+      '(5,184,000 seconds), which is the default this code already assumed. No refresh product ' +
+      'is offered on a self-serve app, so a connection must be reauthorised every 60 days. ' +
+      'Posting as a company page needs the Community Management API, and on a verified ' +
+      'standard app its request button was DISABLED outright — not merely unapproved. ' +
+      'Reported but unverified: Community Management and Sign In with OpenID Connect cannot ' +
+      'coexist on one app, which would mean company-page posting needs a SECOND LinkedIn app ' +
+      'rather than another product on this one. Confirm before building for it. ' +
+      'Video upload is chunked with ETag tracking and is NOT implemented. ' +
+      'Remaining limits here are unverified.',
   },
 
   pinterest: {
