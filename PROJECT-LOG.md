@@ -325,13 +325,37 @@ Connect cannot coexist on one app. If true, company-page posting needs a *second
 LinkedIn app rather than another product on this one. Recorded rather than acted
 on, because acting on an unverified constraint is how the Threads mistake happened.
 
-### ⚠️ Found while doing this: three platforms can publish, and none can be connected
+### ✅ Closed: generic provider authorisation — `pnpm connect:provider <name>`
 
-Threads, Pinterest and LinkedIn each have a working adapter **and** provider, but
-`pnpm connect` still only runs Meta's OAuth dialog. Account *discovery* is fully
-provider-driven; account *authorisation* never was. Recorded in the roadmap as the
-next thing to build — one generic `pnpm connect <provider>` unblocks all three at
-once, and is worth more than a fourth adapter.
+Three platforms had a working adapter **and** provider that nobody could connect,
+because account *discovery* was provider-driven from early on and account
+*authorisation* never was: the connect command only knew Meta's dialog.
+
+Fixed at the contract rather than in the command. `Provider` gained `redirectUri`,
+`authUrl(state)` and `exchangeCode(code)`, implemented by all four providers, so
+`connect-provider.ts` names no platform at all — a new one needs a provider file
+and a registration line and nothing in the command.
+
+- Meta and Threads both exchange **twice** (short-lived then long-lived). Skipping
+  the second step yields a credential that dies within the hour, which looks like
+  a successful connect until the next day. Both are handled in their provider.
+- Scopes are read back out of the dialog URL rather than declared a second time,
+  so the stored list cannot drift from what was actually requested.
+- The Meta-only `pnpm connect` was left untouched. It is verified working, and
+  replacing a verified path is a separate decision from adding one.
+- **Verified by running it:** with no argument and with a bad argument it lists
+  the configured providers and exits non-zero. It correctly showed `meta` and
+  `linkedin` and omitted Threads and Pinterest, which have no credentials.
+  The full authorisation round trip is NOT yet verified against a live platform.
+
+### ⚠️ Latent mismatch found while doing this: `bluesky`
+
+Core's `PLATFORMS` still lists `bluesky`, dropped from scope in decisions/0001
+but kept because the validation tests use it as a fixture. Prisma's enum never
+had it. A `bluesky` connection would therefore compile and fail at the database.
+Nothing can reach that today — there is no Bluesky provider or adapter — so it is
+recorded rather than fixed, because the fix means rewriting a verified test file
+around a different fixture platform.
 
 ---
 

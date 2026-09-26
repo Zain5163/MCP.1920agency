@@ -2,7 +2,12 @@ import { randomBytes, timingSafeEqual } from 'node:crypto'
 
 import type { Platform } from '@social-publisher/core'
 
-import { registerProvider, type DiscoveredAccount, type Provider } from './provider.ts'
+import {
+  registerProvider,
+  type AuthorisedCredential,
+  type DiscoveredAccount,
+  type Provider,
+} from './provider.ts'
 
 /**
  * Threads authorisation and discovery.
@@ -185,6 +190,10 @@ export class ThreadsProvider implements Provider {
   readonly displayName = 'Threads'
   readonly platforms: readonly Platform[] = [THREADS]
 
+  get redirectUri(): string {
+    return this.#config.redirectUri
+  }
+
   readonly #config: ThreadsOAuthConfig
 
   constructor(config: ThreadsOAuthConfig) {
@@ -197,6 +206,18 @@ export class ThreadsProvider implements Provider {
    */
   async refresh(currentToken: string): Promise<{ accessToken: string; expiresAt: Date }> {
     return await new ThreadsOAuth(this.#config).refresh(currentToken)
+  }
+
+  authUrl(state: string): string {
+    return buildThreadsAuthUrl(this.#config, state)
+  }
+
+  /** Short-lived first here too, so the long-lived exchange is not optional. */
+  async exchangeCode(code: string): Promise<AuthorisedCredential> {
+    const oauth = new ThreadsOAuth(this.#config)
+    const short = await oauth.exchangeCode(code)
+    const long = await oauth.exchangeForLongLived(short.accessToken)
+    return { accessToken: long.accessToken, expiresAt: long.expiresAt }
   }
 
   /**

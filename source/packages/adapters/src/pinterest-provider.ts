@@ -2,7 +2,12 @@ import { randomBytes } from 'node:crypto'
 
 import type { Platform } from '@social-publisher/core'
 
-import { registerProvider, type DiscoveredAccount, type Provider } from './provider.ts'
+import {
+  registerProvider,
+  type AuthorisedCredential,
+  type DiscoveredAccount,
+  type Provider,
+} from './provider.ts'
 
 /**
  * Pinterest authorisation and board discovery.
@@ -170,6 +175,10 @@ export class PinterestProvider implements Provider {
   readonly displayName = 'Pinterest'
   readonly platforms: readonly Platform[] = [PINTEREST]
 
+  get redirectUri(): string {
+    return this.#config.redirectUri
+  }
+
   readonly #config: PinterestOAuthConfig
 
   constructor(config: PinterestOAuthConfig) {
@@ -184,6 +193,14 @@ export class PinterestProvider implements Provider {
    * boards as accounts keeps the rest of the system unchanged, which is the same
    * reasoning that made Instagram a linked account of a Facebook Page.
    */
+  authUrl(state: string): string {
+    return buildPinterestAuthUrl(this.#config, state)
+  }
+
+  async exchangeCode(code: string): Promise<AuthorisedCredential> {
+    return await new PinterestOAuth(this.#config).exchangeCode(code)
+  }
+
   async discover(userAccessToken: string): Promise<DiscoveredAccount[]> {
     const boards = await new PinterestOAuth(this.#config).boards(userAccessToken)
 

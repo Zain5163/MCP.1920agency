@@ -80,7 +80,13 @@ Two of these carry consequences worth deciding before building, not after:
   link, a customer posting daily costs about $6/month on X alone — which is why
   the pricing model was set to bring-your-own-key.
 
-### ⚠️ The blocker all three new platforms share: there is no way to authorise them
+### ~~⚠️ The blocker all three new platforms share: there is no way to authorise them~~ **DONE 2026-09-26**
+
+Closed by `pnpm connect:provider <name>`. `Provider` now covers authorisation as
+well as discovery, so the command names no platform. What follows is the original
+entry, kept because it explains why the contract changed.
+
+
 
 Threads, Pinterest and LinkedIn all have a working adapter **and** a working
 provider — but `pnpm connect` still only knows how to run Meta's OAuth dialog.

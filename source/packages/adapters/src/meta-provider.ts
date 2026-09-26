@@ -1,7 +1,12 @@
 import type { Platform } from '@social-publisher/core'
 
-import { FacebookOAuth, type OAuthConfig } from './facebook-oauth.ts'
-import { registerProvider, type DiscoveredAccount, type Provider } from './provider.ts'
+import { FacebookOAuth, buildAuthUrl, type OAuthConfig } from './facebook-oauth.ts'
+import {
+  registerProvider,
+  type AuthorisedCredential,
+  type DiscoveredAccount,
+  type Provider,
+} from './provider.ts'
 
 /**
  * Meta as a provider: one authorisation, many Facebook Pages, and the Instagram
@@ -20,10 +25,33 @@ export class MetaProvider implements Provider {
   readonly displayName = 'Facebook & Instagram'
   readonly platforms: readonly Platform[] = [FACEBOOK, INSTAGRAM]
 
+  get redirectUri(): string {
+    return this.#config.redirectUri
+  }
+
   readonly #config: OAuthConfig
 
   constructor(config: OAuthConfig) {
     this.#config = config
+  }
+
+  authUrl(state: string): string {
+    return buildAuthUrl(this.#config, state)
+  }
+
+  /**
+   * Meta issues a short-lived token first, so this exchanges twice. Skipping the
+   * second step gives a credential that dies in about an hour — which looks
+   * like a working connect until the next day.
+   */
+  async exchangeCode(code: string): Promise<AuthorisedCredential> {
+    const oauth = new FacebookOAuth(this.#config)
+    const short = await oauth.exchangeCode(code)
+    const long = await oauth.exchangeForLongLived(short.accessToken)
+    return {
+      accessToken: long.accessToken,
+      ...(long.expiresAt !== undefined ? { expiresAt: long.expiresAt } : {}),
+    }
   }
 
   async discover(userAccessToken: string): Promise<DiscoveredAccount[]> {

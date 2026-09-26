@@ -2,7 +2,12 @@ import { randomBytes } from 'node:crypto'
 
 import type { Platform } from '@social-publisher/core'
 
-import { registerProvider, type DiscoveredAccount, type Provider } from './provider.ts'
+import {
+  registerProvider,
+  type AuthorisedCredential,
+  type DiscoveredAccount,
+  type Provider,
+} from './provider.ts'
 
 /**
  * LinkedIn authorisation and account discovery.
@@ -266,6 +271,10 @@ export class LinkedInProvider implements Provider {
   readonly displayName = 'LinkedIn'
   readonly platforms: readonly Platform[] = [LINKEDIN]
 
+  get redirectUri(): string {
+    return this.#config.redirectUri
+  }
+
   readonly #config: LinkedInOAuthConfig
 
   constructor(config: LinkedInOAuthConfig) {
@@ -280,6 +289,14 @@ export class LinkedInProvider implements Provider {
    * company page without needing an account-type column — the same trick as
    * Pinterest storing a board id.
    */
+  authUrl(state: string): string {
+    return buildLinkedInAuthUrl(this.#config, state)
+  }
+
+  async exchangeCode(code: string): Promise<AuthorisedCredential> {
+    return await new LinkedInOAuth(this.#config).exchangeCode(code)
+  }
+
   async discover(userAccessToken: string): Promise<DiscoveredAccount[]> {
     const oauth = new LinkedInOAuth(this.#config)
 

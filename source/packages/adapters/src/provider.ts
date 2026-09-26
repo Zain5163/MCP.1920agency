@@ -37,6 +37,13 @@ export interface DiscoveredAccount {
   readonly linked?: readonly DiscoveredAccount[]
 }
 
+/** What an authorisation yields, once the redirect has been exchanged. */
+export interface AuthorisedCredential {
+  readonly accessToken: string
+  readonly refreshToken?: string
+  readonly expiresAt?: Date
+}
+
 export interface Provider {
   /** Stable key stored on ProviderAuth: 'meta', 'linkedin', 'google'. */
   readonly key: string
@@ -44,6 +51,26 @@ export interface Provider {
   readonly displayName: string
   /** Which platforms an authorisation with this provider can yield. */
   readonly platforms: readonly Platform[]
+  /**
+   * Where this provider sends the browser back to. The connect command needs the
+   * port and path to know what to listen on, and each provider uses its own so
+   * that one misconfigured redirect cannot break the others.
+   */
+  readonly redirectUri: string
+
+  /**
+   * Where to send someone to authorise.
+   *
+   * This and `exchangeCode` were added after three platforms ended up with
+   * working adapters that nobody could connect: discovery was provider-driven
+   * from the start, authorisation never was, so the connect command only knew
+   * how to run Meta's dialog. Putting both on the provider is what makes
+   * `connect <provider>` generic instead of a switch on platform names.
+   */
+  authUrl(state: string): string
+
+  /** Turns the code from the redirect into a usable credential. */
+  exchangeCode(code: string): Promise<AuthorisedCredential>
 
   /** Every account this authorisation can reach, connected or not. */
   discover(userAccessToken: string): Promise<DiscoveredAccount[]>
