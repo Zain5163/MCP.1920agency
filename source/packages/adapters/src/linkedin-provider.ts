@@ -20,11 +20,22 @@ import {
  *     application LinkedIn approves sparingly, and access can be refused with no
  *     appeal.
  *
- * Discovery therefore treats organisations as *optional*. A tenant with only
- * member access gets their personal profile and no error; one with Community
- * Management access also gets every page they administer. A 403 on the
- * organisation call is a missing approval, not a fault, so it is swallowed
- * rather than failing the whole connect flow.
+ * **These two cannot live on the same app.** Confirmed 2026-09-26: with Sign In
+ * with OpenID Connect enabled, Community Management's request button is disabled
+ * outright. Creating a second app without OIDC made it requestable immediately.
+ * This had been carried as a reported-but-unverified claim; it is now a fact the
+ * design depends on.
+ *
+ * So one LinkedIn account means **two apps and two providers**:
+ *
+ *   - `linkedin` — the member app. OIDC plus `w_member_social`. Posts as a
+ *     person.
+ *   - `linkedin_page` — the organisation app. Organisation scopes only and no
+ *     OIDC, so it cannot call `/v2/userinfo` and must not try. Posts as a page.
+ *
+ * Both yield the same `linkedin` platform and the same adapter, because the
+ * author URN already carries which kind of thing is posting. Only authorisation
+ * and discovery differ, which is exactly what a Provider is for.
  */
 
 const AUTH_BASE = 'https://www.linkedin.com/oauth/v2/authorization'
@@ -35,7 +46,10 @@ const LINKEDIN: Platform = 'linkedin'
 /** Granted by the self-serve "Share on LinkedIn" product. */
 export const LINKEDIN_MEMBER_SCOPES = ['openid', 'profile', 'w_member_social'] as const
 
-/** Requires Community Management API approval. Requesting them without it fails the whole dialog. */
+/**
+ * The organisation app's scopes. Requesting these from an app without Community
+ * Management approval fails the whole dialog, not just these scopes.
+ */
 export const LINKEDIN_ORGANIZATION_SCOPES = [
   'r_organization_social',
   'w_organization_social',
@@ -47,10 +61,12 @@ export interface LinkedInOAuthConfig {
   readonly appSecret: string
   readonly redirectUri: string
   /**
-   * Only set this once LinkedIn has actually approved Community Management for
-   * the app. Asking for organisation scopes without approval does not degrade
-   * gracefully — the authorisation dialog refuses outright, so the tenant cannot
-   * connect their personal profile either.
+   * True for the **organisation app**: a separate LinkedIn app with Community
+   * Management approved and OpenID Connect deliberately absent.
+   *
+   * This is not a flag to add to the member app. Setting it there would request
+   * organisation scopes that app does not hold, and the dialog refuses outright
+   * rather than degrading — which would break personal posting too.
    */
   readonly organizationAccess?: boolean
   readonly apiVersion?: string
@@ -68,9 +84,16 @@ export function createLinkedInState(): string {
   return randomBytes(32).toString('base64url')
 }
 
+/**
+ * Each app asks for its own scopes and nothing else.
+ *
+ * The organisation app deliberately does NOT request `openid` or `profile`: it
+ * has no Sign In with OpenID Connect product, and asking for a scope an app does
+ * not hold fails the whole dialog rather than dropping that one scope.
+ */
 export function linkedInScopes(config: LinkedInOAuthConfig): string[] {
   return config.organizationAccess === true
-    ? [...LINKEDIN_MEMBER_SCOPES, ...LINKEDIN_ORGANIZATION_SCOPES]
+    ? [...LINKEDIN_ORGANIZATION_SCOPES]
     : [...LINKEDIN_MEMBER_SCOPES]
 }
 
@@ -267,9 +290,19 @@ export class LinkedInOAuth {
 }
 
 export class LinkedInProvider implements Provider {
-  readonly key = 'linkedin'
-  readonly displayName = 'LinkedIn'
   readonly platforms: readonly Platform[] = [LINKEDIN]
+
+  /**
+   * Two apps means two registry keys, or the second registration would silently
+   * replace the first and one of them would quietly stop working.
+   */
+  get key(): string {
+    return this.#config.organizationAccess === true ? 'linkedin_page' : 'linkedin'
+  }
+
+  get displayName(): string {
+    return this.#config.organizationAccess === true ? 'LinkedIn Pages' : 'LinkedIn'
+  }
 
   get redirectUri(): string {
     return this.#config.redirectUri
@@ -300,8 +333,32 @@ export class LinkedInProvider implements Provider {
   async discover(userAccessToken: string): Promise<DiscoveredAccount[]> {
     const oauth = new LinkedInOAuth(this.#config)
 
+    if (this.#config.organizationAccess === true) {
+      /**
+       * The organisation app has no OpenID Connect, so `/v2/userinfo` would 403.
+       * Calling it anyway and catching the failure would work, but it would make
+       * every connect slower and log an error that is not one. There is simply no
+       * member to discover here.
+       */
+      const orgs = await oauth.organizations(userAccessToken)
+      if (orgs.length === 0) {
+        throw new LinkedInOAuthError(
+          'This LinkedIn authorisation administers no company pages. Check that the ' +
+            'account admins the page, and that Community Management access has actually ' +
+            'been GRANTED — while the request is still pending this call returns nothing ' +
+            'rather than an error, so it looks like you admin no pages.',
+        )
+      }
+      return orgs.map((org) => ({
+        externalId: org.urn,
+        platform: LINKEDIN,
+        displayName: org.name,
+        accessToken: userAccessToken,
+      }))
+    }
+
     const member = await oauth.member(userAccessToken)
-    const accounts: DiscoveredAccount[] = [
+    return [
       {
         externalId: `urn:li:person:${member.sub}`,
         platform: LINKEDIN,
@@ -309,19 +366,6 @@ export class LinkedInProvider implements Provider {
         accessToken: userAccessToken,
       },
     ]
-
-    for (const org of await oauth.organizations(userAccessToken)) {
-      accounts.push({
-        externalId: org.urn,
-        platform: LINKEDIN,
-        displayName: org.name,
-        // Organisations post with the same member token; LinkedIn authorises by
-        // the ACL, not by a per-page token the way Meta does.
-        accessToken: userAccessToken,
-      })
-    }
-
-    return accounts
   }
 }
 

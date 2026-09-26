@@ -100,6 +100,14 @@ function registerConfigured(): void {
     })
   }
 
+  /**
+   * LinkedIn is TWO apps, not one.
+   *
+   * Community Management and Sign In with OpenID Connect cannot coexist on the
+   * same LinkedIn app — confirmed 2026-09-26. So personal posting and
+   * company-page posting each need their own app, their own credentials and their
+   * own redirect, and they register as two providers.
+   */
   const liId = optional('LINKEDIN_APP_ID')
   const liSecret = optional('LINKEDIN_APP_SECRET')
   if (liId !== undefined && liSecret !== undefined) {
@@ -108,9 +116,22 @@ function registerConfigured(): void {
       appSecret: liSecret,
       redirectUri: optional('LINKEDIN_REDIRECT_URI', 'http://localhost:8787/linkedin/callback')!,
       apiVersion: optional('LINKEDIN_API_VERSION', '202601')!,
-      // Only true once the platform has actually granted organisation access.
-      // Asking without it makes the dialog refuse outright.
-      organizationAccess: optional('LINKEDIN_ORGANIZATION_ACCESS') === 'true',
+    })
+  }
+
+  const pageId = optional('LINKEDIN_PAGE_APP_ID')
+  const pageSecret = optional('LINKEDIN_PAGE_APP_SECRET')
+  if (pageId !== undefined && pageSecret !== undefined) {
+    registerLinkedInProvider({
+      appId: pageId,
+      appSecret: pageSecret,
+      redirectUri: optional(
+        'LINKEDIN_PAGE_REDIRECT_URI',
+        'http://localhost:8787/linkedin-page/callback',
+      )!,
+      apiVersion: optional('LINKEDIN_API_VERSION', '202601')!,
+      // What makes this the organisation app: organisation scopes only, no OIDC.
+      organizationAccess: true,
     })
   }
 }

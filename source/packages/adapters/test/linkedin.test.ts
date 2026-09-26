@@ -302,10 +302,54 @@ describe('authorisation and discovery', () => {
     for (const org of LINKEDIN_ORGANIZATION_SCOPES) assert.ok(!scopes.includes(org))
   })
 
-  test('adds organisation scopes only when Community Management is approved', () => {
+  test('the organisation app asks for organisation scopes ONLY', () => {
+    // It has no Sign In with OpenID Connect product, and asking for a scope an
+    // app does not hold fails the whole dialog rather than dropping that scope.
     const url = new URL(buildLinkedInAuthUrl({ ...config, organizationAccess: true }, 'S'))
     const scopes = url.searchParams.get('scope')!.split(' ')
+
     assert.ok(scopes.includes('w_organization_social'))
+    assert.ok(!scopes.includes('openid'), 'must not ask for a scope this app lacks')
+    assert.ok(!scopes.includes('w_member_social'))
+  })
+
+  test('the two apps register under different keys', () => {
+    // The same key would mean the second registration silently replaced the first.
+    const member = new LinkedInProvider(config)
+    const page = new LinkedInProvider({ ...config, organizationAccess: true })
+
+    assert.equal(member.key, 'linkedin')
+    assert.equal(page.key, 'linkedin_page')
+    assert.notEqual(member.displayName, page.displayName)
+  })
+
+  test('the organisation app never calls userinfo, having no OIDC', async () => {
+    const { fetchImpl, calls } = mockLinkedIn([
+      { body: { elements: [{ organization: 'urn:li:organization:42' }] } },
+      { body: { localizedName: '1920 Agency' } },
+    ])
+    const found = await new LinkedInProvider({
+      ...config,
+      organizationAccess: true,
+      fetch: fetchImpl,
+    }).discover('TOKEN')
+
+    assert.equal(calls.some((c) => c.url.includes('userinfo')), false)
+    assert.equal(found.length, 1)
+    assert.equal(found[0]!.externalId, 'urn:li:organization:42')
+  })
+
+  test('the organisation app explains an empty page list rather than connecting nothing', async () => {
+    // This is the state while Community Management approval is still pending: the
+    // call succeeds and returns nothing, which reads like "you admin no pages".
+    const { fetchImpl } = mockLinkedIn([{ body: { elements: [] } }])
+    await assert.rejects(
+      () =>
+        new LinkedInProvider({ ...config, organizationAccess: true, fetch: fetchImpl }).discover(
+          'TOKEN',
+        ),
+      /pending|no company pages/i,
+    )
   })
 
   test('separates scopes with spaces, not commas', () => {
@@ -320,7 +364,6 @@ describe('authorisation and discovery', () => {
   test('discovers the member profile as a full person URN', async () => {
     const { fetchImpl } = mockLinkedIn([
       { body: { sub: 'ABC123', name: 'Rana Zain Usman' } },
-      { status: 403, body: { message: 'Not enough permissions' } },
     ])
     const found = await new LinkedInProvider({ ...config, fetch: fetchImpl }).discover('TOKEN')
 
@@ -329,39 +372,37 @@ describe('authorisation and discovery', () => {
     assert.equal(found[0]!.displayName, 'Rana Zain Usman')
   })
 
-  test('a missing Community Management approval loses pages, not the whole connection', async () => {
-    // The common case for a new app. It must not look like a broken connect.
-    const { fetchImpl } = mockLinkedIn([
-      { body: { sub: 'ABC123', name: 'Rana' } },
-      { status: 403, body: { message: 'Not enough permissions' } },
-    ])
+  test('the member app connects fine with no organisation access at all', async () => {
+    // It never asks for any, so a missing Community Management approval is not
+    // even visible on this path.
+    const { fetchImpl } = mockLinkedIn([{ body: { sub: 'ABC123', name: 'Rana' } }])
     const found = await new LinkedInProvider({ ...config, fetch: fetchImpl }).discover('TOKEN')
     assert.equal(found.length, 1)
   })
 
-  test('returns company pages as organisation URNs when access is granted', async () => {
-    const { fetchImpl } = mockLinkedIn([
-      { body: { sub: 'ABC123', name: 'Rana' } },
-      { body: { elements: [{ organization: 'urn:li:organization:42' }] } },
-      { body: { localizedName: '1920 Agency' } },
-    ])
+  test('the member app returns the profile and nothing else', async () => {
+    // Company pages belong to the organisation app now. A member app that also
+    // listed them would be promising something it cannot post to.
+    const { fetchImpl } = mockLinkedIn([{ body: { sub: 'ABC123', name: 'Rana' } }])
     const found = await new LinkedInProvider({ ...config, fetch: fetchImpl }).discover('TOKEN')
 
-    assert.equal(found.length, 2)
-    assert.equal(found[1]!.externalId, 'urn:li:organization:42')
-    assert.equal(found[1]!.displayName, '1920 Agency')
+    assert.equal(found.length, 1)
+    assert.match(found[0]!.externalId, /^urn:li:person:/)
   })
 
   test('falls back to the URN when a page name cannot be read', async () => {
     const { fetchImpl } = mockLinkedIn([
-      { body: { sub: 'A', name: 'R' } },
       { body: { elements: [{ organization: 'urn:li:organization:42' }] } },
       { status: 403, body: { message: 'no' } },
     ])
-    const found = await new LinkedInProvider({ ...config, fetch: fetchImpl }).discover('TOKEN')
+    const found = await new LinkedInProvider({
+      ...config,
+      organizationAccess: true,
+      fetch: fetchImpl,
+    }).discover('TOKEN')
 
-    assert.equal(found.length, 2)
-    assert.equal(found[1]!.displayName, 'urn:li:organization:42')
+    assert.equal(found.length, 1)
+    assert.equal(found[0]!.displayName, 'urn:li:organization:42')
   })
 
   test('sends the secret in the form body, not as Basic auth', async () => {
