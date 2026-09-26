@@ -287,6 +287,53 @@ already has the limits; nothing currently reads the actual file to compare.
 
 ---
 
+## K. Ads features worth building, not yet built
+
+_Added 2026-09-27 while consolidating the ads work into this project._
+
+### K1. Ad policy review status
+
+An ad can be **created successfully and then rejected** by Meta's policy review,
+hours later. From the API's point of view everything worked; from the customer's
+point of view the ad never ran.
+
+Meta exposes the reason on the ad object. Reading it and surfacing it is the
+difference between "your ad is live" and the truth. Same category as Pinterest's
+sandbox and LinkedIn's silent truncation: **a failure that reports success.**
+
+### K2. Dry run
+
+Build every payload, show exactly what would be sent, create nothing. Useful for
+proving a plan without touching an account, and the natural thing for an AI to
+call before asking a person to approve.
+
+### K3. Resume a partial failure instead of duplicating
+
+Creating a campaign is several calls: campaign, then ad sets, then creatives,
+then ads. A failure at step three leaves a half-built campaign, and re-running
+**creates a second one** rather than continuing.
+
+The fix is to record what was created as it is created, and resume from there.
+Until it exists, the partial state must be reported clearly enough that someone
+can delete the half-built campaign before retrying.
+
+### K4. Briefs as reusable files
+
+A campaign described in a file, version-controlled, diffable, reusable across
+clients. Turns "set up the usual campaign for this client" into editing two
+fields rather than rebuilding from memory.
+
+### K5. Scheduled monitoring and rules
+
+Check spend and results on a schedule, and act on rules: pause an ad above a cost
+per result, raise a budget on a winner. **This is where the policy layer earns
+its keep** — every one of those actions spends or stops money, and none should
+be an AI's unchecked decision.
+
+Depends on K1 (knowing what is actually running) and on reading performance.
+
+---
+
 ## Rough order I would suggest
 
 Not a decision — a starting point for one.

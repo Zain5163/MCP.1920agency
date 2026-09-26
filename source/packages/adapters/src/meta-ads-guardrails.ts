@@ -3,11 +3,9 @@ import type { AdIssue, AdPlan, Money } from '@social-publisher/core'
 /**
  * Meta advertising guardrails.
  *
- * Ported from `..\\..\\Meta-Ads-Publisher`, a Python tool the owner already built
- * and validated offline. Per the roadmap's own decision (5b.0): **connect it,
- * do not rebuild it.** These rules are the valuable part — they encode real
- * advertising judgement rather than API shape, and re-deriving them from scratch
- * would have thrown away the thinking.
+ * These rules encode advertising judgement, not API shape. Meta will happily
+ * accept a campaign that is structurally valid and will still waste money, and
+ * most of what follows is about that second kind of problem.
  *
  * The distinction that runs through this file:
  *

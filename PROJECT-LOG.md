@@ -704,6 +704,50 @@ every day.
 **Nothing calls the Meta API yet.** This runs before anything is created, so a
 bad plan costs nothing to discover.
 
+## 2026-09-27 — Consolidated the ads work into this project
+
+Owner's instruction: everything under one project, our hierarchy, our
+conventions — *"this should not look like another outsider… use it as our own
+product."* So the ads work stops being a port and becomes part of the codebase.
+
+Taken and rewritten as ours:
+
+- **Guardrails** (`meta-ads-guardrails.ts`) — the advertising judgement. Comments
+  now explain *why* each rule exists rather than where it came from, which is
+  better documentation anyway: a reader needs the reasoning, not the history.
+- **Naming and attribution** (`meta-ads-naming.ts`) — 15 tests.
+
+### The UTM detail that is easy to destroy
+
+Meta's dynamic parameters — `{{campaign.name}}`, `{{adset.name}}` — are filled by
+**Meta at click time**, so the braces must survive intact. Interpolating them on
+our side looks correct, produces a working URL, and freezes the names at creation
+time — so the moment anything is renamed, attribution silently points at the old
+name. A test asserts the placeholders stay literal.
+
+Related: an explicitly empty `urlTags` is **honoured**, not replaced. Someone
+turning attribution off is making a decision; overriding it would be ignoring
+them. Absent means "generate them", empty means "no".
+
+### Naming is not cosmetic
+
+An account full of *Campaign 1 - Copy (2)* cannot be reasoned about by a person
+or by an AI. Names encode objective, audience, country, optimisation, format and
+iteration, and ad set names distinguish **broad from targeted** — the first thing
+anyone compares in a report.
+
+### Recorded rather than built
+
+`IDEAS.md` section K, so nothing is lost when the old folder is retired:
+ad policy review status (**an ad can be created successfully and rejected hours
+later** — the same failure-that-reports-success shape as Pinterest's sandbox),
+dry run, resuming a partial failure instead of duplicating a campaign, briefs as
+reusable files, and scheduled monitoring with rules.
+
+**Not done:** `AI-Automation\Meta-Ads-Publisher` still exists and has not been
+touched. Deleting or moving another project's folder needs explicit approval, so
+it waits for one.
+
 ## Verified live, not just tested
 
 | What | How it was proven |
