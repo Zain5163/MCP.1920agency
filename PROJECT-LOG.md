@@ -415,6 +415,35 @@ code exists. They are here so the first ads adapter has an obvious place to call
 rather than an excuse to invent its own. A mismatched currency is refused rather
 than converted: a wrong exchange rate silently multiplies a budget.
 
+### ⚠️ Found while verifying: the two MCP transports had silently diverged
+
+`tools.ts` carried the comment *"Defined once and shared by both transports — so
+the two can never drift apart in what they allow."* **That was false.**
+`http-server.ts` calls `registerTools`; `server.ts` (stdio) defines its own six
+tools inline. They had already diverged — stdio additionally accepts local file
+paths, and its `check_status` reports configuration and keep-alive age.
+
+So gating only `tools.ts` would have left the **stdio transport ungated**, which is
+the one used locally by a desktop AI client — the most likely path of all. The
+gate was applied to both. The duplication itself is a real defect and is recorded
+rather than fixed: merging them is a refactor of a working local server, and doing
+it in the same change as the safety fix would have risked the thing being fixed.
+
+The comment claiming they were shared was worse than no comment: it was the reason
+the divergence went unnoticed.
+
+### Verified live, not simulated
+
+Spoke JSON-RPC to the **real stdio MCP server** and called `publish_post` targeting
+the live LinkedIn connection with no confirm token.
+
+- It returned `APPROVAL NEEDED — nothing has been sent` with the account, the full
+  text and a token.
+- **Nothing was published.**
+- Database checked afterwards: **zero** rows matching the probe text, post count
+  unchanged at 6, target count unchanged at 8. The refusal left no trace, so
+  "nothing has been sent" is literally true rather than approximately true.
+
 ## Verified live, not just tested
 
 | What | How it was proven |

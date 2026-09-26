@@ -5,6 +5,8 @@ import { z } from 'zod'
 import { checkConfig } from '@social-publisher/config'
 import {
   PLATFORMS,
+  decide,
+  formatApprovalRequest,
   formatResolution,
   resolutionFor,
   type ErrorCode,
@@ -162,10 +164,30 @@ server.tool(
     }),
 )
 
+/**
+ * Same approval token as the HTTP transport.
+ *
+ * Duplicated rather than shared because these two tool sets have genuinely
+ * diverged — stdio also accepts local file paths. The duplication is a defect in
+ * its own right and is recorded as such; leaving the STDIO transport ungated
+ * while claiming R11 was closed would have been the worse of the two problems.
+ */
+const publishShape = {
+  ...draftShape,
+  confirm: z
+    .string()
+    .optional()
+    .describe(
+      'Approval token from a previous call to this tool. Call without it first: ' +
+        'you will get a summary to show the user. Only after they approve, call ' +
+        'again with everything identical plus this token.',
+    ),
+}
+
 server.tool(
   'publish_post',
-  'Publish a post immediately to connected social accounts. This is PUBLIC and cannot be undone — confirm the exact wording with the user before calling it.',
-  draftShape,
+  'Publish a post immediately to connected social accounts. This is PUBLIC and cannot be undone. Call it once WITHOUT a confirm token to get a summary, show that to the user, and only call again with the token once they have approved.',
+  publishShape,
   async (args) =>
     await guard(async (scope) => {
       const { draft, platforms, connections } = await buildDraft(scope, args)
@@ -188,6 +210,29 @@ server.tool(
       // Proves every id belongs to this tenant. Throws rather than silently
       // publishing the valid subset.
       await scope.requireConnections(chosen.map((c) => c.id))
+
+      // After validation, so the summary describes a post that would really go
+      // out. Before createPost, so a refusal leaves no trace and "nothing has
+      // been sent" is literally true.
+      const gate = decide({
+        action: 'publish_post',
+        payload: {
+          body: draft.body,
+          accounts: chosen.map((c) => c.id).sort(),
+          media: draft.media.map((m) => m.publicUrl ?? m.localPath ?? m.id),
+        },
+        ...(args.confirm !== undefined ? { confirmation: args.confirm } : {}),
+        describe: () =>
+          [
+            `Publishing to ${chosen.length} account(s):`,
+            ...chosen.map((c) => `  ${c.platform.padEnd(15)} ${c.displayName}`),
+            '',
+            'Text:',
+            ...draft.body.split('\n').map((line) => `  ${line}`),
+            ...(draft.media.length > 0 ? ['', `Attachments: ${draft.media.length}`] : []),
+          ].join('\n'),
+      })
+      if (!gate.allowed) return text(formatApprovalRequest(gate))
 
       const post = await scope.createPost({ body: draft.body, createdBy: 'mcp' })
 
