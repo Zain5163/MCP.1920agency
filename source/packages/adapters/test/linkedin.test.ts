@@ -253,13 +253,6 @@ describe('images', () => {
     assert.equal(content.multiImage?.images.length, 2)
   })
 
-  test('refuses video with an explanation rather than a confusing API error', async () => {
-    const { li } = make([CREATED])
-    await assert.rejects(
-      () => li.publish(ctx(), draft({ media: [img({ kind: 'video', mime: 'video/mp4' })] })),
-      PublishError,
-    )
-  })
 })
 
 describe('errors', () => {
@@ -379,5 +372,139 @@ describe('authorisation and discovery', () => {
 
     assert.equal(calls[0]!.headers.Authorization, undefined)
     assert.equal(calls[0]!.body.client_secret, 'LI_SECRET')
+  })
+})
+
+describe('video', () => {
+  const VIDEO_INIT = (parts: number): Reply => ({
+    body: {
+      value: {
+        video: 'urn:li:video:VID1',
+        uploadToken: 'TOKEN',
+        uploadInstructions: Array.from({ length: parts }, (_, i) => ({
+          uploadUrl: `https://upload.linkedin.example/part${i}`,
+          firstByte: i * 10,
+          lastByte: i * 10 + 9,
+        })),
+      },
+    },
+  })
+
+  const PART = (etag: string): Reply => ({ headers: { etag } })
+
+  const vid = (over: Partial<MediaRef> = {}): MediaRef => ({
+    id: 'v1',
+    kind: 'video',
+    mime: 'video/mp4',
+    bytes: 20,
+    publicUrl: 'https://media.example.com/a.mp4',
+    ...over,
+  })
+
+  test('initialises with the REAL byte count, not a declared one', async () => {
+    // fileSizeBytes decides how many parts come back, so a wrong figure yields
+    // instructions that do not match the file.
+    // The media is fetched FIRST, because the real length is what decides how
+    // many parts come back. JSON.stringify([1,2,3,4,5]) is 11 bytes.
+    const { fetchImpl, calls } = mockLinkedIn([
+      { body: [1, 2, 3, 4, 5] }, // the media download
+      VIDEO_INIT(1),
+      PART('"etag-0"'),
+      {},
+      CREATED,
+    ])
+    const li = new LinkedInAdapter({ fetch: fetchImpl })
+    await li.publish(ctx(), draft({ media: [vid({ bytes: 999_999 })] }))
+
+    const init = calls.find((c) => c.url.includes('initializeUpload'))!
+    const request = init.body.initializeUploadRequest as { fileSizeBytes: number }
+    assert.notEqual(request.fileSizeBytes, 999_999, 'must not trust the declared size')
+    assert.equal(request.fileSizeBytes, 11)
+  })
+
+  test('uploads every part and finalises with the ETags in order', async () => {
+    const { fetchImpl, calls } = mockLinkedIn([
+      { body: [1, 2, 3, 4, 5] },
+      VIDEO_INIT(3),
+      PART('"e0"'),
+      PART('"e1"'),
+      PART('"e2"'),
+      {},
+      CREATED,
+    ])
+    const li = new LinkedInAdapter({ fetch: fetchImpl })
+    await li.publish(ctx(), draft({ media: [vid()] }))
+
+    const puts = calls.filter((c) => c.method === 'PUT')
+    assert.equal(puts.length, 3)
+
+    const finalize = calls.find((c) => c.url.includes('finalizeUpload'))!
+    const request = finalize.body.finalizeUploadRequest as {
+      video: string
+      uploadToken: string
+      uploadedPartIds: string[]
+    }
+    assert.equal(request.video, 'urn:li:video:VID1')
+    assert.equal(request.uploadToken, 'TOKEN')
+    assert.deepEqual(request.uploadedPartIds, ['"e0"', '"e1"', '"e2"'])
+  })
+
+  test('a part with no ETag stops the upload rather than finalising a broken video', async () => {
+    const { fetchImpl, calls } = mockLinkedIn([
+      { body: [1] },
+      VIDEO_INIT(2),
+      PART('"e0"'),
+      { headers: {} }, // second part returns no ETag
+      {},
+      CREATED,
+    ])
+    const li = new LinkedInAdapter({ fetch: fetchImpl })
+
+    await assert.rejects(() => li.publish(ctx(), draft({ media: [vid()] })), PublishError)
+    assert.equal(calls.some((c) => c.url.includes('finalizeUpload')), false)
+  })
+
+  test('the finished video is referenced as content.media', async () => {
+    const { fetchImpl, calls } = mockLinkedIn([
+      { body: [1] },
+      VIDEO_INIT(1),
+      PART('"e0"'),
+      {},
+      CREATED,
+    ])
+    const li = new LinkedInAdapter({ fetch: fetchImpl })
+    await li.publish(ctx(), draft({ media: [vid()] }))
+
+    const post = calls.find((c) => c.url.endsWith('/rest/posts'))!
+    const content = post.body.content as { media?: { id: string } }
+    assert.equal(content.media?.id, 'urn:li:video:VID1')
+  })
+
+  test('refuses a video mixed with images — LinkedIn has no such container', async () => {
+    const { li, calls } = make([CREATED])
+    await assert.rejects(
+      () => li.publish(ctx(), draft({ media: [img(), vid()] })),
+      PublishError,
+    )
+    assert.equal(calls.length, 0)
+  })
+
+  test('refuses more than one video', async () => {
+    const { li } = make([CREATED])
+    await assert.rejects(
+      () => li.publish(ctx(), draft({ media: [vid({ id: 'a' }), vid({ id: 'b' })] })),
+      PublishError,
+    )
+  })
+
+  test('missing upload instructions fail before any PUT', async () => {
+    const { fetchImpl, calls } = mockLinkedIn([
+      { body: [1] },
+      { body: { value: { video: 'urn:li:video:X' } } },
+    ])
+    const li = new LinkedInAdapter({ fetch: fetchImpl })
+
+    await assert.rejects(() => li.publish(ctx(), draft({ media: [vid()] })), PublishError)
+    assert.equal(calls.some((c) => c.method === 'PUT'), false)
   })
 })

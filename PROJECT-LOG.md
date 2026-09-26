@@ -494,6 +494,40 @@ it would have stopped a model ever attaching a local file to a LinkedIn post.
 chunked upload and ETag tracking; the adapter refuses video with an explanation
 rather than failing partway through an upload.
 
+## 2026-09-26 — LinkedIn video upload built (not yet published live)
+
+Seven tests. 403 across 10 suites, 13 workspaces typecheck clean.
+
+Video is a **different endpoint** from images, not a variation on it:
+
+1. `POST /rest/videos?action=initializeUpload` with the exact byte count. LinkedIn
+   replies with a *list* of byte ranges and a URL for each — 4 MB per part.
+2. A PUT per range. **Each response carries an `ETag` that must be kept.**
+3. `POST /rest/videos?action=finalizeUpload` with those ETags in order plus the
+   upload token.
+
+Design notes worth keeping:
+
+- `fileSizeBytes` must be the **real** length, so the media is read before
+  initialising. A declared size that disagrees yields instructions that do not
+  match the file. A test asserts a wrong declared size is ignored.
+- A missing ETag **stops the upload** rather than finalising. Finalising without
+  every part risks silently producing a broken video, which is worse than an
+  error. A test asserts `finalizeUpload` is never reached in that case.
+- Under 4 MB the instruction list has one entry, so a small video looks
+  deceptively like the image flow. Tested with 1, 2 and 3 parts so the multi-part
+  path is not left to a lucky first upload.
+- Parts upload in sequence, so a failure names the part that failed.
+- **A post carries images OR one video, never both.** LinkedIn has no container
+  that mixes them and the error it returns does not hint that the mixture was the
+  problem, so the adapter refuses it up front.
+
+**NOT verified live.** Per R4 this is "it compiled and the tests pass", nothing
+more. The workspace holds no video that is safe to publish: everything found is
+client footage, unreviewed personal footage, or third-party reference material
+(someone else's copyrighted upload). Choosing one unilaterally to post publicly
+would have been reckless, so the owner nominates the file.
+
 ## Verified live, not just tested
 
 | What | How it was proven |

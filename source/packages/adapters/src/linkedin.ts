@@ -85,6 +85,23 @@ interface UploadInit {
   }
 }
 
+/**
+ * Video is initialised differently from an image: LinkedIn returns a *list* of
+ * byte ranges to upload rather than one URL, because anything over 4 MB is sent
+ * in parts.
+ */
+interface VideoUploadInit {
+  readonly value?: {
+    readonly video?: string
+    readonly uploadToken?: string
+    readonly uploadInstructions?: ReadonlyArray<{
+      readonly uploadUrl: string
+      readonly firstByte: number
+      readonly lastByte: number
+    }>
+  }
+}
+
 export class LinkedInAdapter implements PlatformAdapter {
   readonly platform: Platform = 'linkedin'
   readonly capabilities: Capabilities = CAPABILITIES.linkedin
@@ -122,17 +139,34 @@ export class LinkedInAdapter implements PlatformAdapter {
       )
     }
 
-    const images = draft.media.filter((m) => m.kind === 'image')
-    if (images.length !== draft.media.length) {
+    /**
+     * A post is images or one video, never both.
+     *
+     * LinkedIn has no container that mixes them, and attempting it fails with an
+     * error about the content type that gives no hint the mixture was the
+     * problem.
+     */
+    const videos = draft.media.filter((m) => m.kind === 'video')
+    if (videos.length > 0 && videos.length !== draft.media.length) {
       throw new PublishError(
-        'Video posting to LinkedIn is not implemented yet — it uses a separate chunked upload with ETag tracking. Post the video as a link, or remove it from the draft.',
+        'LinkedIn cannot mix a video with images in one post. Send the video on its own.',
         { failureClass: 'permanent' },
       )
     }
+    if (videos.length > 1) {
+      throw new PublishError('LinkedIn takes one video per post, not several.', {
+        failureClass: 'permanent',
+      })
+    }
 
     const uploaded: string[] = []
-    for (const image of images) {
-      uploaded.push(await this.#uploadImage(ctx, author, image))
+    const firstVideo = videos[0]
+    if (firstVideo !== undefined) {
+      uploaded.push(await this.#uploadVideo(ctx, author, firstVideo))
+    } else {
+      for (const image of draft.media) {
+        uploaded.push(await this.#uploadImage(ctx, author, image))
+      }
     }
 
     const body: Record<string, unknown> = {
@@ -226,6 +260,100 @@ export class LinkedInAdapter implements PlatformAdapter {
         httpStatus: put.status,
       })
     }
+
+    return urn
+  }
+
+  /**
+   * Uploads a video in parts, then finalises it.
+   *
+   * Three calls rather than the image's two, and the middle one repeats:
+   *
+   *   1. `initializeUpload` — given the exact byte count, LinkedIn replies with a
+   *      list of byte ranges and a URL for each. Under 4 MB that list has one
+   *      entry, which is why a small video looks deceptively like the image flow.
+   *   2. A PUT per range. **Each response carries an `ETag` that must be kept**;
+   *      losing one means the parts cannot be reassembled and the upload is wasted.
+   *   3. `finalizeUpload`, handing back the ETags in order with the upload token.
+   *
+   * Parts go up in sequence rather than in parallel. Slower, but a failure then
+   * names the part that failed instead of producing several simultaneous errors,
+   * and a video upload is already slow enough that this is not where the time goes.
+   */
+  async #uploadVideo(ctx: PublishContext, owner: string, media: MediaRef): Promise<string> {
+    const bytes = await this.#readMedia(media)
+
+    const init = await this.#send(
+      ctx,
+      'POST',
+      `${LINKEDIN_BASE}/rest/videos?action=initializeUpload`,
+      // fileSizeBytes decides how many parts come back, so it must be the real
+      // length rather than anything the caller declared.
+      { initializeUploadRequest: { owner, fileSizeBytes: bytes.length } },
+    )
+
+    const parsed = (await init.json()) as VideoUploadInit
+    const urn = parsed.value?.video
+    const uploadToken = parsed.value?.uploadToken
+    const instructions = parsed.value?.uploadInstructions
+
+    if (urn === undefined || instructions === undefined || instructions.length === 0) {
+      throw new PublishError('LinkedIn did not return upload instructions for the video.', {
+        failureClass: 'transient',
+      })
+    }
+
+    const partIds: string[] = []
+    for (const [index, part] of instructions.entries()) {
+      // lastByte is inclusive; subarray's end is not.
+      const chunk = bytes.subarray(part.firstByte, part.lastByte + 1)
+
+      let response: Response
+      try {
+        const request: RequestInit = {
+          method: 'PUT',
+          headers: {
+            Authorization: `Bearer ${ctx.credential.accessToken}`,
+            'content-type': media.mime,
+          },
+          body: chunk,
+        }
+        if (ctx.signal !== undefined) request.signal = ctx.signal
+        response = await this.#fetch(part.uploadUrl, request)
+      } catch (cause) {
+        throw new PublishError(
+          `Could not upload video part ${index + 1} of ${instructions.length} to LinkedIn`,
+          { failureClass: classifyNetworkError(cause), cause },
+        )
+      }
+
+      if (!response.ok) {
+        throw new PublishError(
+          `LinkedIn rejected video part ${index + 1} of ${instructions.length} (HTTP ${response.status})`,
+          { failureClass: classifyHttpStatus(response.status), httpStatus: response.status },
+        )
+      }
+
+      const etag = response.headers.get('etag')
+      if (etag === null || etag === '') {
+        // Without every ETag the parts cannot be reassembled, so stopping here
+        // beats finalising an upload that will be rejected or, worse, silently
+        // produce a broken video.
+        throw new PublishError(
+          `LinkedIn did not return an ETag for video part ${index + 1}, so the upload cannot be completed.`,
+          { failureClass: 'transient' },
+        )
+      }
+      partIds.push(etag)
+    }
+
+    await this.#send(ctx, 'POST', `${LINKEDIN_BASE}/rest/videos?action=finalizeUpload`, {
+      finalizeUploadRequest: {
+        video: urn,
+        ...(uploadToken !== undefined ? { uploadToken } : {}),
+        uploadedPartIds: partIds,
+      },
+    })
 
     return urn
   }

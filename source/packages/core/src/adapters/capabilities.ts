@@ -249,7 +249,10 @@ export const CAPABILITIES: Readonly<Record<Platform, CapabilityRecord>> = {
       'Reported but unverified: Community Management and Sign In with OpenID Connect cannot ' +
       'coexist on one app, which would mean company-page posting needs a SECOND LinkedIn app ' +
       'rather than another product on this one. Confirm before building for it. ' +
-      'Video upload is chunked with ETag tracking and is NOT implemented. ' +
+      'Video is a SEPARATE endpoint from images: /rest/videos, split into 4 MB parts, ' +
+      'each PUT returning an ETag that must be collected and handed to finalizeUpload. ' +
+      'Losing one ETag wastes the whole upload. A post carries images OR one video, ' +
+      'never both. ' +
       'Remaining limits here are unverified.',
   },
 
