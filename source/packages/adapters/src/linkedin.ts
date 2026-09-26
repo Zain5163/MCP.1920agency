@@ -1,4 +1,7 @@
-import { readFile } from 'node:fs/promises'
+import { open, stat, unlink } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { randomUUID } from 'node:crypto'
 
 import {
   CAPABILITIES,
@@ -71,6 +74,53 @@ const RESERVED = /[\\|{}@[\]()<>#*_~]/g
  */
 export function escapeLittleText(text: string): string {
   return text.replace(RESERVED, (character) => `\\${character}`)
+}
+
+/**
+ * A file that can be read one byte range at a time.
+ *
+ * Exists so a large video is never held in memory in one piece: LinkedIn asks
+ * for 4 MB parts, and each part is read from disk only when it is about to be
+ * sent.
+ */
+interface MediaSource {
+  readonly size: number
+  read(start: number, endInclusive: number): Promise<Uint8Array>
+  close(): Promise<void>
+}
+
+/**
+ * `owned` means this adapter created the file and must delete it. A caller's own
+ * media is never deleted, which would be a spectacular thing to get wrong.
+ */
+async function fileSource(path: string, owned: boolean): Promise<MediaSource> {
+  const { size } = await stat(path)
+  const handle = await open(path, 'r')
+  let closed = false
+
+  return {
+    size,
+    async read(start, endInclusive) {
+      const length = endInclusive - start + 1
+      const buffer = Buffer.allocUnsafe(length)
+      const { bytesRead } = await handle.read(buffer, 0, length, start)
+      // A short read means the file changed under us mid-upload. Sending the
+      // padding would upload silent corruption, so it stops instead.
+      if (bytesRead !== length) {
+        throw new PublishError(
+          `Read ${bytesRead} bytes where ${length} were expected. The media file changed while it was being uploaded.`,
+          { failureClass: 'transient' },
+        )
+      }
+      return new Uint8Array(buffer)
+    },
+    async close() {
+      if (closed) return
+      closed = true
+      await handle.close().catch(() => {})
+      if (owned) await unlink(path).catch(() => {})
+    },
+  }
 }
 
 export interface LinkedInAdapterOptions {
@@ -233,25 +283,30 @@ export class LinkedInAdapter implements PlatformAdapter {
       })
     }
 
-    const bytes = await this.#readMedia(media)
-
+    const source = await this.#openMedia(media)
     let put: Response
     try {
-      const request: RequestInit = {
-        method: 'PUT',
-        headers: {
-          Authorization: `Bearer ${ctx.credential.accessToken}`,
-          'content-type': media.mime,
-        },
-        body: bytes,
+      // An image goes up in one piece; LinkedIn offers no parts for images.
+      const bytes = await source.read(0, source.size - 1)
+      try {
+        const request: RequestInit = {
+          method: 'PUT',
+          headers: {
+            Authorization: `Bearer ${ctx.credential.accessToken}`,
+            'content-type': media.mime,
+          },
+          body: bytes,
+        }
+        if (ctx.signal !== undefined) request.signal = ctx.signal
+        put = await this.#fetch(target, request)
+      } catch (cause) {
+        throw new PublishError('Could not upload the image to LinkedIn', {
+          failureClass: classifyNetworkError(cause),
+          cause,
+        })
       }
-      if (ctx.signal !== undefined) request.signal = ctx.signal
-      put = await this.#fetch(target, request)
-    } catch (cause) {
-      throw new PublishError('Could not upload the image to LinkedIn', {
-        failureClass: classifyNetworkError(cause),
-        cause,
-      })
+    } finally {
+      await source.close()
     }
 
     if (!put.ok) {
@@ -281,15 +336,29 @@ export class LinkedInAdapter implements PlatformAdapter {
    * and a video upload is already slow enough that this is not where the time goes.
    */
   async #uploadVideo(ctx: PublishContext, owner: string, media: MediaRef): Promise<string> {
-    const bytes = await this.#readMedia(media)
+    const source = await this.#openMedia(media)
+    try {
+      return await this.#uploadVideoFrom(ctx, owner, media, source)
+    } finally {
+      // Always closes the handle and removes any temporary download, including
+      // when a part fails partway through.
+      await source.close()
+    }
+  }
 
+  async #uploadVideoFrom(
+    ctx: PublishContext,
+    owner: string,
+    media: MediaRef,
+    source: MediaSource,
+  ): Promise<string> {
     const init = await this.#send(
       ctx,
       'POST',
       `${LINKEDIN_BASE}/rest/videos?action=initializeUpload`,
       // fileSizeBytes decides how many parts come back, so it must be the real
       // length rather than anything the caller declared.
-      { initializeUploadRequest: { owner, fileSizeBytes: bytes.length } },
+      { initializeUploadRequest: { owner, fileSizeBytes: source.size } },
     )
 
     const parsed = (await init.json()) as VideoUploadInit
@@ -305,8 +374,10 @@ export class LinkedInAdapter implements PlatformAdapter {
 
     const partIds: string[] = []
     for (const [index, part] of instructions.entries()) {
-      // lastByte is inclusive; subarray's end is not.
-      const chunk = bytes.subarray(part.firstByte, part.lastByte + 1)
+      // Read this part only when it is about to be sent, so only one 4 MB slice
+      // is in memory at a time regardless of how large the video is.
+      // lastByte is inclusive.
+      const chunk = await source.read(part.firstByte, Math.min(part.lastByte, source.size - 1))
 
       let response: Response
       try {
@@ -358,11 +429,22 @@ export class LinkedInAdapter implements PlatformAdapter {
     return urn
   }
 
-  /** LinkedIn wants bytes, so take them from wherever this media actually is. */
-  async #readMedia(media: MediaRef): Promise<Uint8Array> {
+  /**
+   * Opens media as a file on disk that can be read one range at a time.
+   *
+   * The first version of this returned the whole file as a single `Uint8Array`.
+   * Fine for a 1.6 MB image, and an out-of-memory crash for a 400 MB video —
+   * several concurrent uploads on a worker would each hold their entire file in
+   * one buffer. Since LinkedIn wants the video in 4 MB parts anyway, reading
+   * those parts straight from disk is both the fix and the natural shape.
+   *
+   * A URL is downloaded to a temporary file first rather than held in memory.
+   * That trades disk for RAM deliberately: disk is the resource we have.
+   */
+  async #openMedia(media: MediaRef): Promise<MediaSource> {
     if (media.localPath !== undefined) {
       try {
-        return new Uint8Array(await readFile(media.localPath))
+        return await fileSource(media.localPath, false)
       } catch (cause) {
         throw new PublishError(`Could not read the media file at ${media.localPath}`, {
           failureClass: 'permanent',
@@ -372,22 +454,47 @@ export class LinkedInAdapter implements PlatformAdapter {
     }
 
     if (media.publicUrl !== undefined) {
+      const url = media.publicUrl
       let response: Response
       try {
-        response = await this.#fetch(media.publicUrl)
+        response = await this.#fetch(url)
       } catch (cause) {
-        throw new PublishError(`Could not download the media from ${media.publicUrl}`, {
+        throw new PublishError(`Could not download the media from ${url}`, {
           failureClass: classifyNetworkError(cause),
           cause,
         })
       }
       if (!response.ok) {
-        throw new PublishError(
-          `Media host returned HTTP ${response.status} for ${media.publicUrl}`,
-          { failureClass: classifyHttpStatus(response.status), httpStatus: response.status },
-        )
+        throw new PublishError(`Media host returned HTTP ${response.status} for ${url}`, {
+          failureClass: classifyHttpStatus(response.status),
+          httpStatus: response.status,
+        })
       }
-      return new Uint8Array(await response.arrayBuffer())
+
+      const temp = join(tmpdir(), `adspilot-${randomUUID()}`)
+      try {
+        const handle = await open(temp, 'w')
+        try {
+          // Streamed rather than buffered, so a large download never exists in
+          // memory in one piece either.
+          if (response.body !== null) {
+            for await (const chunk of response.body as unknown as AsyncIterable<Uint8Array>) {
+              await handle.write(chunk)
+            }
+          }
+        } finally {
+          await handle.close()
+        }
+      } catch (cause) {
+        await unlink(temp).catch(() => {})
+        throw new PublishError(`Could not save the download from ${url}`, {
+          failureClass: 'transient',
+          cause,
+        })
+      }
+
+      // Owned: this temp file is deleted when the source is closed.
+      return await fileSource(temp, true)
     }
 
     throw new PublishError('The media has neither a local file nor a URL to upload from.', {

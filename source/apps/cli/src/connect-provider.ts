@@ -170,7 +170,7 @@ function usage(requested: string | undefined): never {
 
   console.error('  Configured and ready:\n')
   for (const provider of available) {
-    console.error(`    ${provider.key.padEnd(10)} ${provider.displayName}`)
+    console.error(`    ${provider.key.padEnd(14)} ${provider.displayName}`)
   }
   console.error(`\n  Run:  pnpm connect:provider ${available[0]!.key}\n`)
   process.exit(1)

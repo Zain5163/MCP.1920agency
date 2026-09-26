@@ -417,19 +417,35 @@ describe('authorisation and discovery', () => {
 })
 
 describe('video', () => {
-  const VIDEO_INIT = (parts: number): Reply => ({
-    body: {
-      value: {
-        video: 'urn:li:video:VID1',
-        uploadToken: 'TOKEN',
-        uploadInstructions: Array.from({ length: parts }, (_, i) => ({
-          uploadUrl: `https://upload.linkedin.example/part${i}`,
-          firstByte: i * 10,
-          lastByte: i * 10 + 9,
-        })),
+  /**
+   * The mocked download returns JSON.stringify([1,2,3,4,5]), which is 11 bytes,
+   * so the byte ranges have to cover exactly those 11 bytes.
+   *
+   * That precision matters: the adapter now reads each part from disk and fails
+   * on a short read, because a short read means the file changed mid-upload and
+   * sending the padding would upload silent corruption. Ranges that overshoot
+   * the file — which these fixtures originally had — used to pass only
+   * because the old in-memory version returned empty slices without complaint.
+   */
+  const DOWNLOAD: Reply = { body: [1, 2, 3, 4, 5] }
+  const TOTAL = JSON.stringify([1, 2, 3, 4, 5]).length
+
+  const VIDEO_INIT = (parts: number): Reply => {
+    const per = Math.ceil(TOTAL / parts)
+    return {
+      body: {
+        value: {
+          video: 'urn:li:video:VID1',
+          uploadToken: 'TOKEN',
+          uploadInstructions: Array.from({ length: parts }, (_, i) => ({
+            uploadUrl: `https://upload.linkedin.example/part${i}`,
+            firstByte: i * per,
+            lastByte: Math.min(i * per + per - 1, TOTAL - 1),
+          })),
+        },
       },
-    },
-  })
+    }
+  }
 
   const PART = (etag: string): Reply => ({ headers: { etag } })
 
@@ -448,7 +464,7 @@ describe('video', () => {
     // The media is fetched FIRST, because the real length is what decides how
     // many parts come back. JSON.stringify([1,2,3,4,5]) is 11 bytes.
     const { fetchImpl, calls } = mockLinkedIn([
-      { body: [1, 2, 3, 4, 5] }, // the media download
+      DOWNLOAD, // the media download
       VIDEO_INIT(1),
       PART('"etag-0"'),
       {},
@@ -460,12 +476,12 @@ describe('video', () => {
     const init = calls.find((c) => c.url.includes('initializeUpload'))!
     const request = init.body.initializeUploadRequest as { fileSizeBytes: number }
     assert.notEqual(request.fileSizeBytes, 999_999, 'must not trust the declared size')
-    assert.equal(request.fileSizeBytes, 11)
+    assert.equal(request.fileSizeBytes, TOTAL)
   })
 
   test('uploads every part and finalises with the ETags in order', async () => {
     const { fetchImpl, calls } = mockLinkedIn([
-      { body: [1, 2, 3, 4, 5] },
+      DOWNLOAD,
       VIDEO_INIT(3),
       PART('"e0"'),
       PART('"e1"'),
@@ -492,7 +508,7 @@ describe('video', () => {
 
   test('a part with no ETag stops the upload rather than finalising a broken video', async () => {
     const { fetchImpl, calls } = mockLinkedIn([
-      { body: [1] },
+      DOWNLOAD,
       VIDEO_INIT(2),
       PART('"e0"'),
       { headers: {} }, // second part returns no ETag
@@ -507,7 +523,7 @@ describe('video', () => {
 
   test('the finished video is referenced as content.media', async () => {
     const { fetchImpl, calls } = mockLinkedIn([
-      { body: [1] },
+      DOWNLOAD,
       VIDEO_INIT(1),
       PART('"e0"'),
       {},
@@ -540,12 +556,78 @@ describe('video', () => {
 
   test('missing upload instructions fail before any PUT', async () => {
     const { fetchImpl, calls } = mockLinkedIn([
-      { body: [1] },
+      DOWNLOAD,
       { body: { value: { video: 'urn:li:video:X' } } },
     ])
     const li = new LinkedInAdapter({ fetch: fetchImpl })
 
     await assert.rejects(() => li.publish(ctx(), draft({ media: [vid()] })), PublishError)
     assert.equal(calls.some((c) => c.method === 'PUT'), false)
+  })
+})
+
+describe('large media is never held in memory whole', () => {
+  /**
+   * The defect this guards against: the first version read the entire file into
+   * one Uint8Array before slicing it. Fine for an image, an out-of-memory crash
+   * for a large video on a busy worker.
+   *
+   * A unit test cannot measure memory, so it asserts the observable consequence
+   * instead — each part sent is only as large as its own byte range, and the
+   * ranges come from LinkedIn rather than from anything we buffered.
+   */
+  test('each PUT carries only its own 4 MB range, not the whole file', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'li-big-'))
+    const file = join(dir, 'big.mp4')
+    // 10 MB: three parts at LinkedIn's 4 MB boundary.
+    const size = 10 * 1024 * 1024
+    await writeFile(file, Buffer.alloc(size, 9))
+
+    const PART_BYTES = 4 * 1024 * 1024
+    const ranges = [
+      { firstByte: 0, lastByte: PART_BYTES - 1 },
+      { firstByte: PART_BYTES, lastByte: PART_BYTES * 2 - 1 },
+      { firstByte: PART_BYTES * 2, lastByte: size - 1 },
+    ]
+
+    const { fetchImpl, calls } = mockLinkedIn([
+      {
+        body: {
+          value: {
+            video: 'urn:li:video:BIG',
+            uploadToken: 'T',
+            uploadInstructions: ranges.map((r, i) => ({
+              uploadUrl: `https://upload.linkedin.example/p${i}`,
+              ...r,
+            })),
+          },
+        },
+      },
+      { headers: { etag: '"a"' } },
+      { headers: { etag: '"b"' } },
+      { headers: { etag: '"c"' } },
+      {},
+      CREATED,
+    ])
+
+    const li = new LinkedInAdapter({ fetch: fetchImpl })
+    await li.publish(
+      ctx(),
+      draft({
+        media: [
+          { id: 'v', kind: 'video', mime: 'video/mp4', bytes: size, localPath: file },
+        ],
+      }),
+    )
+
+    const puts = calls.filter((c) => c.method === 'PUT')
+    assert.equal(puts.length, 3)
+    assert.equal((puts[0]!.rawBody as Uint8Array).length, PART_BYTES)
+    assert.equal((puts[1]!.rawBody as Uint8Array).length, PART_BYTES)
+    assert.equal((puts[2]!.rawBody as Uint8Array).length, size - PART_BYTES * 2)
+
+    // The declared size is ignored; the real file length is what is sent.
+    const init = calls[0]!.body.initializeUploadRequest as { fileSizeBytes: number }
+    assert.equal(init.fileSizeBytes, size)
   })
 })

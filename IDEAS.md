@@ -238,16 +238,24 @@ all platforms beats a tab per platform. Depends on D1/D2 analytics.
 _Added 2026-09-26, after the LinkedIn video adapter was built and the owner asked
 whether the MCP could shrink files itself._
 
-### J1. ⚠️ First, a real defect: the whole file is read into memory
+### ~~J1. The whole file is read into memory~~ **FIXED 2026-09-27**
 
-`#readMedia` in the LinkedIn adapter returns the entire file as one `Uint8Array`,
-then slices it into parts. Harmless for a 1.6 MB image. A 400 MB video means 400 MB
-of RAM in a single buffer, and several at once on a busy worker is an
-out-of-memory crash rather than a slow upload.
+`#readMedia` returned the entire file as one `Uint8Array` and sliced it. Harmless
+for a 1.6 MB image; 400 MB of RAM in a single buffer for a large video, and an
+out-of-memory crash rather than a slow upload with several running at once.
 
-**This should be fixed before video is used for anything real**, and it is a
-prerequisite for J2 rather than a nice-to-have: streaming the file in 4 MB parts
-straight from disk is both the fix and the natural shape for chunked upload.
+Replaced by a `MediaSource` that reads one byte range at a time from disk. A URL
+is downloaded to a temporary file first — trading disk for RAM deliberately,
+because disk is the resource we have — and that file is deleted when the source
+closes, including when a part fails partway through.
+
+Two things the rewrite made strict that were previously silent:
+
+- **A short read now fails.** It means the file changed mid-upload, and sending
+  the padding would upload silent corruption.
+- That strictness **immediately caught unrealistic byte ranges in the project's
+  own tests**, which had passed only because the in-memory version returned empty
+  slices without complaint.
 
 ### J2. Transcode and compress per platform
 

@@ -528,6 +528,39 @@ client footage, unreviewed personal footage, or third-party reference material
 (someone else's copyrighted upload). Choosing one unilaterally to post publicly
 would have been reckless, so the owner nominates the file.
 
+## 2026-09-27 — Fixed the memory defect before using video for anything
+
+Owner asked whether the MCP could compress video. Answering that surfaced a
+defect in code written hours earlier, and R9 says nothing new is built on top of
+a known defect, so it was fixed first.
+
+`#readMedia` read the **entire file into one buffer**, then sliced it into 4 MB
+parts. A 400 MB video meant 400 MB of RAM in one allocation; several concurrent
+uploads on a worker would be an out-of-memory crash, not a slow upload.
+
+Replaced with a `MediaSource` that reads one range at a time from disk. A URL is
+streamed to a temporary file first rather than buffered, which trades disk for
+RAM on purpose. The temp file is removed when the source closes, including on a
+failure partway through a multi-part upload.
+
+**A short read is now an error.** It means the file changed while it was being
+uploaded, and sending the padding would upload silent corruption rather than
+failing — the same class of problem as LinkedIn's text truncation, and worth
+the same refusal to paper over.
+
+That strictness immediately **caught unrealistic byte ranges in this project's
+own video tests**. They had passed only because the in-memory version returned
+empty slices without complaint. A stricter implementation finding bad fixtures
+is the test suite doing its job late rather than never.
+
+A new test uses a real 10 MB file and asserts each PUT carries only its own 4 MB
+range. Memory cannot be measured in a unit test, so it asserts the observable
+consequence instead.
+
+Also: both LinkedIn providers now register and list correctly — `linkedin` and
+`linkedin_page` — confirmed by running the connect command. The page app cannot
+authorise yet; Community Management is **Review in progress**.
+
 ## Verified live, not just tested
 
 | What | How it was proven |
