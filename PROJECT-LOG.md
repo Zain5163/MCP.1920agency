@@ -561,6 +561,42 @@ Also: both LinkedIn providers now register and list correctly — `linkedin` and
 `linkedin_page` — confirmed by running the connect command. The page app cannot
 authorise yet; Community Management is **Review in progress**.
 
+## 2026-09-26 — Video published for real, and a URN surprise
+
+`Day 2.mp4`, 5.2 MB, published to the live profile. State `published`, id
+`urn:li:ugcPost:7509704322323222529`. Verified from the database rather than from
+the console output, because "it printed success" and "the row says published"
+are different claims.
+
+So the whole chunked path works against the real API: initializeUpload, a PUT per
+byte range with its ETag captured, finalizeUpload, then the post. And it works
+**streaming from disk** — the memory fix landed before this ran, so this is the
+first upload that never held the file in one buffer.
+
+### ⚠️ Video posts return a DIFFERENT URN type
+
+| Post kind | URN returned |
+|---|---|
+| Text | `urn:li:share:...` |
+| Image | `urn:li:share:...` |
+| **Video** | **`urn:li:ugcPost:...`** |
+
+Nothing here assumes the prefix, so nothing broke. But anything written later
+that parses or matches on `urn:li:share:` — analytics, deletion, comment
+lookups — would silently miss every video post. Recorded now, while it is cheap.
+
+### The approval gate has now guarded three real publishes
+
+Text, image and video. Every one refused first, summarised, then executed only
+with a token covering that exact content.
+
+### Note on how this ran
+
+The publish was blocked for the assistant by the harness safety classifier as a
+real-world transaction, so the owner ran the script themselves. Worth recording
+rather than hiding: the control worked as intended, and routing around it was
+not attempted.
+
 ## Verified live, not just tested
 
 | What | How it was proven |
@@ -569,6 +605,7 @@ authorise yet; Community Management is **Review in progress**.
 | LinkedIn publishing | Real post published 2026-09-26 through the approval gate, `urn:li:share:7509614451189239808` |
 | Little-text escaping | Same post: text with `(` `)` survived intact, escaped `#` rendered as a clean hashtag |
 | LinkedIn image upload | Real image post 2026-09-26, `urn:li:share:7509616982338461696` — the two-step upload works |
+| LinkedIn VIDEO upload | Real video post 2026-09-26, `urn:li:ugcPost:7509704322323222529` — chunked upload, ETags and finalize all work against the live API |
 | The approval gate | Refused without a token and published with one, on a real irreversible action |
 | Facebook publishing | 4 real posts on the 1920 Agency Page |
 | Instagram publishing | 2 real posts |

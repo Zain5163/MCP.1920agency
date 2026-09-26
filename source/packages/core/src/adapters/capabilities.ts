@@ -239,6 +239,9 @@ export const CAPABILITIES: Readonly<Record<Platform, CapabilityRecord>> = {
       'Text containing ( ) survived intact, and an escaped # rendered as a normal ' +
       'hashtag with no backslash visible — LinkedIn unescapes little text on display. ' +
       'A created post returns 201 with an empty body; the id is in the x-restli-id header. ' +
+      'The URN TYPE DIFFERS BY POST KIND, confirmed 2026-09-26: text and image posts ' +
+      'return urn:li:share:..., video posts return urn:li:ugcPost:... . Anything that ' +
+      'matches on the share prefix will silently miss every video post. ' +
       'Every call needs LinkedIn-Version (YYYYMM, retired after about a year) and ' +
       'X-Restli-Protocol-Version: 2.0.0. ' +
       'TWO self-serve products are needed, not one: "Share on LinkedIn" grants w_member_social, ' +
