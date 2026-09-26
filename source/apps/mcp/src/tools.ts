@@ -4,6 +4,8 @@ import { z } from 'zod'
 import type { TokenIdentity } from '@social-publisher/auth'
 import {
   PLATFORMS,
+  decide,
+  formatApprovalRequest,
   formatResolution,
   resolutionFor,
   type Connection,
@@ -91,6 +93,26 @@ const draftShape = {
     .describe('Attachments, as public URLs. Instagram requires these.'),
 }
 
+/**
+ * The publish tool takes everything a draft does, plus a confirmation token.
+ *
+ * Deliberately NOT a boolean. A `confirm: true` flag would be set by the same
+ * model that composed the post, which is no check at all. The token is an HMAC
+ * over this exact payload, handed back only after a person has seen the summary
+ * — so it cannot be invented, and it does not survive an edit.
+ */
+const publishShape = {
+  ...draftShape,
+  confirm: z
+    .string()
+    .optional()
+    .describe(
+      'Approval token from a previous call to this tool. Call without it first: ' +
+        'you will get a summary to show the user. Only after they approve, call ' +
+        'again with everything identical plus this token.',
+    ),
+}
+
 export function registerTools(server: McpServer, identity: TokenIdentity, logger: Logger): void {
   const { scope } = identity
 
@@ -162,7 +184,7 @@ export function registerTools(server: McpServer, identity: TokenIdentity, logger
   server.tool(
     'publish_post',
     'Publish immediately to this account\'s social platforms. This is PUBLIC and cannot be undone — confirm the exact wording with the user before calling it.',
-    draftShape,
+    publishShape,
     async (args) =>
       await guard('publish_post', async () => {
         const { draft, platforms, connections } = await buildDraft(scope, args)
@@ -184,6 +206,45 @@ export function registerTools(server: McpServer, identity: TokenIdentity, logger
 
         // Proves every connection belongs to this token's tenant.
         await scope.requireConnections(chosen.map((c) => c.id))
+
+        /**
+         * The approval gate.
+         *
+         * Placed HERE, after validation and account resolution, so the summary
+         * describes a post that would actually go out — approving something that
+         * would then fail validation teaches people the gate is noise.
+         *
+         * Placed BEFORE createPost, so a refusal leaves no trace. "Nothing has
+         * been sent" has to be literally true or it is worse than no message.
+         */
+        const gate = decide({
+          action: 'publish_post',
+          // Only what is actually published. Including the caller's raw arguments
+          // would let an irrelevant field invalidate an approval the user gave.
+          payload: {
+            body: draft.body,
+            accounts: chosen.map((c) => c.id).sort(),
+            media: draft.media.map((m) => m.publicUrl ?? m.id),
+          },
+          ...(args.confirm !== undefined ? { confirmation: args.confirm } : {}),
+          describe: () =>
+            [
+              `Publishing to ${chosen.length} account(s):`,
+              ...chosen.map((c) => `  ${c.platform.padEnd(15)} ${c.displayName}`),
+              '',
+              'Text:',
+              ...draft.body.split('\n').map((line) => `  ${line}`),
+              ...(draft.media.length > 0 ? ['', `Attachments: ${draft.media.length}`] : []),
+            ].join('\n'),
+        })
+
+        if (!gate.allowed) {
+          await logger.info('mcp.publish_post.awaiting_approval', 'approval requested', {
+            tenantId: scope.tenantId,
+            data: { accounts: chosen.length },
+          })
+          return text(formatApprovalRequest(gate))
+        }
 
         const post = await scope.createPost({ body: draft.body, createdBy: `mcp:${identity.userId}` })
 

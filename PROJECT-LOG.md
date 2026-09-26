@@ -381,6 +381,40 @@ Fixed by naming browser executables directly and falling back to the handler, an
 the printed URL now says why a desktop app cannot be used. Same family as the
 earlier `cmd /c start` bug: on Windows, "open this URL" is not one thing.
 
+## 2026-09-26 — The policy layer: closing R11
+
+Until today the only thing between a model's mistake and a public post was **a
+sentence in a tool description** asking it to confirm. That is advice to the very
+component being constrained, and it fails precisely when the model is confused —
+the case that matters. Raised by an outside architecture review the owner brought
+in; it was the one thing in that review we did not already have.
+
+`packages/core/src/domain/policy.ts`, 26 tests.
+
+- Actions are classified **low / medium / high**. Reads execute. Scheduling and
+  cancelling execute and are audited — recoverable, not harmless. Publishing
+  requires approval.
+- **An unclassified action defaults to high.** An action nobody classified is far
+  more likely to be new and unconsidered than harmless, so it fails closed. The
+  test suite asserts this, because it is what keeps the layer trustworthy as the
+  system grows.
+- **Confirmation is a token, not a boolean.** A `confirm: true` flag would be set
+  by the same model that composed the post — no check at all. The token is an HMAC
+  over the canonical payload, so it cannot be invented, and a token for one post
+  does not authorise different text. Editing a single character invalidates it.
+- The secret is generated **per process**, so an approval cannot be replayed days
+  later against a system that has moved on.
+- The gate sits **after** validation (so the summary describes a post that would
+  really go out) and **before** `createPost` (so "nothing has been sent" is
+  literally true, not approximately true).
+- Object key order does not change a token; **array order does**, because order is
+  content.
+
+**Spend ceilings are written and tested but wired to nothing**, because no ads
+code exists. They are here so the first ads adapter has an obvious place to call
+rather than an excuse to invent its own. A mismatched currency is refused rather
+than converted: a wrong exchange rate silently multiplies a budget.
+
 ## Verified live, not just tested
 
 | What | How it was proven |

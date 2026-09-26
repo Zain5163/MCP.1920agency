@@ -110,10 +110,19 @@ Nothing an AI decides may execute an irreversible or money-spending action on it
 own. The classification and the limits live in code, not in instructions to a
 model.
 
-**Status: stated, not yet built.** `publish_post` currently executes with only a
-sentence in its tool description asking the model to confirm first. Recorded as
-section I in `IDEAS.md`. Listed here because it is the rule, and the gap between
-the rule and the code is exactly what this file exists to make visible.
+**Status: built 2026-09-26** for publishing, in
+`source/packages/core/src/domain/policy.ts`. Actions are classified low, medium or
+high risk; high risk returns a summary and a token and executes only when that
+token comes back. The token is an HMAC over the exact payload, so it cannot be
+invented and does not survive an edit to the content — which is what a `confirm:
+true` boolean could never give, since the model setting the flag is the one that
+composed the post.
+
+Unclassified actions default to **high**, so forgetting to classify a new action
+fails closed.
+
+Spend ceilings are written and tested but used by nothing, because no ads code
+exists yet.
 
 ---
 
