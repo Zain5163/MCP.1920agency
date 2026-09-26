@@ -40,6 +40,22 @@ import { graphError, type GraphErrorBody } from './meta-errors.ts'
 export const INSTAGRAM_API_VERSION = 'v25.0'
 const GRAPH_BASE = 'https://graph.facebook.com'
 
+/**
+ * The other way in.
+ *
+ * Instagram authorised directly — no Facebook Page — speaks to its own host with
+ * its own token. Same platform, same publishing flow, different address. See
+ * `decisions/0004`.
+ *
+ * Sending a direct-Instagram token to graph.facebook.com fails with an auth
+ * error that says nothing about the host being wrong, which is why this is
+ * chosen from the connection rather than guessed.
+ */
+const INSTAGRAM_DIRECT_BASE = 'https://graph.instagram.com'
+
+/** The provider key set on connections authorised through Instagram itself. */
+const DIRECT_PROVIDER_KEY = 'instagram'
+
 type ContainerStatus = 'EXPIRED' | 'ERROR' | 'FINISHED' | 'IN_PROGRESS' | 'PUBLISHED'
 
 export interface InstagramAdapterOptions {
@@ -261,8 +277,22 @@ export class InstagramAdapter implements PlatformAdapter {
     return await this.#request<T>(ctx, `${path}?${params.toString()}`, { method: 'GET' })
   }
 
+  /**
+   * Which Instagram this connection is.
+   *
+   * A connection made through a Facebook Page carries the provider that created
+   * it — 'meta' — while one authorised through Instagram itself carries
+   * 'instagram'. Older connections predate the field entirely; they were all made
+   * through a Page, so the Page host is the right default.
+   */
+  #baseFor(ctx: PublishContext): string {
+    return ctx.connection.providerKey === DIRECT_PROVIDER_KEY
+      ? INSTAGRAM_DIRECT_BASE
+      : GRAPH_BASE
+  }
+
   async #request<T>(ctx: PublishContext, path: string, init: RequestInit): Promise<T> {
-    const url = `${GRAPH_BASE}/${this.#apiVersion}/${path}`
+    const url = `${this.#baseFor(ctx)}/${this.#apiVersion}/${path}`
 
     let response: Response
     try {

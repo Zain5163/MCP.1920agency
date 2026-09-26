@@ -7,6 +7,7 @@ import {
   flattenAccounts,
   providerFor,
   registerLinkedInProvider,
+  registerInstagramProvider,
   registerMetaProvider,
   registerPinterestProvider,
   registerThreadsProvider,
@@ -77,6 +78,23 @@ function registerConfigured(): void {
       appSecret: metaSecret,
       redirectUri: optional('META_REDIRECT_URI', 'http://localhost:8787/callback')!,
       apiVersion: optional('META_API_VERSION', 'v25.0')!,
+    })
+  }
+
+  /**
+   * Instagram authorised directly, with no Facebook Page involved.
+   *
+   * A separate app id and secret from the Meta app — the Instagram app has its
+   * own, shown on the Instagram product page rather than the app's main settings.
+   * For businesses that never made a Facebook Page, this is the only way in.
+   */
+  const igId = optional('INSTAGRAM_APP_ID')
+  const igSecret = optional('INSTAGRAM_APP_SECRET')
+  if (igId !== undefined && igSecret !== undefined) {
+    registerInstagramProvider({
+      appId: igId,
+      appSecret: igSecret,
+      redirectUri: optional('INSTAGRAM_REDIRECT_URI', 'http://localhost:8787/instagram/callback')!,
     })
   }
 

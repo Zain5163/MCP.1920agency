@@ -70,6 +70,18 @@ export interface Connection {
   readonly scopes: readonly string[]
   readonly expiresAt?: Date
   readonly needsReauth: boolean
+  /**
+   * Which provider's authorisation created this connection.
+   *
+   * Some platforms can be reached more than one way, and the routes are not
+   * interchangeable — Instagram via a Facebook Page speaks to a different host
+   * than Instagram authorised directly. An adapter needs to know which it is
+   * holding.
+   *
+   * Deliberately an opaque string here: core never interprets it, so no platform
+   * knowledge leaks into the domain. Only the adapter reads it.
+   */
+  readonly providerKey?: string
 }
 
 /**

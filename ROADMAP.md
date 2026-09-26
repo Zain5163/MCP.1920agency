@@ -65,7 +65,8 @@ platforms it takes weeks.
 |---|---|---|---|
 | Facebook Pages | ✅ | none beyond the app | **publishing** |
 | Facebook *personal profiles* | ❌ | **Impossible.** `publish_actions` was removed in 2018 and never replaced — no approval grants it | will not be built |
-| Instagram | ✅ | none beyond the app | **publishing** |
+| Instagram (via a Facebook Page) | ✅ | none beyond the app | **publishing** |
+| Instagram (direct, **no Page needed**) | ✅ | its own Instagram app id and secret | adapter and provider built, awaiting credentials |
 | Threads | ✅ | Meta app with the Threads use case — **no review** | waiting on app config |
 | **Pinterest** | ✅ | ⚠️ **Trial access = sandbox.** Pins are visible only to you until Standard Access, which needs a submitted video | adapter built, awaiting app credentials |
 | **LinkedIn** | ✅ | Personal profile: self-serve, **no review** — done. Company pages need Community Management API, whose request button is **disabled outright** on a verified app | **text, image and video all published live 2026-09-26**; posting as a person — page app awaiting Community Management review |

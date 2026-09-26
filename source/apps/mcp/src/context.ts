@@ -86,6 +86,9 @@ export async function loadConnections(scope: TenantScope): Promise<Connection[]>
     credentialSource: r.credentialSource,
     scopes: r.scopes,
     needsReauth: r.needsReauth,
+    ...('providerAuth' in r && r.providerAuth !== null && r.providerAuth !== undefined
+      ? { providerKey: (r.providerAuth as { provider: string }).provider }
+      : {}),
     ...(r.expiresAt !== null ? { expiresAt: r.expiresAt } : {}),
   }))
 }

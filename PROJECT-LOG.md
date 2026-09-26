@@ -748,6 +748,62 @@ reusable files, and scheduled monitoring with rules.
 touched. Deleting or moving another project's folder needs explicit approval, so
 it waits for one.
 
+## 2026-09-27 — Instagram without a Facebook Page
+
+Owner's observation, and a good one: *"most of the time people directly create
+business account through their Instagram."* Those businesses could not connect
+at all, and "you need a Facebook Page you do not want" is not a reason anyone
+accepts.
+
+Checked before building, per R7 — secondary sources contradicted each other, so
+Meta's own documentation settled it: *"This API setup does not require a
+Facebook Page to be linked to the Instagram professional account."*
+
+`decisions/0004`, `instagram-provider.ts`, 13 tests.
+
+### The architectural problem, and why it was small
+
+`PublishService` holds `Map<Platform, PlatformAdapter>` — **one adapter per
+platform, by construction**. Two Instagram adapters do not fit, and making them
+fit would mean platform branching in the publisher, which the architecture test
+forbids.
+
+Solved by letting the adapter choose its host from the connection. The
+information was already stored: `providerAuthId` points at the authorisation
+that created the connection. It simply was never carried through. So
+`Connection` gained `providerKey`, populated from an existing relation —
+**no schema change**.
+
+`providerKey` is an opaque string in core and is never interpreted there. Only
+the adapter reads it, so no platform knowledge leaks.
+
+### Not a second platform, deliberately
+
+An `instagram_direct` platform value was rejected: it is the same Instagram
+account reached differently. A customer seeing two Instagrams in a list would
+reasonably ask which one is theirs.
+
+Inferring the host from scopes was also rejected — it works today and breaks
+silently whenever a scope name changes, and the failure is a request to the
+wrong host that reads like an auth problem.
+
+### Details that will bite someone otherwise
+
+- **Two token exchanges.** The first returns a token lasting about an hour.
+  Stopping there gives a connection that works while you test it and is dead by
+  morning. Same trap as Meta and Threads.
+- **This token expires and refreshes**; a Page token does not. So this provider
+  implements `refresh` and Meta's does not, and the existing refresh runner
+  needed no changes.
+- **Its own app id and secret**, shown on the Instagram product page, not the
+  Meta app id. Different numbers entirely.
+- **Scopes are comma-separated** here, space-separated on LinkedIn. Four
+  platforms, three conventions, each rejecting the others unhelpfully.
+- The old `business_*` scope names were retired 2025-01-27. A test asserts the
+  current ones.
+
+**Not verified live** — no Instagram app credentials configured yet.
+
 ## Verified live, not just tested
 
 | What | How it was proven |
