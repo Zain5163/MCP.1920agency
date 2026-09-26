@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process'
+import { existsSync } from 'node:fs'
 
 import {
   allProviders,
@@ -183,7 +184,11 @@ async function main(): Promise<void> {
   })
 
   console.log(`\n  Opening ${provider.displayName} in your browser…`)
-  console.log(`  If nothing opens, paste this in yourself:\n\n  ${authUrl}\n`)
+  console.log('  If a DESKTOP APP opens instead of a browser, it cannot complete this.')
+  console.log(`  Paste this into a browser instead:
+
+  ${authUrl}
+`)
   openBrowser(authUrl)
 
   const { code } = await listener.promise
@@ -298,9 +303,33 @@ async function ensureTenant() {
   return existing ?? (await db().tenant.create({ data: { name: TENANT_NAME } }))
 }
 
+/**
+ * Windows browsers, in the order we would rather use them.
+ *
+ * Handing the URL to the system handler is the obvious approach and it fails in a
+ * specific way: if the platform's desktop app is installed, Windows gives the link
+ * to *that*. The LinkedIn app opened instead of a browser, and a desktop app
+ * cannot complete a redirect to localhost, so the authorisation never arrives.
+ * Naming a browser executable avoids the handler entirely.
+ */
+const WINDOWS_BROWSERS = [
+  'C:/Program Files/Google/Chrome/Application/chrome.exe',
+  'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe',
+  'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
+  'C:/Program Files/Microsoft/Edge/Application/msedge.exe',
+  'C:/Program Files/Mozilla Firefox/firefox.exe',
+]
+
 function openBrowser(url: string): void {
   try {
     if (process.platform === 'win32') {
+      const browser = WINDOWS_BROWSERS.find((path) => existsSync(path))
+      if (browser !== undefined) {
+        spawn(browser, [url], { detached: true, stdio: 'ignore' }).unref()
+        return
+      }
+      // No known browser installed. Fall back to the system handler, which may
+      // open a desktop app instead — which is why the URL is always printed too.
       // cmd.exe treats & as a command separator, so an unquoted OAuth URL is cut
       // at the first parameter and the platform reports a missing redirect URI.
       // rundll32 receives the URL as one argv entry with no shell parsing.

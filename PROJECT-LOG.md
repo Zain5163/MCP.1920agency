@@ -359,10 +359,33 @@ around a different fixture platform.
 
 ---
 
+## 2026-09-26 — LinkedIn connected for real
+
+`pnpm connect:provider linkedin` ran end to end: dialog, callback, token
+exchange, `/v2/userinfo`, encrypted storage. `pnpm status` shows
+`linkedin  Zain Usman (urn:li:person:vR9KXeWJtX)` — stored as the full person
+URN, which is what the adapter authors posts as.
+
+The authorisation expires **2026-11-25**, the 60-day window with no refresh
+available. That date is real and will arrive.
+
+**Publishing to LinkedIn is still unproven.** A connected account is not a
+published post, and the riskiest thing on this platform — little-text escaping —
+cannot be checked until something is published and read back.
+
+**Found while doing it: the browser opener picked the wrong application.** Handing
+the URL to the Windows system handler opened the *LinkedIn desktop app*, which
+cannot complete a redirect to localhost, so the authorisation silently never
+arrived. The URL printed to the console still worked when pasted into a browser.
+Fixed by naming browser executables directly and falling back to the handler, and
+the printed URL now says why a desktop app cannot be used. Same family as the
+earlier `cmd /c start` bug: on Windows, "open this URL" is not one thing.
+
 ## Verified live, not just tested
 
 | What | How it was proven |
 |---|---|
+| LinkedIn authorisation | Connected 2026-09-26; person URN stored; visible in `pnpm status` |
 | Facebook publishing | 4 real posts on the 1920 Agency Page |
 | Instagram publishing | 2 real posts |
 | Media upload | Real file uploaded, public URL fetched back |
