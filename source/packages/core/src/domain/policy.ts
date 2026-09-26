@@ -94,6 +94,56 @@ export const ACTION_POLICY: Readonly<Record<string, ActionPolicy>> = {
     spendsMoney: false,
   },
 
+  /**
+   * Ads. Every one of these can cost money, which is why they are listed rather
+   * than left to the high-risk default — the default protects, but says nothing
+   * useful about why.
+   */
+  create_ad_plan: {
+    rationale:
+      'Creates a campaign, ad sets and ads. Created PAUSED, so it cannot spend on ' +
+      'its own — but it commits a budget that one further click will start spending.',
+    risk: 'high',
+    reversible: true,
+    spendsMoney: false,
+  },
+  activate_campaign: {
+    rationale:
+      'Starts spending. From this moment money leaves the account continuously until ' +
+      'something stops it, and what has been spent cannot be recovered.',
+    risk: 'high',
+    reversible: false,
+    spendsMoney: true,
+  },
+  update_budget: {
+    rationale:
+      'Changes how fast money leaves. A mistyped figure spends the intended amount ' +
+      'many times over, and it looks like a small edit.',
+    risk: 'high',
+    reversible: false,
+    spendsMoney: true,
+  },
+  pause_campaign: {
+    rationale:
+      'Stops spending. The damage from a wrong pause is lost delivery, which is ' +
+      'recoverable; refusing to pause quickly would be worse than pausing wrongly.',
+    risk: 'medium',
+    reversible: true,
+    spendsMoney: false,
+  },
+  get_ad_performance: {
+    rationale: 'Reads spend and results. Changes nothing.',
+    risk: 'low',
+    reversible: true,
+    spendsMoney: false,
+  },
+  list_ad_accounts: {
+    rationale: 'Reads which ad accounts this authorisation can reach. Changes nothing.',
+    risk: 'low',
+    reversible: true,
+    spendsMoney: false,
+  },
+
   publish_post: {
     rationale:
       'Puts content in front of the public under someone’s name, immediately and ' +

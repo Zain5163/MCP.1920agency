@@ -217,3 +217,48 @@ describe('spend ceilings', () => {
     assert.equal(checkSpend(limit, { dailyMinor: -5_000, currency: 'USD' }).ok, false)
   })
 })
+
+describe('ads actions', () => {
+  test('anything that starts or accelerates spending is high risk', () => {
+    for (const action of ['create_ad_plan', 'activate_campaign', 'update_budget']) {
+      assert.equal(policyFor(action).risk, 'high', action)
+    }
+  })
+
+  test('pausing is medium — refusing to stop spending would be worse', () => {
+    assert.equal(policyFor('pause_campaign').risk, 'medium')
+  })
+
+  test('reading spend is low risk', () => {
+    assert.equal(policyFor('get_ad_performance').risk, 'low')
+    assert.equal(policyFor('list_ad_accounts').risk, 'low')
+  })
+
+  test('activating and raising a budget are marked as spending money', () => {
+    assert.equal(policyFor('activate_campaign').spendsMoney, true)
+    assert.equal(policyFor('update_budget').spendsMoney, true)
+  })
+
+  test('creating a paused plan does not itself spend', () => {
+    // It commits a budget, but nothing leaves the account until activation.
+    assert.equal(policyFor('create_ad_plan').spendsMoney, false)
+    assert.equal(policyFor('create_ad_plan').risk, 'high')
+  })
+
+  test('activation needs a token covering that exact campaign', () => {
+    const first = decide({
+      action: 'activate_campaign',
+      payload: { campaignId: 'c1', dailyBudgetMinor: 5_000 },
+      describe: () => 'Activate: 50.00 USD/day',
+    })
+    assert.equal(first.allowed, false)
+
+    const raised = decide({
+      action: 'activate_campaign',
+      payload: { campaignId: 'c1', dailyBudgetMinor: 50_000 },
+      confirmation: first.allowed === false ? first.token : '',
+      describe: () => 'Activate: 500.00 USD/day',
+    })
+    assert.equal(raised.allowed, false, 'a ten-fold budget change must need fresh approval')
+  })
+})

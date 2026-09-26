@@ -597,6 +597,59 @@ real-world transaction, so the owner ran the script themselves. Worth recording
 rather than hiding: the control worked as intended, and routing around it was
 not attempted.
 
+## 2026-09-27 — The ads domain model (tier 5b begins)
+
+Architecture before integration, per AGENTS.md. No adapter yet; a model, a
+decision record and 26 tests first, because getting the shape wrong is only
+expensive once two platforms exist.
+
+`decisions/0003-ads-domain-model.md`, `packages/core/src/domain/ads.ts`.
+
+### ⚠️ "Campaign" means different things on different platforms
+
+| Ours | Meta | LinkedIn | Holds |
+|---|---|---|---|
+| Campaign | Campaign | **Ad Campaign Group** | objective |
+| AdSet | Ad Set | **Ad Campaign** | budget, schedule, audience |
+| Ad | Ad | **Creative** | the creative |
+
+**LinkedIn's "Campaign" is Meta's "Ad Set".** Anyone reading both sets of docs in
+the same week will conflate them, and the failure is putting a budget on the
+wrong object — which either does nothing or spends at the wrong level. The
+domain uses our own names; adapters translate.
+
+### Decisions worth restating
+
+- **Money is integer minor units.** `money(10.5, 'USD')` throws, and the error
+  says to write `1050`. Floats are convenient and wrong for budgets.
+- **Mixed currencies are refused, never converted.** A wrong exchange rate
+  silently multiplies a budget. One ad account holds one currency, so a mix
+  means an ad set is wrong and guessing which is worse than refusing.
+- **Everything is created PAUSED, with no option to skip it.** An option to skip
+  a safety rule is the safety rule not existing. A wrongly-created paused
+  campaign costs nothing; a wrongly-created live one spends while you work out
+  what happened.
+- **Targeting no country is an error, not a warning.** An untargeted ad set
+  spends money on an audience nobody chose.
+- **No end date warns rather than blocks.** Legitimate for always-on work, and
+  the easiest way to overspend, so the approval summary calls it out explicitly.
+- **The approval summary leads with the MONTHLY figure.** 50/day reads as small;
+  1500/month is the number that changes minds.
+
+### The policy layer now covers money
+
+`activate_campaign` and `update_budget` are high risk and marked as spending.
+`create_ad_plan` is high risk but does **not** spend — it commits a budget that
+one further action starts. `pause_campaign` is medium: refusing to stop spending
+quickly would be worse than pausing wrongly.
+
+A test proves a token approving a 50/day activation does **not** authorise the
+same campaign at 500/day.
+
+**Nothing is wired to LinkedIn yet.** Next is reading — list ad accounts and
+performance — which is useful alone, carries no financial risk, and proves auth
+and pagination before anything can spend.
+
 ## Verified live, not just tested
 
 | What | How it was proven |
