@@ -83,11 +83,23 @@ export interface AdAccount {
   readonly currency: string
 }
 
-/** Who to show the ads to. Deliberately thin until two platforms are implemented. */
+/** Who to show the ads to. */
 export interface Audience {
-  /** ISO 3166 country codes. */
+  /** ISO 3166 country codes, two letters, uppercase. */
   readonly countries: readonly string[]
   readonly languages?: readonly string[]
+  /** Both platforms enforce a legal minimum of 18. */
+  readonly ageMin?: number
+  readonly ageMax?: number
+  readonly genders?: 'all' | 'male' | 'female'
+  /**
+   * Interest or attribute targeting, by the platform's own names.
+   *
+   * Kept as plain strings rather than an enum because the vocabularies do not
+   * overlap at all — LinkedIn targets job titles and seniority, Meta targets
+   * interests — and a shared enum would fit neither.
+   */
+  readonly interests?: readonly string[]
   /**
    * Platform-native targeting, passed through untranslated.
    *
@@ -99,19 +111,53 @@ export interface Audience {
   readonly platformTargeting?: Readonly<Record<string, unknown>>
 }
 
-/** The top level. Holds the objective and nothing that spends. */
+/**
+ * Where the budget lives.
+ *
+ * `campaign` is Meta's CBO — one budget, the platform moves spend to whichever ad
+ * set is winning. `adset` fixes each ad set's own budget. **Setting both is an
+ * error on Meta**, not a preference, so this has to be explicit rather than
+ * inferred from which field happens to be filled.
+ */
+export type BudgetLevel = 'campaign' | 'adset'
+
+/** The top level. Holds the objective, and the budget when the level is campaign. */
 export interface CampaignDraft {
   readonly name: string
   readonly objective: AdObjective
+  readonly budgetLevel?: BudgetLevel
+  /** Only when `budgetLevel` is `campaign`. */
+  readonly dailyBudget?: Money
+  /**
+   * Regulated categories. Housing, employment, credit and political ads are
+   * legally restricted in how they may be targeted, and the platform enforces it.
+   */
+  readonly specialCategories?: readonly string[]
 }
 
-/** Where the money lives. */
+/** Where the money lives when the budget level is `adset`. */
 export interface AdSetDraft {
   readonly name: string
-  readonly dailyBudget: Money
+  /** Omitted when the campaign holds the budget instead. */
+  readonly dailyBudget?: Money
   readonly audience: Audience
   readonly startAt?: Date
   readonly endAt?: Date
+  /** What the platform should optimise delivery for, in its own vocabulary. */
+  readonly optimizationGoal?: string
+  /** The conversion the pixel reports, when optimising for conversions. */
+  readonly conversionEvent?: string
+}
+
+/** What the ad is made of. */
+export interface AdCreative {
+  readonly kind: 'image' | 'video' | 'existing_post'
+  /** Local file, for image and video. */
+  readonly localPath?: string
+  /** For `existing_post`: boost something already published. */
+  readonly postId?: string
+  /** Video only. Without one the platform picks a frame, usually badly. */
+  readonly thumbnailPath?: string
 }
 
 /** One creative. */
@@ -120,8 +166,16 @@ export interface AdDraft {
   readonly body: string
   readonly headline?: string
   readonly landingPageUrl?: string
+  readonly callToAction?: string
+  readonly creative?: AdCreative
   /** Media already uploaded to the platform, by its platform id. */
   readonly mediaIds?: readonly string[]
+  /**
+   * Explicitly empty means attribution was disabled on purpose. Undefined means
+   * the adapter generates them. The difference matters: one is a choice, the
+   * other is a default.
+   */
+  readonly urlTags?: string
 }
 
 /** A whole request: one campaign, its ad sets, and their ads. */
@@ -164,6 +218,41 @@ export function validateAdPlan(plan: AdPlan): AdValidation {
     })
   }
 
+  /**
+   * Budget belongs at exactly one level.
+   *
+   * Meta rejects a request that sets both, and the error it returns does not say
+   * that is the problem. Catching it here turns a confusing platform failure into
+   * a sentence that names the fix.
+   */
+  const level: BudgetLevel = plan.campaign.budgetLevel ?? 'adset'
+  const anyAdSetBudget = plan.adSets.some((e) => e.adSet.dailyBudget !== undefined)
+
+  if (level === 'campaign') {
+    if (plan.campaign.dailyBudget === undefined) {
+      issues.push({
+        severity: 'error',
+        message: 'Budget level is campaign, so campaign.dailyBudget is required.',
+        path: 'campaign.dailyBudget',
+      })
+    }
+    if (anyAdSetBudget) {
+      issues.push({
+        severity: 'error',
+        message:
+          'Both a campaign budget and ad set budgets are set. Platforms reject both at once — remove the ad set budgets, or change budgetLevel to adset.',
+        path: 'adSets',
+      })
+    }
+  } else if (plan.campaign.dailyBudget !== undefined) {
+    issues.push({
+      severity: 'error',
+      message:
+        'A campaign budget is set but budget level is adset. Remove one, or the platform decides which you meant.',
+      path: 'campaign.dailyBudget',
+    })
+  }
+
   const currencies = new Set<string>()
 
   plan.adSets.forEach((entry, i) => {
@@ -174,14 +263,66 @@ export function validateAdPlan(plan: AdPlan): AdValidation {
       issues.push({ severity: 'error', message: 'The ad set needs a name.', path: `${at}.name` })
     }
 
-    currencies.add(adSet.dailyBudget.currency)
-
-    if (adSet.dailyBudget.minor <= 0) {
+    if (adSet.dailyBudget !== undefined) {
+      currencies.add(adSet.dailyBudget.currency)
+      if (adSet.dailyBudget.minor <= 0) {
+        issues.push({
+          severity: 'error',
+          message: 'A daily budget must be greater than zero.',
+          path: `${at}.dailyBudget`,
+        })
+      }
+    } else if (level === 'adset') {
       issues.push({
         severity: 'error',
-        message: 'A daily budget must be greater than zero.',
+        message: 'Budget level is adset, so this ad set needs its own daily budget.',
         path: `${at}.dailyBudget`,
       })
+    }
+
+    const { ageMin = 18, ageMax = 65 } = adSet.audience
+    if (ageMin < 18) {
+      // Not a guardrail we chose; platforms enforce it.
+      issues.push({
+        severity: 'error',
+        message: 'Age targeting cannot start below 18.',
+        path: `${at}.audience.ageMin`,
+      })
+    }
+    if (ageMin > ageMax) {
+      issues.push({
+        severity: 'error',
+        message: `Minimum age ${ageMin} is above maximum age ${ageMax}, so this targets nobody.`,
+        path: `${at}.audience.ageMin`,
+      })
+    }
+
+    const bad = adSet.audience.countries.filter((c) => !/^[A-Z]{2}$/.test(c))
+    if (bad.length > 0) {
+      issues.push({
+        severity: 'error',
+        message: `Countries must be two-letter uppercase ISO codes. Got: ${bad.join(', ')}.`,
+        path: `${at}.audience.countries`,
+      })
+    }
+
+    /**
+     * Regulated categories restrict targeting by law, and the platform enforces
+     * it by rejecting the ad rather than by quietly widening the audience.
+     */
+    if ((plan.campaign.specialCategories?.length ?? 0) > 0) {
+      const narrowed =
+        (adSet.audience.genders !== undefined && adSet.audience.genders !== 'all') ||
+        ageMin !== 18 ||
+        ageMax !== 65
+      if (narrowed) {
+        issues.push({
+          severity: 'error',
+          message:
+            'This campaign is in a special ad category (housing, employment, credit or politics), so age and gender must stay at 18-65, all genders. That is a legal restriction, not a preference.',
+          path: `${at}.audience`,
+        })
+      }
     }
 
     if (adSet.audience.countries.length === 0) {
@@ -256,17 +397,24 @@ export function validateAdPlan(plan: AdPlan): AdValidation {
 
 /** Total daily spend a plan commits to, for checking against a ceiling. */
 export function totalDailyBudget(plan: AdPlan): Money | undefined {
-  const first = plan.adSets[0]
+  // With a campaign-level budget the ad set figures are absent by design, and
+  // summing them would report zero for a campaign that spends every day.
+  if (plan.campaign.budgetLevel === 'campaign') return plan.campaign.dailyBudget
+
+  const budgets = plan.adSets
+    .map((e) => e.adSet.dailyBudget)
+    .filter((b): b is Money => b !== undefined)
+
+  const first = budgets[0]
   if (first === undefined) return undefined
 
-  const currency = first.adSet.dailyBudget.currency
   let minor = 0
-  for (const { adSet } of plan.adSets) {
+  for (const budget of budgets) {
     // Refuses rather than converting: see decisions/0003.
-    if (adSet.dailyBudget.currency !== currency) return undefined
-    minor += adSet.dailyBudget.minor
+    if (budget.currency !== first.currency) return undefined
+    minor += budget.minor
   }
-  return { minor, currency }
+  return { minor, currency: first.currency }
 }
 
 /**

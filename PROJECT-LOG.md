@@ -650,6 +650,60 @@ same campaign at 500/day.
 performance — which is useful alone, carries no financial risk, and proves auth
 and pagination before anything can spend.
 
+## 2026-09-27 — Meta Ads: ported the guardrails, did not rebuild them
+
+Owner reprioritised: Meta Ads before LinkedIn Ads, because *"barely few people
+run ads on [LinkedIn]… mostly meta is the most important."* Correct, and LinkedIn
+Ads moved to `WAITING-LIST.md` rather than being dropped.
+
+Found `AI-Automation\Meta-Ads-Publisher` — a 1,436-line Python tool the owner
+built and validated offline on 2026-09-10, never connected to a live account.
+The roadmap's own decision (5b.0) was **connect it, do not rebuild it**, so the
+first work here was reading it rather than writing.
+
+The valuable part is not the API code — it is `validate.py`, which encodes real
+advertising judgement. Ported to `meta-ads-guardrails.ts` with 24 tests.
+
+### The rule worth the whole exercise
+
+**The learning-phase budget floor**, and it is *derived* rather than chosen:
+
+> Meta needs roughly 50 conversions per week per ad set to leave the learning
+> phase. So the floor is `CPA × 50 ÷ 7`. At a 20.00 CPA that is **142.86/day**.
+
+Deriving it means the number and the reason cannot drift apart — change the CPA
+and the floor follows. Most advertisers run far below it, and it is the single
+biggest reason small-budget campaigns underperform: below the floor delivery
+stays unstable and cost per result is materially worse however good the creative
+is. The warning quotes the actual numbers and how many times short the budget is.
+
+It is a **warning, not an error**, and a test asserts that. It is a judgement
+call, and a guardrail that blocks a legitimate choice gets switched off.
+
+### Other judgement encoded, not invented
+
+- Fewer than 3 ads per ad set is not a creative test; more than 6 and Meta
+  starves them of impressions.
+- More than 3 ad sets fragments budget and slows every one out of learning.
+- Interest stacking on a conversion ad set now usually loses to broad targeting.
+- Mixing conversion events in one campaign splits the pixel's signal.
+- Special ad categories (housing, employment, credit, politics) force age and
+  gender back to defaults. **A legal restriction, not a preference.**
+- 125 characters before "See more"; 40 before a headline truncates.
+- An explicitly empty `urlTags` is a deliberate choice to disable attribution and
+  is surfaced; an absent one is a default and is not.
+
+### Model change: budget level
+
+`campaign` (Meta's CBO) versus `adset`. **Setting both is an error on Meta**, not
+a preference, and the error Meta returns does not say so. Caught locally now,
+with a message that names the fix. `totalDailyBudget` respects the level rather
+than summing absent ad set figures and reporting zero for a campaign that spends
+every day.
+
+**Nothing calls the Meta API yet.** This runs before anything is created, so a
+bad plan costs nothing to discover.
+
 ## Verified live, not just tested
 
 | What | How it was proven |
