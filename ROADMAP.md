@@ -64,6 +64,7 @@ platforms it takes weeks.
 | Platform | Build | Access needed | Status |
 |---|---|---|---|
 | Facebook Pages | ✅ | none beyond the app | **publishing** |
+| Facebook *personal profiles* | ❌ | **Impossible.** `publish_actions` was removed in 2018 and never replaced — no approval grants it | will not be built |
 | Instagram | ✅ | none beyond the app | **publishing** |
 | Threads | ✅ | Meta app with the Threads use case — **no review** | waiting on app config |
 | **Pinterest** | ✅ | ⚠️ **Trial access = sandbox.** Pins are visible only to you until Standard Access, which needs a submitted video | adapter built, awaiting app credentials |
