@@ -67,7 +67,7 @@ platforms it takes weeks.
 | Instagram | ✅ | none beyond the app | **publishing** |
 | Threads | ✅ | Meta app with the Threads use case — **no review** | waiting on app config |
 | **Pinterest** | ✅ | ⚠️ **Trial access = sandbox.** Pins are visible only to you until Standard Access, which needs a submitted video | adapter built, awaiting app credentials |
-| **LinkedIn** | ✅ | Personal profile: self-serve, **no review** — done. Company pages need Community Management API, whose request button is **disabled outright** on a verified app | **connected 2026-09-26**; posting as a person, not the agency page |
+| **LinkedIn** | ✅ | Personal profile: self-serve, **no review** — done. Company pages need Community Management API, whose request button is **disabled outright** on a verified app | **publishing verified 2026-09-26**; posting as a person, not the agency page |
 | **YouTube** | ⬜ | ⚠️ Audit for quota. Default is ~6 uploads/day **shared across all customers** | not started |
 | **TikTok** | ⬜ | ⚠️ Audit. **Until it passes, posts are private/self-only** | not started |
 | **X** | ⬜ | ⚠️ **Costs money** — pay-per-use, ~$0.20 per post containing a link | not started |

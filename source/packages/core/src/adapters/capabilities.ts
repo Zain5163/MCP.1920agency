@@ -230,8 +230,10 @@ export const CAPABILITIES: Readonly<Record<Platform, CapabilityRecord>> = {
       'whole URN. ' +
       'WARNING: commentary is "little text", not plain text. An unescaped reserved character ' +
       '( ) [ ] { } @ # * _ ~ < > | \\ does NOT error — LinkedIn drops the post from that ' +
-      'character onward and still reports success. escapeLittleText handles it; whether an ' +
-      'escaped # still renders as a clickable hashtag is unverified. ' +
+      'character onward and still reports success. escapeLittleText handles it. ' +
+      'CONFIRMED by a real published post 2026-09-26: escaping round-trips end to end. ' +
+      'Text containing ( ) survived intact, and an escaped # rendered as a normal ' +
+      'hashtag with no backslash visible — LinkedIn unescapes little text on display. ' +
       'A created post returns 201 with an empty body; the id is in the x-restli-id header. ' +
       'Every call needs LinkedIn-Version (YYYYMM, retired after about a year) and ' +
       'X-Restli-Protocol-Version: 2.0.0. ' +

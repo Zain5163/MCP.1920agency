@@ -444,11 +444,41 @@ the live LinkedIn connection with no confirm token.
   unchanged at 6, target count unchanged at 8. The refusal left no trace, so
   "nothing has been sent" is literally true rather than approximately true.
 
+## 2026-09-26 — First LinkedIn post, and the escaping question answered
+
+Owner approved publishing a real marketing post. It went out through the new
+approval gate: called once without a token and refused, called again with the
+token and published. `urn:li:share:7509614451189239808`.
+
+The post was written to be genuinely publishable **and** to test the one thing
+that could not be answered from documentation. It contained
+`1920 Agency (a marketing and video editing studio):` early on and a trailing
+`#ContentMarketing`.
+
+Owner read the published text back in full. Two results:
+
+- **No truncation at the `(`.** Had escaping been wrong, everything from that
+  character onward would have vanished while the API still reported success.
+  `escapeLittleText` is correct.
+- **The escaped `#` rendered as a normal hashtag, no backslash visible.** This
+  had been an open question with no documented answer, carried as *reported,
+  unverified* since the adapter was written. LinkedIn unescapes little text on
+  display, so the rule is simply: escape everything, it round-trips.
+
+That moves LinkedIn from "adapter built" to **proven end to end** — authorise,
+discover, store encrypted, gate, publish, read back correct.
+
+Still not checked: media upload, video, rate limits, and whether the
+3,000-character limit counts graphemes or UTF-16 units.
+
 ## Verified live, not just tested
 
 | What | How it was proven |
 |---|---|
 | LinkedIn authorisation | Connected 2026-09-26; person URN stored; visible in `pnpm status` |
+| LinkedIn publishing | Real post published 2026-09-26 through the approval gate, `urn:li:share:7509614451189239808` |
+| Little-text escaping | Same post: text with `(` `)` survived intact, escaped `#` rendered as a clean hashtag |
+| The approval gate | Refused without a token and published with one, on a real irreversible action |
 | Facebook publishing | 4 real posts on the 1920 Agency Page |
 | Instagram publishing | 2 real posts |
 | Media upload | Real file uploaded, public URL fetched back |
