@@ -209,6 +209,10 @@ export const CAPABILITIES: Readonly<Record<Platform, CapabilityRecord>> = {
     minMediaCount: 0,
     // Neither: LinkedIn is the only platform here that takes uploaded bytes and
     // will not fetch a URL, so the adapter reads from disk or downloads first.
+    // Reported as 3 seconds to 30 minutes for the API. Feed video in the app is
+    // capped lower (~15 minutes), so the API figure is the permissive one.
+    videoMinSeconds: 3,
+    videoMaxSeconds: 1_800,
     requiresPublicMediaUrl: false,
     supportsNativeScheduling: false,
     allowsMixedMedia: false,
@@ -249,6 +253,10 @@ export const CAPABILITIES: Readonly<Record<Platform, CapabilityRecord>> = {
       'Reported but unverified: Community Management and Sign In with OpenID Connect cannot ' +
       'coexist on one app, which would mean company-page posting needs a SECOND LinkedIn app ' +
       'rather than another product on this one. Confirm before building for it. ' +
+      'FILE SIZE: sources CONFLICT. The Videos API is reported as capped at 200 MB, ' +
+      'while native upload in the LinkedIn app takes 5 GB — so a video that uploads ' +
+      'fine by hand may be refused through the API. Unverified either way; find out ' +
+      'empirically before promising a customer a large upload. ' +
       'Video is a SEPARATE endpoint from images: /rest/videos, split into 4 MB parts, ' +
       'each PUT returning an ETag that must be collected and handed to finalizeUpload. ' +
       'Losing one ETag wastes the whole upload. A post carries images OR one video, ' +

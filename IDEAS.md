@@ -233,6 +233,52 @@ all platforms beats a tab per platform. Depends on D1/D2 analytics.
 
 ---
 
+## J. Media processing — transcode before upload
+
+_Added 2026-09-26, after the LinkedIn video adapter was built and the owner asked
+whether the MCP could shrink files itself._
+
+### J1. ⚠️ First, a real defect: the whole file is read into memory
+
+`#readMedia` in the LinkedIn adapter returns the entire file as one `Uint8Array`,
+then slices it into parts. Harmless for a 1.6 MB image. A 400 MB video means 400 MB
+of RAM in a single buffer, and several at once on a busy worker is an
+out-of-memory crash rather than a slow upload.
+
+**This should be fixed before video is used for anything real**, and it is a
+prerequisite for J2 rather than a nice-to-have: streaming the file in 4 MB parts
+straight from disk is both the fix and the natural shape for chunked upload.
+
+### J2. Transcode and compress per platform
+
+The case for it is stronger than "make files smaller":
+
+- **LinkedIn's API file limit is reported at 200 MB**, far below the 5 GB the app
+  accepts by hand. A normal 1080p export can exceed that.
+- **Every platform wants something different.** X caps video at 140 seconds.
+  Instagram enforces aspect ratios between 4:5 and 1.91:1 and rejects anything
+  outside with an error that reads like a permissions problem. TikTok has its own
+  encoding expectations.
+- Today the answer to all of that is "re-export it yourself, per platform", which
+  is exactly the manual work this project exists to remove.
+
+One source video in, one correctly-encoded file per platform out. For a video
+editing agency this is arguably the single most valuable feature in this backlog.
+
+**The cost is real and should not be hidden:** it means a dependency on `ffmpeg`,
+a binary that must exist on whatever machine runs the worker. That is the first
+thing in this project that cannot be solved in TypeScript alone, and it changes
+deployment. Worth it, but it is a decision, not a detail.
+
+### J3. Validate before uploading, not after
+
+Cheaper than J2 and worth doing first: read duration, dimensions and size from the
+file, and check them against `capabilities.ts` **before** spending several minutes
+uploading something the platform will reject. `validateAgainstCapabilities`
+already has the limits; nothing currently reads the actual file to compare.
+
+---
+
 ## Rough order I would suggest
 
 Not a decision — a starting point for one.
