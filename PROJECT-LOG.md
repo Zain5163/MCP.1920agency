@@ -471,6 +471,29 @@ discover, store encrypted, gate, publish, read back correct.
 Still not checked: media upload, video, rate limits, and whether the
 3,000-character limit counts graphemes or UTF-16 units.
 
+## 2026-09-26 — LinkedIn image upload proven
+
+Second real post, this time with a local PNG: `urn:li:share:7509616982338461696`.
+
+This exercised the path that makes LinkedIn different from every other platform
+built so far. Instagram, Threads and Pinterest are handed a URL and fetch the
+file themselves. LinkedIn issues a **single-use upload URL** and expects the
+bytes, so the adapter reads the file from disk and PUTs it, then references the
+returned image URN in the post. All three calls — initializeUpload, the binary
+PUT, and the post — succeeded against the live API.
+
+Notably this worked **without any object storage**. The file came straight off
+local disk, which is the same property Facebook has and Instagram does not.
+
+Also fixed: the stdio tool described `localPath` as "Facebook only", which had
+been true when it was written and silently became wrong the day the LinkedIn
+adapter landed. A stale hint in a tool description is read by an AI as fact, so
+it would have stopped a model ever attaching a local file to a LinkedIn post.
+
+**Video is still not implemented.** LinkedIn video uses a different endpoint with
+chunked upload and ETag tracking; the adapter refuses video with an explanation
+rather than failing partway through an upload.
+
 ## Verified live, not just tested
 
 | What | How it was proven |
@@ -478,6 +501,7 @@ Still not checked: media upload, video, rate limits, and whether the
 | LinkedIn authorisation | Connected 2026-09-26; person URN stored; visible in `pnpm status` |
 | LinkedIn publishing | Real post published 2026-09-26 through the approval gate, `urn:li:share:7509614451189239808` |
 | Little-text escaping | Same post: text with `(` `)` survived intact, escaped `#` rendered as a clean hashtag |
+| LinkedIn image upload | Real image post 2026-09-26, `urn:li:share:7509616982338461696` — the two-step upload works |
 | The approval gate | Refused without a token and published with one, on a real irreversible action |
 | Facebook publishing | 4 real posts on the 1920 Agency Page |
 | Instagram publishing | 2 real posts |

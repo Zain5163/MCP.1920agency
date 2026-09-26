@@ -134,7 +134,10 @@ const draftShape = {
     .array(
       z.object({
         kind: z.enum(['image', 'video']),
-        localPath: z.string().optional().describe('Absolute path to a local file. Facebook only.'),
+        localPath: z
+          .string()
+          .optional()
+          .describe('Absolute path to a local file. Works for Facebook and LinkedIn, which take uploaded bytes.'),
         publicUrl: z.string().optional().describe('Public https URL. Required for Instagram.'),
         mime: z.string().describe('e.g. image/jpeg, video/mp4'),
         durationSeconds: z.number().optional().describe('Needed to check video length limits.'),
