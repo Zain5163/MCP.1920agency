@@ -175,6 +175,64 @@ activation step — connect it rather than rebuild it._
 
 ---
 
+## I. Safety rails for actions that cost money or cannot be undone
+
+_Added 2026-09-26, from an outside architecture review the owner brought in.
+Most of that review described things already built — the normalised draft, the
+adapter layer, OAuth with encrypted tokens, the MCP surface, not depending on one
+AI vendor. **This is the part it was right about that we do not have.**_
+
+### I1. A policy and validation layer between the AI and execution
+
+Today an MCP client calls `publish_post` and it publishes. The only thing standing
+between a model's mistake and a public post is **a sentence in the tool
+description** asking it to confirm first. That is a prompt, not a control, and a
+prompt is not a safety mechanism.
+
+Nothing has gone wrong because the only user is the owner and the posts are the
+owner's own. It stops being adequate the moment either of those changes — and it
+is completely inadequate for ads, where the same shape of mistake spends money.
+
+The proposal is a deterministic layer every tool call passes through, which
+classifies the action and decides whether it may execute:
+
+| Risk | Example | Behaviour |
+|---|---|---|
+| Low | read status, list accounts, fetch metrics | execute |
+| Medium | pause an ad, cancel a scheduled post | execute, always audited |
+| High | publish publicly, create a campaign, raise a budget | **prepare, return a summary, require explicit confirmation** |
+
+The important property: the classification and the ceiling are **code**, not
+instructions to a model. An AI can propose anything; what it is allowed to execute
+is decided deterministically. This is the same "AI proposes, a deterministic
+validator authorises" rule already written into tier 5b — the change is that it
+should be a **general layer built now**, not an ads-only prerequisite written down
+for later, because the irreversible action already exists.
+
+### I2. Spend ceilings as a stored limit, not a convention
+
+Tier 5b says ads must be created paused with an explicit activation step. That is
+right and should hold. Add to it a per-tenant maximum — daily and monthly — stored
+in the database and checked by the validator, so "increase every budget by 500%"
+fails on arithmetic rather than on good judgement.
+
+### I3. Lead capture and CRM handoff
+
+Not previously considered anywhere in this backlog. Lead-generation ads produce
+leads, and a lead that sits in a platform's dashboard for three days is worth much
+less than one that reaches a salesperson in three minutes: retrieve leads, qualify
+them, push to a CRM, assign an owner. For a marketing agency this is arguably
+worth more than the campaign creation it depends on.
+
+### I4. Cross-account anomaly queries
+
+"Show me every campaign that spent over $100 yesterday with a cost per lead above
+$30" — one question, every platform, one answer. Read-only, so it carries none of
+the risk above, and it is the most convincing demonstration of why one MCP across
+all platforms beats a tab per platform. Depends on D1/D2 analytics.
+
+---
+
 ## Rough order I would suggest
 
 Not a decision — a starting point for one.
