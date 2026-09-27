@@ -804,6 +804,41 @@ wrong host that reads like an auth problem.
 
 **Not verified live** — no Instagram app credentials configured yet.
 
+## 2026-09-27 — The Meta ads client: campaigns that cannot spend
+
+`meta-ads.ts`, 14 tests. Campaign → ad set → creative → ad, all created **PAUSED**,
+with no option to change that.
+
+### `review` cannot touch the API, by construction
+
+Separate method from `create`, and a test asserts it makes **zero** network
+calls. This is what an AI calls before asking a person to approve, so it must be
+impossible for it to have side effects. It merges the platform-neutral checks
+with the Meta guardrails and returns errors, warnings and the summary together.
+
+### A partial failure reports what exists
+
+Objects are created top down because each needs the id above it, so a failure at
+step three leaves a half-built campaign — and re-running creates a **second** one
+rather than resuming. Until that is fixed (IDEAS K3) the error names the campaign
+id, states that everything is paused and nothing is spending, and says to delete
+it before retrying. A test asserts all three.
+
+### Details carried over deliberately
+
+- Budgets in **minor units as strings** — Meta's format, and the reason money is
+  integer cents throughout.
+- `promoted_object` carries pixel and event: that pair is what the algorithm
+  optimises toward. Without them a conversion goal is a request Meta cannot act on.
+- `error_user_msg` is preferred over `message` when Meta sends it. It is usually
+  far better — *"your ad account is not authorised to run ads in this country"*
+  against *"Invalid parameter"*.
+- Advantage+ placements and advantage audience on by default; manual placement
+  lists lose to them in most accounts.
+
+**Nothing has touched a real ad account.** Needs an ad account id and a token
+with `ads_management` — the Page token used for publishing is not enough.
+
 ## Verified live, not just tested
 
 | What | How it was proven |
