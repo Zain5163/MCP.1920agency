@@ -895,6 +895,48 @@ PAUSED, in a sandbox, so nothing can spend — but it is clutter, and it is
 exactly the duplication IDEAS K3 exists to stop: re-running builds a new
 campaign rather than resuming.
 
+## 2026-09-28 — System User token works; the creative needs an asset assignment
+
+Owner published the app and created a System User token. Two env keys existed
+briefly — the working token under a new name, the failing one under the name the
+code reads — so the code kept using the broken one. Consolidated to a single key;
+two sources of truth for a credential is a bug waiting to happen.
+
+Campaign and ad set now create cleanly. The creative fails with:
+
+> *You don't have the required permission to access this profile* (code 10)
+
+Not a code problem. A creative references the **Page**, and a System User only
+reaches assets explicitly assigned to it in Business Manager. The ad account was
+granted; the Page was not.
+
+### The bigger question, answered: `decisions/0005`
+
+The owner asked how customers would grant access. The honest answer is that the
+thing being set up **does not scale to customers at all**.
+
+A System User token is a **non-expiring credential with full spending power**.
+Asking a customer to create one and paste it into a form is a request no
+customer should agree to, and holding it would be a liability we chose.
+
+Customers use **Facebook Login for Business**: they click Connect, see Meta's own
+dialog, choose which ad accounts to include, and can revoke it themselves without
+speaking to us. Same `Provider` contract already used for Pages, LinkedIn and
+Instagram — nothing structural changes.
+
+**The gate:** `ads_management` on someone else's account needs Meta **App
+Review** — business verification, a screencast of it working, a written case per
+permission, and Meta's judgement. Until then it works only where the authorising
+person already has a role, which is exactly why the owner's account works and a
+customer's would not.
+
+Review requires a **working** integration to demonstrate, so building is the path
+to access rather than the other way round.
+
+One thing recorded as needing to change: `MetaAdsClient` takes its account and
+token at construction from environment variables. That is single-tenant by
+design and must become per-call before any customer touches it.
+
 ## Verified live, not just tested
 
 | What | How it was proven |
