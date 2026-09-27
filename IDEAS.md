@@ -334,6 +334,54 @@ Depends on K1 (knowing what is actually running) and on reading performance.
 
 ---
 
+## L. Conversion tracking — the other half of advertising
+
+_Added 2026-09-28. Full notes in `research/2026-09-28-meta-conversions-api.md`._
+
+### L1. Meta Conversions API
+
+Send conversions **server to server** instead of relying on a browser pixel that
+iOS prompts, ad blockers and cookie banners increasingly stop from firing.
+
+The reason this matters more than it sounds: **Meta optimises toward the
+conversions it is told about.** Losing a third of them to a blocked pixel does not
+just under-report results — it makes targeting worse and keeps an ad set in the
+learning phase longer.
+
+Which ties straight to the guardrail already in the code. The learning-phase floor
+is `CPA × 50 ÷ 7`. If a third of conversions never arrive, the real floor is a
+third higher than it looks. **Recovering the signal is the cheaper half of that
+problem than raising the budget.**
+
+Two things to get right, both of which fail silently:
+
+- **Normalisation before hashing.** One uppercase letter and the SHA-256 never
+  matches. The event is accepted; the match simply never happens.
+- **Deduplication.** The pixel and the server both report on purpose, and Meta
+  discards the duplicate — but only when both send the same `event_id`. Get it
+  wrong and every conversion is counted twice.
+
+### L2. The same shape on other platforms
+
+LinkedIn's Conversions API and TikTok's Events API solve the same problem the same
+way. One normalised conversion event, an adapter per platform — exactly the
+pattern already used for publishing.
+
+LinkedIn's Conversions API is **already requested** and awaiting review, so the
+access work is underway.
+
+### L3. ⚠️ Decide the data policy BEFORE writing any of it
+
+This is the first thing in the project that would handle **personal data** —
+emails and phone numbers, hashed but still stable identifiers for a person.
+
+That is a different category from anything stored today, and it needs a decision
+about retention, and about whether we store conversions at all or forward and
+forget. **Forward-and-forget is the safer default** and should be argued against,
+not assumed away.
+
+---
+
 ## Rough order I would suggest
 
 Not a decision — a starting point for one.
