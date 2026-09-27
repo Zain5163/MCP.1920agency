@@ -937,6 +937,38 @@ One thing recorded as needing to change: `MetaAdsClient` takes its account and
 token at construction from environment variables. That is single-tenant by
 design and must become per-call before any customer touches it.
 
+## 2026-09-28 — Diagnosing the creative failure properly
+
+The creative kept failing with *“You don't have the required permission to access
+this profile”* (code 10) after the Page was assigned to the System User. Rather
+than guess again, queried what the token can actually reach:
+
+| Question | Answer |
+|---|---|
+| Who is this token? | `122102498205487991` — **“Sandbox Ad Account Owner”** |
+| What Pages can it see? | `102223309294786`, `tasks=ADVERTISE` only |
+| Can it read the Page's name? | No — returns `undefined` |
+| What Pages will the ad account promote? | **`[]` — empty** |
+
+Two findings, and the second is the cause.
+
+**The token is not the Business Manager System User.** It is a synthetic identity
+created by the sandbox quickstart. Assigning the Page to *Mysmadspilot* was the
+right action and had no effect on *this* token, because it belongs to a different
+principal.
+
+**`promote_pages` on the sandbox ad account is empty.** A creative names a Page,
+and the ad account will not accept one it has no association with — even though
+the Page was ticked in the sandbox creation dialog. Business Manager asset
+assignment and the ad account's own Page association are **separate things**, and
+satisfying one does not satisfy the other.
+
+Worth recording as a method rather than a fact: four attempts were spent guessing
+from error messages before asking the API what it could see. Three queries
+answered it. **Meta's permission errors name the symptom, never the principal or
+the missing association**, so with any code 10 the first move is to ask who the
+token is and what it can reach.
+
 ## Verified live, not just tested
 
 | What | How it was proven |
