@@ -11,7 +11,11 @@ import {
   type Money,
 } from '@social-publisher/core'
 
-import { checkMetaAdPlan, type MetaCheckContext } from './meta-ads-guardrails.ts'
+import {
+  META_CONVERSION_GOALS,
+  checkMetaAdPlan,
+  type MetaCheckContext,
+} from './meta-ads-guardrails.ts'
 import { META_DEFAULT_NAMING, adName, adSetName, campaignName, urlTags } from './meta-ads-naming.ts'
 
 /**
@@ -71,6 +75,15 @@ export interface MetaAdAccount {
   readonly adAccountId: string
   /** The Page the ads are published by. Meta requires one even for Instagram placements. */
   readonly pageId: string
+  /**
+   * The Instagram **actor** id for ads, which is not the Instagram account id
+   * used for publishing. They look alike and are different values: the
+   * publishing id is rejected here with “must be a valid Instagram account
+   * id”. The ads one comes from the ad account's connected Instagram in
+   * Business Settings.
+   *
+   * Optional. Without it the ads run as the Page, which is valid.
+   */
   readonly instagramId?: string
   /** Required for conversion optimisation. Without it, those goals are rejected. */
   readonly pixelId?: string
@@ -216,6 +229,17 @@ export class MetaAdsClient {
     if (plan.campaign.budgetLevel === 'campaign' && plan.campaign.dailyBudget !== undefined) {
       body.daily_budget = minorUnits(plan.campaign.dailyBudget)
       body.bid_strategy = 'LOWEST_COST_WITHOUT_CAP'
+    } else {
+      /**
+       * Mandatory whenever the budget sits on the ad sets rather than the
+       * campaign. Meta refuses the campaign outright without it, and the error
+       * names the field but not the fact that it is only required in this case.
+       *
+       * `false` keeps each ad set's budget its own. `true` lets Meta move up to
+       * 20% between them, which is reasonable but is a spending decision, so it
+       * is not something to switch on by default on someone's behalf.
+       */
+      body.is_adset_budget_sharing_enabled = 'false'
     }
 
     return await this.#post('campaigns', body)
@@ -242,7 +266,24 @@ export class MetaAdsClient {
       billing_event: 'IMPRESSIONS',
       optimization_goal: goal,
       targeting: JSON.stringify(this.#targeting(adSet.audience)),
-      attribution_spec: JSON.stringify(ATTRIBUTION_SPECS['7d_click_1d_view']),
+    }
+
+    /**
+     * Attribution windows are constrained by the optimisation goal, and Meta
+     * rejects the combination rather than adjusting it.
+     *
+     * A 7-day click plus 1-day view window only makes sense when optimising for
+     * conversions, because there is a conversion to attribute. Optimising for
+     * clicks allows only (1, 0) — the click *is* the outcome, so there is nothing
+     * to attribute a week later.
+     *
+     * Sending nothing for click goals lets Meta apply its own default, which is
+     * correct by definition and cannot be rejected. Found live: the hardcoded
+     * 7d_click_1d_view failed with “the following combinations… are allowed:
+     * (1, 0)”.
+     */
+    if (META_CONVERSION_GOALS.has(goal)) {
+      body.attribution_spec = JSON.stringify(ATTRIBUTION_SPECS['7d_click_1d_view'])
     }
 
     if (adSet.dailyBudget !== undefined) {
@@ -269,13 +310,31 @@ export class MetaAdsClient {
   }
 
   #targeting(audience: AdPlan['adSets'][number]['adSet']['audience']): Record<string, unknown> {
+    /**
+     * Advantage audience and a hard age range are mutually exclusive.
+     *
+     * With advantage audience on, Meta treats the age bounds as a *suggestion*
+     * and expands past them when it finds cheaper results. Narrowing the range
+     * is then rejected — with the memorable message “you can add a lower maximum
+     * age as a suggestion instead”, which does not mention the setting causing it.
+     *
+     * The flag is also **mandatory**: omitting it is refused with “you need to
+     * enable or disable the Advantage audience feature”. So it is always sent,
+     * explicitly 1 or 0.
+     *
+     * An explicit age range is read as what it is: a decision to hold the
+     * audience fixed, so the flag goes to 0. Left at the defaults it goes to 1,
+     * where it is the better-performing choice in most accounts.
+     */
+    const narrowedAge =
+      (audience.ageMin !== undefined && audience.ageMin !== 18) ||
+      (audience.ageMax !== undefined && audience.ageMax !== 65)
+
     const spec: Record<string, unknown> = {
       geo_locations: { countries: audience.countries },
       age_min: audience.ageMin ?? 18,
       age_max: audience.ageMax ?? 65,
-      // Lets Meta look beyond the stated targeting when it finds cheaper
-      // conversions. Worth having on unless an audience is deliberately fixed.
-      targeting_automation: { advantage_audience: 1 },
+      targeting_automation: { advantage_audience: narrowedAge ? 0 : 1 },
     }
 
     const genders = GENDER_CODES[audience.genders ?? 'all']

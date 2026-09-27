@@ -223,3 +223,101 @@ describe('when something fails partway', () => {
     }
   })
 })
+
+describe('budget-sharing, which Meta demands', () => {
+  test('ad-set budgets require is_adset_budget_sharing_enabled', async () => {
+    // Found live: Meta refuses the campaign outright without this field, and its
+    // error names the field but not that it applies only to this case.
+    const { fetchImpl, calls } = mockMeta([OK])
+    await client(fetchImpl).create(plan())
+
+    const campaign = calls.find((c) => c.url.endsWith('/campaigns'))!
+    assert.equal(campaign.body.is_adset_budget_sharing_enabled, 'false')
+  })
+
+  test('a campaign-level budget does not send it', async () => {
+    const { fetchImpl, calls } = mockMeta([OK])
+    const p = plan()
+    await client(fetchImpl).create({
+      ...p,
+      campaign: { ...p.campaign, budgetLevel: 'campaign', dailyBudget: gbp(20_000) },
+      adSets: [{ ...p.adSets[0]!, adSet: { ...p.adSets[0]!.adSet, dailyBudget: undefined } }],
+    })
+
+    const campaign = calls.find((c) => c.url.endsWith('/campaigns'))!
+    assert.equal(campaign.body.is_adset_budget_sharing_enabled, undefined)
+    assert.equal(campaign.body.daily_budget, '20000')
+  })
+})
+
+describe('attribution windows', () => {
+  test('a conversion goal gets the 7-day click window', async () => {
+    const { fetchImpl, calls } = mockMeta([OK])
+    await client(fetchImpl).create(plan())
+
+    const adset = calls.find((c) => c.url.endsWith('/adsets'))!
+    const spec = JSON.parse(adset.body.attribution_spec!) as Array<{ window_days: number }>
+    assert.equal(spec.length, 2)
+  })
+
+  test('a click goal sends NONE — Meta only allows (1, 0) and rejects the rest', async () => {
+    // Found live. The click is the outcome, so there is nothing to attribute a
+    // week later. Omitting it lets Meta apply a default that cannot be rejected.
+    const { fetchImpl, calls } = mockMeta([OK])
+    const p = plan()
+    await client(fetchImpl).create({
+      ...p,
+      adSets: [
+        {
+          ...p.adSets[0]!,
+          adSet: {
+            ...p.adSets[0]!.adSet,
+            optimizationGoal: 'LINK_CLICKS',
+            conversionEvent: undefined,
+          },
+        },
+      ],
+    })
+
+    const adset = calls.find((c) => c.url.endsWith('/adsets'))!
+    assert.equal(adset.body.attribution_spec, undefined)
+  })
+})
+
+describe('Advantage audience versus a fixed age range', () => {
+  test('default ages keep Advantage audience on', async () => {
+    const { fetchImpl, calls } = mockMeta([OK])
+    await client(fetchImpl).create(plan())
+
+    const adset = calls.find((c) => c.url.endsWith('/adsets'))!
+    const targeting = JSON.parse(adset.body.targeting!) as Record<string, unknown>
+    assert.deepEqual(targeting.targeting_automation, { advantage_audience: 1 })
+  })
+
+  test('a narrowed age range sets the flag to 0, explicitly', async () => {
+    // Found live. With Advantage audience on, age is a suggestion Meta expands
+    // past, so narrowing it is refused with a message that never names the cause.
+    const { fetchImpl, calls } = mockMeta([OK])
+    const p = plan()
+    await client(fetchImpl).create({
+      ...p,
+      adSets: [
+        {
+          ...p.adSets[0]!,
+          adSet: {
+            ...p.adSets[0]!.adSet,
+            audience: { countries: ['GB'], ageMin: 25, ageMax: 55 },
+          },
+        },
+      ],
+    })
+
+    const adset = calls.find((c) => c.url.endsWith('/adsets'))!
+    const targeting = JSON.parse(adset.body.targeting!) as Record<string, unknown>
+    // Sent explicitly as 0, never omitted: Meta refuses an ad set that leaves
+    // the flag out entirely.
+    assert.deepEqual(targeting.targeting_automation, { advantage_audience: 0 })
+    assert.equal(targeting.age_min, 25)
+    assert.equal(targeting.age_max, 55)
+  })
+})

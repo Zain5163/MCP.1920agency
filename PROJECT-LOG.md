@@ -839,6 +839,62 @@ it before retrying. A test asserts all three.
 **Nothing has touched a real ad account.** Needs an ad account id and a token
 with `ads_management` — the Page token used for publishing is not enough.
 
+## 2026-09-27 — First contact with the real Meta Marketing API
+
+Owner created a **sandbox ad account** (`1548198627338649`, PKR, Asia/Karachi)
+and a token with `ads_management`. Read-only check first: account reachable,
+status ACTIVE, 0 spent.
+
+### ⚠️ A sandbox ad account is the fourth failure-that-reports-success
+
+Meta's own wording: *"These ad accounts don't require a payment method and the
+ads you create **won't run**."* Campaigns are created, ids come back, everything
+succeeds, and nothing ever delivers.
+
+Same shape as Pinterest Trial access, TikTok pre-audit, and LinkedIn's silent
+truncation. Written into the env file so a future session cannot mistake a
+sandbox success for a working campaign.
+
+### Four real API rules, none of which were in the ported code
+
+Every one came from an actual rejection, and each is now a test:
+
+1. **`is_adset_budget_sharing_enabled` is mandatory** when budgets sit on ad
+   sets. Meta refuses the campaign outright, and the error names the field but
+   not that it applies only in this case.
+2. **Attribution windows depend on the optimisation goal.** A 7-day click window
+   is only valid for conversion goals. Optimising for clicks allows *(1, 0)*
+   only — the click *is* the outcome. Now sent only for conversion goals, so
+   Meta applies its own default elsewhere and cannot reject it.
+3. **Advantage audience and a narrowed age range conflict.** With it on, Meta
+   treats age as a *suggestion*; narrowing is refused with “you can add a lower
+   maximum age as a suggestion instead”, which never names the cause. And the
+   flag is **mandatory** — omitting it is also refused. So it is always sent,
+   explicitly `1` by default and `0` when an age range was chosen deliberately.
+4. **The ads `instagram_actor_id` is not the publishing Instagram id.** They
+   look alike; `17841452630711887` publishes fine and is rejected here. Left
+   unset, ads run as the Page, which is valid.
+
+This is the argument for raw HTTP over the Business SDK making itself: every one
+of those was diagnosed from Meta's own message, verbatim, in one read.
+
+### Where it stopped
+
+**Campaign and ad set create successfully. The creative does not:**
+
+> *Ads creative post was created by an app that is in development mode. It must
+> be in public to create this ad.*
+
+App Mode is **Development**. Creating ad creatives needs it Live. That is the
+owner's switch, not a code problem.
+
+### Left behind, needing cleanup
+
+Five paused campaigns and two ad sets in the sandbox, from the retries. All
+PAUSED, in a sandbox, so nothing can spend — but it is clutter, and it is
+exactly the duplication IDEAS K3 exists to stop: re-running builds a new
+campaign rather than resuming.
+
 ## Verified live, not just tested
 
 | What | How it was proven |
@@ -846,6 +902,7 @@ with `ads_management` — the Page token used for publishing is not enough.
 | LinkedIn authorisation | Connected 2026-09-26; person URN stored; visible in `pnpm status` |
 | LinkedIn publishing | Real post published 2026-09-26 through the approval gate, `urn:li:share:7509614451189239808` |
 | Little-text escaping | Same post: text with `(` `)` survived intact, escaped `#` rendered as a clean hashtag |
+| Meta ads auth and creation | Sandbox account read live; campaign and ad set created for real 2026-09-27 |
 | LinkedIn image upload | Real image post 2026-09-26, `urn:li:share:7509616982338461696` — the two-step upload works |
 | LinkedIn VIDEO upload | Real video post 2026-09-26, `urn:li:ugcPost:7509704322323222529` — chunked upload, ETags and finalize all work against the live API |
 | The approval gate | Refused without a token and published with one, on a real irreversible action |
