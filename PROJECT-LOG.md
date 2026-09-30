@@ -1015,6 +1015,59 @@ same thing a second time. It now keeps the underlying class.
   inbox access, and never expires. Ads need six. Recommended regenerating with
   only those; owner's decision.
 
+## 2026-09-30 — Ads in the MCP server: an AI can plan, create and start campaigns
+
+Five tools on the local server, verified by driving the real stdio server over
+JSON-RPC against the live account:
+
+| Tool | Risk | Verified live |
+|---|---|---|
+| `review_ad_plan` | low | priced the plan: PKR 5,000/day, ~150,000/month, no problems |
+| `get_campaign_status` | low | read the real campaign: 3 ads `PENDING_REVIEW` |
+| `create_ad_plan` | high, gated | **refused** — no spend ceiling configured |
+| `activate_campaign` | high, gated | **refused** — no spend ceiling configured |
+| `pause_campaign` | medium, no gate | unit-tested only |
+
+### Three gates, in this order, for anything that can spend
+
+1. **Validation** — refused outright if it would fail at Meta or is illegal.
+2. **The spend ceiling** — checked against **everything the account already
+   spends**, not just this campaign. Ten campaigns at 5,000 a day is 50,000,
+   whatever each looks like alone. `committedDailySpendMinor` reads active
+   campaigns and ad sets and counts each budget once, since CBO and ABO put it at
+   opposite levels.
+3. **Approval** — a token over the exact plan. For activation the token covers
+   the campaign **and its budget**, so a budget changed between approval and
+   execution invalidates it.
+
+### The ceiling fails closed
+
+With no `META_ADS_DAILY_LIMIT` / `META_ADS_MONTHLY_LIMIT` set, nothing that can
+spend runs, and the refusal says exactly what to add. **There is no default.** Any
+default would be a number the software chose on the owner's behalf, and a
+ceiling nobody chose is not a ceiling. Keys added to the env file empty.
+
+### Lifecycle details worth keeping
+
+- **Activation switches the campaign on LAST**, after its ads and ad sets. It is
+  the master switch, so there is never a moment where part of a campaign runs.
+- **Activation refuses if Meta rejected any ad.** Otherwise it would start
+  spending on a campaign that cannot deliver them.
+- **Pausing touches only the campaign, and has no approval gate.** It is the one
+  switch that stops everything at once, and stopping spend must never wait on a
+  confirmation round trip: a wrong pause costs delivery, a slow one costs money.
+- `status` reads `effective_status`, not `status`. An ad can be `ACTIVE` and
+  `DISAPPROVED` — switched on and not running. Review feedback is kept so a
+  rejection can be shown with its reason rather than as a quiet campaign.
+
+### Deliberately local-only
+
+Registered on the stdio server, **not** the hosted one. The account and token come
+from the owner's environment, which is single-tenant by construction. The hosted
+server gets these once ad accounts are stored per tenant (decision 0005).
+
+515 tests, 13 workspaces typecheck clean.
+
 ## Verified live, not just tested
 
 | What | How it was proven |

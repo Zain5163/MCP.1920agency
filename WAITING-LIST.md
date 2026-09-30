@@ -91,6 +91,23 @@ ever published, because neither has app credentials configured.
 
 ---
 
+## 7. Meta ads — three owner decisions ⏸
+
+The ads tools are built and verified. Three things only the owner can decide:
+
+1. **Spend ceiling.** `META_ADS_DAILY_LIMIT` and `META_ADS_MONTHLY_LIMIT` in the
+   env file, whole PKR. Until both are set, create and activate refuse. No
+   default on purpose.
+2. **Orphan campaigns** in the sandbox from retries — all PAUSED, none can spend.
+   Keep `120330000132891215`, delete the rest? Awaiting approval.
+3. **The ads token carries 43 permissions and never expires.** Six are needed.
+   Regenerate with only those, or keep it?
+
+Also: the three ads in `120330000132891215` were `PENDING_REVIEW` on 2026-09-30.
+Check with `get_campaign_status` whether Meta approved them.
+
+---
+
 ## How to use this file
 
 When something here unblocks, move it into `ROADMAP.md` and delete it from here.

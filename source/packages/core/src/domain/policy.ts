@@ -137,6 +137,18 @@ export const ACTION_POLICY: Readonly<Record<string, ActionPolicy>> = {
     reversible: true,
     spendsMoney: false,
   },
+  review_ad_plan: {
+    rationale: 'Checks a campaign plan and prices it. Calls nothing that creates or spends.',
+    risk: 'low',
+    reversible: true,
+    spendsMoney: false,
+  },
+  get_campaign_status: {
+    rationale: 'Reads what a campaign is doing and whether its ads passed review. Changes nothing.',
+    risk: 'low',
+    reversible: true,
+    spendsMoney: false,
+  },
   list_ad_accounts: {
     rationale: 'Reads which ad accounts this authorisation can reach. Changes nothing.',
     risk: 'low',

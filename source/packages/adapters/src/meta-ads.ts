@@ -112,6 +112,38 @@ export interface CreateResult {
   readonly summary: string
 }
 
+/** One object's state as Meta reports it, not as we last set it. */
+export interface ObjectStatus {
+  readonly id: string
+  readonly name: string
+  /** What we asked for: ACTIVE or PAUSED. */
+  readonly status: string
+  /**
+   * What is actually happening. This is the field that matters: an ad can be
+   * `status: ACTIVE` and `effective_status: DISAPPROVED`, which means it was
+   * switched on and is not running.
+   */
+  readonly effectiveStatus: string
+  /** Meta's policy reasons, when an ad was rejected. */
+  readonly reviewFeedback?: Readonly<Record<string, unknown>>
+}
+
+export interface CampaignStatus {
+  readonly campaign: ObjectStatus
+  readonly adSets: readonly (ObjectStatus & { readonly dailyBudgetMinor?: number })[]
+  readonly ads: readonly ObjectStatus[]
+  /** Daily spend this campaign commits to once active, in minor units. */
+  readonly dailyBudgetMinor: number
+  /** Ads Meta has refused. Present even when everything else looks fine. */
+  readonly rejected: readonly ObjectStatus[]
+  /** Ads still waiting on Meta's policy review. */
+  readonly inReview: readonly ObjectStatus[]
+}
+
+/** States in which an ad will never deliver, whatever its own status says. */
+const REJECTED_STATES = new Set(['DISAPPROVED', 'WITH_ISSUES'])
+const IN_REVIEW_STATES = new Set(['IN_PROCESS', 'PENDING_REVIEW'])
+
 export class MetaAdsClient {
   readonly #account: MetaAdAccount
   readonly #token: string
@@ -219,6 +251,147 @@ export class MetaAdsClient {
       warnings: review.warnings,
       summary: review.summary,
     }
+  }
+
+  /**
+   * What a campaign is really doing, read from Meta.
+   *
+   * Exists because creation succeeding says nothing about delivery. Ads go
+   * through policy review after they are created, and can be rejected hours
+   * later with everything upstream still reporting success. This reads
+   * `effective_status` and the review feedback so a rejection is visible
+   * instead of looking like a quiet campaign.
+   */
+  async status(campaignId: string): Promise<CampaignStatus> {
+    const campaign = await this.#get(campaignId, {
+      fields: 'id,name,status,effective_status,daily_budget',
+    })
+    const adSets = await this.#get(`${campaignId}/adsets`, {
+      fields: 'id,name,status,effective_status,daily_budget',
+      limit: '100',
+    })
+    const ads = await this.#get(`${campaignId}/ads`, {
+      fields: 'id,name,status,effective_status,ad_review_feedback',
+      limit: '100',
+    })
+
+    const toStatus = (row: Record<string, unknown>): ObjectStatus => ({
+      id: String(row.id),
+      name: String(row.name ?? ''),
+      status: String(row.status ?? ''),
+      effectiveStatus: String(row.effective_status ?? ''),
+      ...(row.ad_review_feedback !== undefined
+        ? { reviewFeedback: row.ad_review_feedback as Record<string, unknown> }
+        : {}),
+    })
+
+    const adSetRows = ((adSets as { data?: Record<string, unknown>[] }).data ?? []).map((row) => ({
+      ...toStatus(row),
+      ...(row.daily_budget !== undefined ? { dailyBudgetMinor: Number(row.daily_budget) } : {}),
+    }))
+    const adRows = ((ads as { data?: Record<string, unknown>[] }).data ?? []).map(toStatus)
+
+    // A campaign budget (CBO) and ad set budgets are mutually exclusive, so
+    // whichever is present is the whole daily commitment.
+    const campaignBudget = (campaign as { daily_budget?: string }).daily_budget
+    const dailyBudgetMinor =
+      campaignBudget !== undefined
+        ? Number(campaignBudget)
+        : adSetRows.reduce((sum, row) => sum + (row.dailyBudgetMinor ?? 0), 0)
+
+    return {
+      campaign: toStatus(campaign as Record<string, unknown>),
+      adSets: adSetRows,
+      ads: adRows,
+      dailyBudgetMinor,
+      rejected: adRows.filter((a) => REJECTED_STATES.has(a.effectiveStatus)),
+      inReview: adRows.filter((a) => IN_REVIEW_STATES.has(a.effectiveStatus)),
+    }
+  }
+
+  /**
+   * Daily spend the account already commits to, across everything running.
+   *
+   * A spend ceiling that looks only at the campaign being approved is useless:
+   * ten campaigns at 50 a day is 500 a day, whatever each one looks like
+   * alone. This is the figure the ceiling is checked against.
+   */
+  async committedDailySpendMinor(): Promise<number> {
+    const account = `act_${this.#account.adAccountId}`
+    const campaigns = await this.#get(`${account}/campaigns`, {
+      fields: 'id,daily_budget,effective_status',
+      effective_status: JSON.stringify(['ACTIVE']),
+      limit: '200',
+    })
+    const adSets = await this.#get(`${account}/adsets`, {
+      fields: 'id,daily_budget,effective_status',
+      effective_status: JSON.stringify(['ACTIVE']),
+      limit: '500',
+    })
+
+    const sum = (rows: unknown) =>
+      ((rows as { data?: { daily_budget?: string }[] }).data ?? []).reduce(
+        (total, row) => total + (row.daily_budget !== undefined ? Number(row.daily_budget) : 0),
+        0,
+      )
+    // CBO campaigns carry the budget; their ad sets carry none. ABO is the
+    // reverse. Summing both levels therefore counts each budget once.
+    return sum(campaigns) + sum(adSets)
+  }
+
+  /**
+   * Starts spending.
+   *
+   * Ads and ad sets are switched on **first** and the campaign **last**. The
+   * campaign is the master switch: while it is paused nothing below it
+   * delivers, so doing it last means there is never a moment where part of the
+   * campaign is running and part is not.
+   *
+   * This method does not decide whether activation is allowed. That is the
+   * policy layer's job, and it must have run before this is called.
+   */
+  async activate(campaignId: string): Promise<CampaignStatus> {
+    const current = await this.status(campaignId)
+    if (current.rejected.length > 0) {
+      throw new PublishError(
+        `${current.rejected.length} ad(s) in this campaign were rejected by Meta's review, so ` +
+          'activating would spend on a campaign that cannot deliver them. Fix or remove them first.',
+        { failureClass: 'permanent' },
+      )
+    }
+
+    for (const ad of current.ads) await this.#update(ad.id, { status: 'ACTIVE' })
+    for (const adSet of current.adSets) await this.#update(adSet.id, { status: 'ACTIVE' })
+    await this.#update(campaignId, { status: 'ACTIVE' })
+
+    return await this.status(campaignId)
+  }
+
+  /**
+   * Stops spending.
+   *
+   * The campaign alone is paused, and first: it is the one switch that stops
+   * everything beneath it at once. Pausing each ad in turn would leave the rest
+   * spending while it worked through them.
+   */
+  async pause(campaignId: string): Promise<CampaignStatus> {
+    await this.#update(campaignId, { status: 'PAUSED' })
+    return await this.status(campaignId)
+  }
+
+  async #get(path: string, params: Record<string, string>): Promise<unknown> {
+    const url = new URL(`${GRAPH_BASE}/${this.#version}/${path}`)
+    for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v)
+    url.searchParams.set('access_token', this.#token)
+    return await this.#send(url.toString(), { method: 'GET' })
+  }
+
+  async #update(id: string, body: Record<string, string>): Promise<void> {
+    await this.#send(`${GRAPH_BASE}/${this.#version}/${id}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ ...body, access_token: this.#token }),
+    })
   }
 
   async #createCampaign(plan: AdPlan): Promise<string> {

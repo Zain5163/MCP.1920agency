@@ -16,6 +16,7 @@ import {
 } from '@social-publisher/core'
 import { disconnect, health, queueStats, type TenantScope } from '@social-publisher/db'
 
+import { registerAdsTools } from './ads-tools.ts'
 import { currentScope, loadConnections, publishService, targetFor } from './context.ts'
 
 /**
@@ -386,6 +387,10 @@ async function buildDraft(
 
   return { draft, platforms, connections }
 }
+
+// Ads are local-only: the account comes from the owner's environment, which is
+// single-tenant by construction. See ads-tools.ts and decisions/0005.
+registerAdsTools(server)
 
 const transport = new StdioServerTransport()
 await server.connect(transport)
