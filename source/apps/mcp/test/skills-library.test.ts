@@ -116,3 +116,19 @@ describe('our own playbooks', () => {
     }
   })
 })
+
+describe('the instructions every client receives on connecting', () => {
+  test('point the AI at every playbook and at the skills, by the names the tools use', async () => {
+    const { SERVER_INSTRUCTIONS } = await import('../src/playbooks.ts')
+    for (const { key } of PLAYBOOKS) assert.ok(SERVER_INSTRUCTIONS.includes(key), `instructions miss ${key}`)
+    for (const tool of ['get_playbook', 'list_skills', 'get_skill']) assert.ok(SERVER_INSTRUCTIONS.includes(tool))
+  })
+
+  test('the tools they name really exist', () => {
+    const server = new McpServer({ name: 't', version: '0' })
+    registerPlaybooks(server)
+    registerSkillsLibrary(server)
+    const tools = (server as unknown as { _registeredTools: Record<string, unknown> })._registeredTools
+    for (const tool of ['get_playbook', 'list_skills', 'get_skill']) assert.ok(tools[tool], `${tool} not registered`)
+  })
+})

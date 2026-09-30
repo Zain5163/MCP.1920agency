@@ -244,6 +244,47 @@ _Sits at 5b rather than earlier because it inherits everything below it — acco
 scheduling, error handling, tenant isolation, audit. Building it before those are
 solid would mean building the riskiest feature on the weakest foundation._
 
+### 5b.5 — Set up people who have no ad account (owner's request, 2026-09-30)
+
+So a customer with nothing but a Facebook login can still run ads through
+AdsPilot. Checked against Meta's documentation on 2026-09-30:
+
+| Needed to run ads | Can AdsPilot create it? | How |
+|---|---|---|
+| A Facebook user account | **No** — the person makes it themselves | — |
+| A Facebook Page | **No** — Meta has no public API for it | Guide them with a direct link, then detect the Page when it exists |
+| A business portfolio (Business Manager) | **Yes** | `POST /{user-id}/businesses` (needs `business_management`, and a published Page) |
+| An ad account | **Yes, up to 5 per business by API** | `POST /{business-id}/adaccount` with name, currency, time zone, end advertiser |
+| A pixel / dataset | **Yes, one per ad account** | `POST /act_{id}/adspixels` with a name |
+| A payment method | **No** — card or funding is added in Meta's own screens | Guide them with a link; detect when billing is set, and refuse to activate until it is |
+| Pixel on their website | Partly | Give them the code, or install it via the WordPress MCP when that exists |
+
+**The tool:** one `set_up_ad_account` flow that checks what exists, lists what is
+missing, creates the three it can (each with approval: they are permanent — Meta
+does not allow deleting a business), and links to the two it cannot.
+
+**Before it can serve other people:** Meta App Review for `business_management`
+and `ads_management` at advanced access, and decision 0005's customer
+connection flow. Until then it can only act on the owner's own businesses.
+
+### 5b.6 — Expert by default, on every ad platform (owner's direction, 2026-09-30)
+
+The aim, in the owner's words: whichever AI a customer connects should work like
+a **top media buyer, performance marketer and e-commerce ad manager** without
+the customer telling it how. See `decisions/0008`.
+
+- **Done 2026-09-30:** the server now sends connection `instructions` telling
+  every AI to read the platform playbook before any ad work and apply it
+  unprompted. The Meta playbook gained a section per goal: leads, sales and
+  e-commerce, traffic, awareness, messaging, local.
+- **Every new ad platform ships with its playbook**, written before or with the
+  adapter, never after: Google, TikTok (written), then Microsoft, Amazon,
+  Snapchat, Pinterest, LinkedIn, X, Telegram. Each gets a section per goal.
+- **Kept current:** each playbook carries an "Updated" date and a verified-against
+  line. A playbook older than about three months gets re-checked against the
+  platform's changelog and the reference repos. A scheduled check can flag it.
+- **Advice, never control.** Anything that must hold stays in code (decision 0006).
+
 ---
 
 ## Tier 6 — Design system
@@ -268,7 +309,7 @@ or spends money goes through the approval layer.
 | Area | What it means | Notes |
 |---|---|---|
 | **Google Ads** | Search, Performance Max, YouTube ads | Developer token with Basic access; playbook already written |
-| **More ad networks** | Microsoft, TikTok, LinkedIn (access granted), Pinterest, Snapchat, X | Each needs its own developer approval |
+| **More ad networks** | Microsoft, TikTok, LinkedIn (access granted), Amazon, Pinterest, Snapchat, X, Telegram | Each needs its own developer approval, and ships with its own playbook (5b.6) |
 | **Ad libraries** | Competitor creatives: Meta Ad Library, Google Ads Transparency, TikTok Creative Center, LinkedIn Ad Library (granted) | Read-only; low risk; strong for pitching clients |
 | **SEO** | Keyword and rank tracking, backlinks and authority, site audits, schema | Data comes from providers (DataForSEO, Semrush, Moz and others). The skills library already covers the method |
 | **AI visibility** | How a brand shows up in ChatGPT, Claude, Gemini and Perplexity answers | The `ai-seo` skill is already served |

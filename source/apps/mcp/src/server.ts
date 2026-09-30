@@ -18,7 +18,7 @@ import { disconnect, health, queueStats, type TenantScope } from '@social-publis
 
 import { registerAdsTools } from './ads-tools.ts'
 import { registerImageTools } from './image-tools.ts'
-import { registerPlaybooks } from './playbooks.ts'
+import { SERVER_INSTRUCTIONS, registerPlaybooks } from './playbooks.ts'
 import { registerSkillsLibrary } from './skills-library.ts'
 import { currentScope, loadConnections, publishService, targetFor } from './context.ts'
 
@@ -34,7 +34,7 @@ import { currentScope, loadConnections, publishService, targetFor } from './cont
  * plausible-sounding fix and misleads the user.
  */
 
-const server = new McpServer({ name: 'adspilot', version: '0.2.0' })
+const server = new McpServer({ name: 'adspilot', version: '0.2.0' }, { instructions: SERVER_INSTRUCTIONS })
 
 const text = (body: string) => ({ content: [{ type: 'text' as const, text: body }] })
 

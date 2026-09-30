@@ -217,6 +217,26 @@ export function expandForPlacements(plan: AdPlan): AdPlan {
   }
 }
 
+/**
+ * Website-event tracking on the ad, whatever the campaign's goal.
+ *
+ * The pixel was attached only to conversion ad sets, as the thing they
+ * optimise toward. A traffic campaign therefore launched with **no website
+ * tracking at all** — found by the owner in Ads Manager on the first real
+ * campaign, 2026-09-30, where "Website events" was unticked and the only dataset
+ * tracked was an unrelated one. Tracking and optimising are different jobs:
+ * every ad should report what visitors do on the site, so results can be read
+ * and later campaigns can optimise on real data.
+ *
+ * Meta adds its own default entries alongside this one.
+ */
+export function websiteTracking(pixelId: string | undefined): Record<string, string> {
+  if (pixelId === undefined) return {}
+  return {
+    tracking_specs: JSON.stringify([{ 'action.type': ['offsite_conversion'], fb_pixel: [pixelId] }]),
+  }
+}
+
 /** A label per aspect ratio, which placement rules then refer to. */
 function labelFor(ratio: AspectRatio): string {
   return `ratio_${ratio.replace(':', 'x').replace('.', '_')}`
@@ -547,6 +567,7 @@ export class MetaAdsClient {
             adset_id: adSetId,
             creative: JSON.stringify({ creative_id: creativeId }),
             status: 'PAUSED',
+            ...websiteTracking(this.#account.pixelId),
           })
           created.adIds.push(adId)
         }

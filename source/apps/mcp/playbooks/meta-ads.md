@@ -184,6 +184,85 @@ Intent is on by default; at most three custom questions are allowed.
 
 ---
 
+## By goal: what a senior media buyer does differently
+
+Pick the objective from what the business actually wants to *pay for*, not what
+sounds closest. Meta finds people who do the thing you optimise for — optimise
+for clicks and you get clickers, not buyers.
+
+| The user says | Objective | Optimise for | Needs |
+|---|---|---|---|
+| "leads", "enquiries", "sign-ups" | `OUTCOME_LEADS` | leads (form) or `Lead` event (site) | a form, or the pixel firing `Lead` |
+| "sales", "orders", e-commerce | `OUTCOME_SALES` | `Purchase` (value when ROAS matters) | the pixel firing `Purchase` with value |
+| "visits", "traffic", new site | `OUTCOME_TRAFFIC` | landing page views, not link clicks | the pixel on the page |
+| "awareness", "reach", launch | `OUTCOME_AWARENESS` | reach, with a frequency cap | nothing |
+| "engagement", "followers" | `OUTCOME_ENGAGEMENT` | the specific engagement | nothing |
+| "installs" | `OUTCOME_APP_PROMOTION` | installs or an in-app event | the app registered with Meta |
+
+**Before any leads or sales campaign, check the tracking.** Every ad this server
+creates carries the account's pixel, whatever the objective. But a sales campaign
+optimising for `Purchase` on a site that never fires `Purchase` spends and learns
+nothing. If the user cannot confirm the event fires, say so and suggest traffic
+(landing page views) until it does.
+
+### Leads
+
+See "Leads" above. In addition: the cost per lead is not the number that matters,
+the cost per *qualified* lead is. Ask what happens to a lead after it arrives and
+how fast; a lead called within five minutes is worth several called next day.
+Suggest the business replies fast before suggesting a bigger budget.
+
+### Sales and e-commerce
+
+- **Optimise for `Purchase`**, and for purchase *value* once the account has
+  roughly 50+ purchases a week and the business has a target ROAS.
+- **Broad targeting, one campaign.** Past buyers and site visitors are included
+  automatically in broad delivery; separate retargeting campaigns now mostly
+  compete with it. Only split out retargeting with a distinct offer (a discount
+  for cart abandoners, say) and a small share of budget (10–20%).
+- **Offer beats creative polish.** Free delivery, a bundle, a clear guarantee the
+  business actually offers. Ask what the offer is; never invent one.
+- **Know the break-even.** Ask the product margin: break-even ROAS = 1 ÷ margin.
+  At 40% margin, anything under 2.5× ROAS loses money on the first order. Say this
+  before launch, not after.
+- **Creative that sells products:** the product in use, a short demo video,
+  unboxing, a real customer photo (only real ones), a comparison, the price shown
+  plainly when it is a strength.
+- *Not built yet:* catalog (Advantage+ catalog) ads from a product feed. Say so if
+  the user asks for dynamic product ads.
+
+### Traffic
+
+- **Optimise for landing page views, never link clicks.** Link clicks include
+  accidental taps and people who leave before the page loads.
+- A traffic campaign is a stepping stone: it warms the pixel and builds audiences.
+  If the real goal is leads or sales, say that traffic will not optimise for them.
+- A slow page wastes a traffic budget. If the page takes over ~3 seconds on a
+  phone, fix that first.
+
+### Awareness
+
+- Optimise for reach with a **frequency cap around 2 per 7 days**.
+- Judge by cost per 1,000 people reached and by what happens afterwards (branded
+  searches, direct visits), never by clicks.
+- Video suits it; the first 2 seconds must carry the brand.
+
+### Messaging (WhatsApp, Messenger, Instagram Direct)
+
+Suits businesses that sell in conversation: services, high-consideration
+purchases, markets where WhatsApp is how people buy (Pakistan, the Gulf).
+Someone must reply within minutes, or the budget is wasted.
+*Not built yet:* message destinations. Say so; do not fake it with a traffic
+campaign to a wa.me link without telling the user that is what it is.
+
+### Local businesses
+
+Keep the location radius realistic (how far a customer will actually travel),
+name the area in the copy ("for DHA Lahore families"), and use the phone number
+or directions as the call to action where the business takes calls.
+
+---
+
 ## Budget and the learning phase
 
 Meta needs roughly **50 results a week per ad set** to leave its "learning phase",

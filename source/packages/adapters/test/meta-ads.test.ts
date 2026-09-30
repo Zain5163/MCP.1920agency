@@ -323,3 +323,41 @@ describe('Advantage audience versus a fixed age range', () => {
     assert.equal(targeting.age_max, 55)
   })
 })
+
+describe('website tracking', () => {
+  test('every ad tracks website events with the pixel, even on a traffic campaign', async () => {
+    // Found by the owner on the first real campaign: a traffic ad launched with
+    // "Website events" unticked, because the pixel was only attached to
+    // conversion ad sets.
+    const { fetchImpl, calls } = mockMeta([OK])
+    const p = plan()
+    await client(fetchImpl).create({
+      ...p,
+      campaign: { ...p.campaign, objective: 'OUTCOME_TRAFFIC' as never },
+      adSets: [
+        {
+          ...p.adSets[0]!,
+          adSet: { ...p.adSets[0]!.adSet, optimizationGoal: 'LINK_CLICKS', conversionEvent: undefined },
+        },
+      ],
+    })
+    for (const ad of calls.filter((c) => c.url.endsWith('/ads'))) {
+      const specs = JSON.parse(ad.body.tracking_specs!) as Array<Record<string, string[]>>
+      assert.deepEqual(specs[0], { 'action.type': ['offsite_conversion'], fb_pixel: ['999'] })
+    }
+  })
+
+  test('without a pixel, nothing is invented', async () => {
+    const { fetchImpl, calls } = mockMeta([OK])
+    await new MetaAdsClient({ account: { ...account, pixelId: undefined }, accessToken: 'T', fetch: fetchImpl }).create({
+      ...plan(),
+      adSets: [
+        {
+          ...plan().adSets[0]!,
+          adSet: { ...plan().adSets[0]!.adSet, optimizationGoal: 'LINK_CLICKS', conversionEvent: undefined },
+        },
+      ],
+    })
+    assert.equal(calls.find((c) => c.url.endsWith('/ads'))!.body.tracking_specs, undefined)
+  })
+})

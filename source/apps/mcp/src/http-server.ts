@@ -8,7 +8,7 @@ import { optional } from '@social-publisher/config'
 import { disconnect, health } from '@social-publisher/db'
 import { createLogger } from '@social-publisher/telemetry'
 
-import { registerPlaybooks } from './playbooks.ts'
+import { SERVER_INSTRUCTIONS, registerPlaybooks } from './playbooks.ts'
 import { registerSkillsLibrary } from './skills-library.ts'
 import { registerTools } from './tools.ts'
 
@@ -110,7 +110,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
    * cannot see another tenant — there is no shared, long-lived server holding a
    * tenant that could be mismatched with an incoming request.
    */
-  const mcp = new McpServer({ name: 'adspilot', version: '0.3.0' })
+  const mcp = new McpServer({ name: 'adspilot', version: '0.3.0' }, { instructions: SERVER_INSTRUCTIONS })
   registerTools(mcp, identity, scoped)
   // Playbooks only: static text, no credentials. Ads tools stay local (decision 0005).
   registerPlaybooks(mcp)

@@ -138,6 +138,13 @@ and others). **The owner granted this deliberately**, to manage client accounts
 through AdsPilot later, and checks it daily. The code acts only on the configured
 account.
 
+## 12. "Website events" tick box on the live ad
+
+The API shows the pixel on the ad (added 2026-09-30); the owner's Ads Manager
+still showed the box unticked. **Waiting on the owner:** reload Ads Manager. If
+it is still unticked, tick it once there, and the ad is read back to see what
+Ads Manager writes, so the code matches it exactly.
+
 ---
 
 ## How to use this file

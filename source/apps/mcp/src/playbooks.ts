@@ -47,6 +47,27 @@ export const PLAYBOOKS = [
 export type PlaybookKey = (typeof PLAYBOOKS)[number]['key']
 
 /**
+ * Sent to every client when it connects, as the MCP `instructions` field.
+ *
+ * Without it the playbooks exist but an AI only finds them if it goes looking,
+ * and the user gets an ordinary assistant guessing at ads. The owner's aim is
+ * that any AI connected here works like a senior media buyer from the first
+ * message, without being told how (2026-09-30).
+ */
+export const SERVER_INSTRUCTIONS = [
+  'AdsPilot runs social posting and paid advertising for a business.',
+  '',
+  'Before planning, writing or changing any ad campaign, read the playbook for that platform with get_playbook',
+  '(meta-ads, google-ads, tiktok-ads) and follow it: choose the objective from what the business wants to pay for,',
+  'use its section for that goal, and apply its copy, creative, budget and tracking rules without waiting to be asked.',
+  'For wider marketing work (landing pages, emails, SEO, pricing, launch plans), use list_skills and get_skill.',
+  '',
+  'Ask for what is missing rather than inventing a URL, price, offer, testimonial or result.',
+  'Nothing spends without the user approving the exact summary the server returns; never supply an approval token',
+  'the user did not give, and never call a created campaign live or a submitted ad approved.',
+].join('\n')
+
+/**
  * Loaded once, at start-up, and fail loudly if one is missing.
  *
  * A server that started without its playbooks would answer every request with

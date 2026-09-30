@@ -1335,6 +1335,51 @@ possibly limited by plan. The client-account reach of the token is deliberate.
 
 591 tests, 13 workspaces typecheck clean.
 
+### Website events were not tracked (found by the owner)
+
+In Ads Manager the owner saw **Website events unticked** on the live ad. Ads were
+created without `tracking_specs`, so Meta applied its defaults (link clicks,
+landing page views, engagement) and left out the pixel. A traffic campaign has
+no conversion goal, so nothing forced the pixel on.
+
+Fixed:
+
+- Every ad AdsPilot creates now carries the account's pixel
+  (`offsite_conversion` + `fb_pixel`) whatever the objective. With no pixel
+  configured, nothing is added. Two tests.
+- The live ad `120249127477440366` had the pixel **added** beside Meta's seven
+  existing entries, not replacing them. Read back from the API: eight entries,
+  pixel `731641141950428` present, and the ad back to **ACTIVE** after the
+  re-review the edit triggered.
+- **Still open:** a later screenshot from the owner still showed the box unticked.
+  That may be a page loaded before the change. If a reload still shows it
+  unticked, the owner ticks it once in Ads Manager and the ad is read back, so
+  the code can write exactly what Ads Manager writes.
+
+The PixBundle.com and other offline datasets are the owner's own, set on the
+account deliberately.
+
+## 2026-09-30 — Expert by default; setting up people with no ad account
+
+The owner's direction: any AI connected to AdsPilot should work like a top media
+buyer without being told how, on every ad platform. See `decisions/0008`.
+
+- The server now sends MCP connection **instructions** telling every AI to read
+  the platform playbook before ad work and apply it unprompted (both the local
+  and the hosted server). A test keeps them in step with the tool names.
+- The Meta playbook gained **"By goal"**: leads, sales and e-commerce (purchase
+  optimisation, break-even ROAS, retargeting's small role), traffic (landing page
+  views, not clicks), awareness (frequency cap), messaging, local. It states what
+  is not built yet (catalog ads, message destinations).
+- Roadmap 5b.5: **setting up customers who have no ad account.** Checked against
+  Meta's docs: a business portfolio, an ad account (up to 5 per business by API)
+  and a pixel (one per ad account) can be created by API; a Page and a payment
+  method cannot, so those are guided links.
+- Roadmap 5b.6 and the ad-networks row: Amazon, Microsoft, Snapchat, Pinterest,
+  Telegram and others, each shipping with its own playbook.
+
+595 tests, 13 workspaces typecheck clean.
+
 ## Verified live, not just tested
 
 | What | How it was proven |
