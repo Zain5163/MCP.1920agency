@@ -41,3 +41,27 @@ that went looking would find them.
 - Playbooks say plainly what is **not built** (catalog ads, message
   destinations), so an AI does not fake a feature with a workaround the user did
   not choose.
+
+## Can the playbooks be hidden from the user? (asked by the owner, 2026-09-30)
+
+The owner asked that the skills be kept in TypeScript so that the AI can use
+them but the end user cannot read them.
+
+**Honest answer: not completely, and the file format does not change it.**
+Whatever the server sends to the AI arrives in the user's own AI app, and the
+user can ask their AI to show it. A `.md` file and a string inside a `.ts` file
+reach the AI as the same text.
+
+What does protect them:
+
+1. **The hosted server.** Customers connect to our server; they never get the
+   source, the files or the whole library. This is the real protection.
+2. **Serve only what the task needs** — one goal's section, not every playbook
+   at once — so nobody collects the library in a single call. (Possible next
+   step.)
+3. **Terms of service** forbidding copying or reselling the content.
+4. **Keep them current.** A copied playbook goes stale within months; ours are
+   re-checked. Being current is worth more than being secret.
+
+The 50 marketingskills are MIT-licensed and public anyway; the value we add is
+the platform playbooks, the enforcement in code, and keeping both current.

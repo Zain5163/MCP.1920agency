@@ -39,6 +39,12 @@ export interface ActionPolicy {
   readonly reversible: boolean
   /** Whether it can cost money. */
   readonly spendsMoney: boolean
+  /**
+   * The sentence shown before approval, when the general rule would say the
+   * wrong thing. Creating a business is permanent but not public, and "this is
+   * public and cannot be undone" would be half false.
+   */
+  readonly consequence?: string
 }
 
 /**
@@ -168,6 +174,36 @@ export const ACTION_POLICY: Readonly<Record<string, ActionPolicy>> = {
     risk: 'low',
     reversible: true,
     spendsMoney: false,
+  },
+  check_ad_setup: {
+    rationale: 'Reads which Page, business, ad account, payment method and pixel exist. Changes nothing.',
+    risk: 'low',
+    reversible: true,
+    spendsMoney: false,
+  },
+  create_business: {
+    rationale: 'Creates a Meta business portfolio in the person’s name. Meta does not allow deleting one.',
+    risk: 'high',
+    reversible: false,
+    spendsMoney: false,
+    consequence:
+      'This creates a permanent business portfolio in your name: Meta does not allow deleting one. Nothing becomes public and nothing spends.',
+  },
+  create_ad_account: {
+    rationale: 'Creates an ad account in a business. It can be closed but not deleted, and Meta allows only five by API per business.',
+    risk: 'high',
+    reversible: false,
+    spendsMoney: false,
+    consequence:
+      'This creates a permanent ad account: it can be closed later but never deleted, and uses one of the five Meta allows by API. Nothing spends until a campaign is approved and started.',
+  },
+  create_pixel: {
+    rationale: 'Creates the ad account’s pixel. Meta allows one per ad account by API and it cannot be deleted.',
+    risk: 'high',
+    reversible: false,
+    spendsMoney: false,
+    consequence:
+      'This creates the ad account’s pixel. Meta allows only one per ad account this way and it cannot be deleted, so the name should be right. Nothing becomes public and nothing spends.',
   },
   create_lead_form: {
     rationale:
@@ -342,6 +378,7 @@ export function decide(options: DecideOptions): PolicyDecision {
  * of publishing a post and false of creating a paused campaign.
  */
 function consequenceOf(policy: ActionPolicy): string {
+  if (policy.consequence !== undefined) return policy.consequence
   if (policy.spendsMoney && !policy.reversible) {
     return 'This spends real money from the moment it runs, and what is spent cannot be recovered.'
   }

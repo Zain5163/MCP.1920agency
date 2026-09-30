@@ -37,7 +37,7 @@ import { currentScope } from './context.ts'
  * The AI can propose anything. What it can execute is decided here, in code.
  */
 
-type ToolResult = { content: Array<{ type: 'text'; text: string }> }
+export type ToolResult = { content: Array<{ type: 'text'; text: string }> }
 const text = (body: string): ToolResult => ({ content: [{ type: 'text' as const, text: body }] })
 
 /** Reads the account from the environment, or explains exactly what is missing. */
@@ -254,7 +254,7 @@ function durationDays(plan: AdPlan): number | undefined {
   return longest > 0 ? longest : undefined
 }
 
-async function audit(action: string, detail: Record<string, unknown>): Promise<void> {
+export async function audit(action: string, detail: Record<string, unknown>): Promise<void> {
   // An audit failure must never be why an ad was or was not created, so it is
   // attempted and not allowed to throw.
   try {
@@ -265,7 +265,7 @@ async function audit(action: string, detail: Record<string, unknown>): Promise<v
   }
 }
 
-async function guarded(fn: () => Promise<ToolResult>): Promise<ToolResult> {
+export async function guarded(fn: () => Promise<ToolResult>): Promise<ToolResult> {
   try {
     return await fn()
   } catch (error) {

@@ -12,6 +12,8 @@ anything here older than six months as needing a check.
 
 | Step | Tool | Spends? |
 |---|---|---|
+| (someone new to Meta ads) See what is missing | `check_ad_setup` | no — reads only |
+| (if missing) Business, ad account, pixel | `create_business`, `create_ad_account`, `create_pixel` | no — each needs the user's approval, and none can be undone |
 | (for instant-form leads) Make the form | `create_lead_form` | no |
 | 1. Price and check the plan | `review_ad_plan` | no |
 | 2. See the actual ad | `preview_ad` | no |
@@ -20,6 +22,12 @@ anything here older than six months as needing a check.
 | 5. Start it | `activate_campaign` | **yes** — needs the user's approval |
 | Read results | `get_ad_performance` | no — suggests, never acts |
 | Stop it any time | `pause_campaign` | stops spending, no approval needed |
+
+**Setting someone up.** Meta does not allow two of the steps by API: creating a
+Facebook **Page** and adding a **payment method**. `check_ad_setup` gives the
+person a direct link for each. Do them in its order — a business needs a
+published Page, an ad account needs a business. Currency and time zone on an
+ad account can never be changed, so confirm both with the user first.
 
 The approval summary from `create_ad_plan` already includes preview links for the
 first ad. Give them to the user: seeing the real ad is worth more than any

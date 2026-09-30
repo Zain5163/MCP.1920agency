@@ -1380,6 +1380,57 @@ buyer without being told how, on every ad platform. See `decisions/0008`.
 
 595 tests, 13 workspaces typecheck clean.
 
+## 2026-09-30 — Account setup tools; playbooks for eleven ad platforms
+
+**Setting up people with no ad account (roadmap 5b.5), built on the local
+server:**
+
+- `check_ad_setup` reads what exists and says what is missing, and who does
+  each step: Page, business portfolio, ad account (and whether it is active),
+  payment method, pixel, and **whether the pixel is actually receiving website
+  events** (flagged after 7 silent days). Run live, read-only, on the owner's
+  connection: all six steps found, pixel last fired 2026-09-27.
+- `create_business`, `create_ad_account`, `create_pixel`: each behind its own
+  approval. The approval says what is true of each: permanent, not public, spends
+  nothing. Policies gained an optional `consequence` sentence for this, because
+  the general rule would have called them "public".
+- The Page and the payment method come back as direct links: Meta allows neither
+  by API. `create_business` needs a person's login; the owner's system user
+  cannot create one.
+- **Nothing has been created with these tools yet.**
+
+**Playbooks, written with a section per goal, sources, and "unverified" marks
+where official pages would not confirm a fact:**
+
+| Playbook | State |
+|---|---|
+| Meta | "By goal" added; setup tools added to its tool table |
+| Google | Extended. Fixed: RSAs take 3–15 headlines and 2–4 descriptions, not exactly 15 and 4 |
+| TikTok | Extended. Fixed: video up to 10 min, display name 20 characters, budget floor CPA × 50 ÷ 7 (was 50×) |
+| Microsoft, Snapchat, Pinterest, LinkedIn, X, Reddit, Amazon, Telegram | New |
+
+Worth knowing from the research:
+
+- Reddit ended its onsite lead forms in September 2026, so Reddit leads now need
+  a form on the business's own site.
+- Amazon announced renames on 2026-09-29: Sponsored Display becomes "display
+  ads", under DVA+.
+- Telegram's official sites refused connections, so its facts are third-party
+  and marked.
+
+**The server keeps them current:** a playbook read more than 90 days after its
+"Updated" date arrives with a warning on top telling the AI to check the
+platform's documentation first. Tests: every playbook has a readable date, and
+every platform except Meta says near the top that it cannot be launched from
+here.
+
+**The owner asked whether the skills can be hidden from users.** Answered in
+`decisions/0008`: not fully, whatever the file format, because what the AI reads
+reaches the user's app. The protection is the hosted server, serving only what a
+task needs, the terms of service, and staying current.
+
+613 tests, 13 workspaces typecheck clean.
+
 ## Verified live, not just tested
 
 | What | How it was proven |

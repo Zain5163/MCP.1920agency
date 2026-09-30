@@ -259,9 +259,13 @@ AdsPilot. Checked against Meta's documentation on 2026-09-30:
 | A payment method | **No** — card or funding is added in Meta's own screens | Guide them with a link; detect when billing is set, and refuse to activate until it is |
 | Pixel on their website | Partly | Give them the code, or install it via the WordPress MCP when that exists |
 
-**The tool:** one `set_up_ad_account` flow that checks what exists, lists what is
-missing, creates the three it can (each with approval: they are permanent — Meta
-does not allow deleting a business), and links to the two it cannot.
+**BUILT 2026-09-30** (local server): `check_ad_setup` reads what exists and says
+what is missing and who does it, including whether the pixel is actually
+receiving website events. `create_business`, `create_ad_account` and
+`create_pixel` each need their own approval, and their approval says they are
+permanent. The Page and payment steps come back as direct links. Verified live
+(read-only) on the owner's account: all six steps found. Nothing has been
+created with them yet.
 
 **Before it can serve other people:** Meta App Review for `business_management`
 and `ads_management` at advanced access, and decision 0005's customer
@@ -278,11 +282,15 @@ the customer telling it how. See `decisions/0008`.
   unprompted. The Meta playbook gained a section per goal: leads, sales and
   e-commerce, traffic, awareness, messaging, local.
 - **Every new ad platform ships with its playbook**, written before or with the
-  adapter, never after: Google, TikTok (written), then Microsoft, Amazon,
-  Snapchat, Pinterest, LinkedIn, X, Telegram. Each gets a section per goal.
-- **Kept current:** each playbook carries an "Updated" date and a verified-against
-  line. A playbook older than about three months gets re-checked against the
-  platform's changelog and the reference repos. A scheduled check can flag it.
+  adapter, never after. **Written 2026-09-30, each with a section per goal:**
+  Meta, Google, Microsoft, TikTok, Snapchat, Pinterest, LinkedIn, X, Reddit,
+  Amazon, Telegram. Only Meta can be launched from the server; the others are
+  planning and copy until their adapters exist.
+- **Kept current:** each playbook carries an "Updated" date and its sources. Past
+  90 days the server itself puts a warning on top when an AI reads it, telling
+  the AI to check the platform's current documentation first. Facts the writers
+  could not confirm from official pages are marked "unverified" in the text
+  (notably Telegram, X and Reddit, whose help sites would not load).
 - **Advice, never control.** Anything that must hold stays in code (decision 0006).
 
 ---

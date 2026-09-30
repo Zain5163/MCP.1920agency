@@ -98,7 +98,7 @@ describe('the skills library', () => {
 })
 
 describe('our own playbooks', () => {
-  test('all three load and are served by name', async () => {
+  test('every playbook loads and is served by name', async () => {
     const server = new McpServer({ name: 't', version: '1' })
     registerPlaybooks(server)
     for (const { key } of PLAYBOOKS) {
@@ -110,9 +110,11 @@ describe('our own playbooks', () => {
   test('the platforms not yet connected say so first', async () => {
     const server = new McpServer({ name: 't', version: '1' })
     registerPlaybooks(server)
-    for (const key of ['google-ads', 'tiktok-ads']) {
+    // Every platform except Meta is planning-only, and must say so near the top
+    // so the AI tells the user before writing a word.
+    for (const { key } of PLAYBOOKS.filter((p) => p.key !== 'meta-ads')) {
       const text = await callTool(server, 'get_playbook', { platform: key })
-      assert.match(text.slice(0, 400), /cannot launch/i, key)
+      assert.match(text.slice(0, 900), /cannot (be )?launch/i, key)
     }
   })
 })
@@ -130,5 +132,23 @@ describe('the instructions every client receives on connecting', () => {
     registerSkillsLibrary(server)
     const tools = (server as unknown as { _registeredTools: Record<string, unknown> })._registeredTools
     for (const tool of ['get_playbook', 'list_skills', 'get_skill']) assert.ok(tools[tool], `${tool} not registered`)
+  })
+})
+
+describe('playbooks stay current', () => {
+  test('every playbook carries a date the server can read', async () => {
+    const { readFileSync } = await import('node:fs')
+    const { playbookDate } = await import('../src/playbooks.ts')
+    for (const { key } of PLAYBOOKS) {
+      const md = readFileSync(new URL(`../playbooks/${key}.md`, import.meta.url), 'utf8')
+      assert.ok(playbookDate(md) !== undefined, `${key} has no "**Updated YYYY-MM-DD.**" line`)
+    }
+  })
+
+  test('an old playbook warns the AI to check before relying on it; a fresh one does not', async () => {
+    const { withFreshness } = await import('../src/playbooks.ts')
+    const md = '# X\n\n**Updated 2026-01-01.** Something.'
+    assert.equal(withFreshness(md, new Date('2026-02-01T00:00:00Z')), md)
+    assert.match(withFreshness(md, new Date('2026-09-30T00:00:00Z')), /272 days old/)
   })
 })

@@ -28,23 +28,74 @@ export const PLAYBOOKS = [
     key: 'meta-ads',
     title: 'Meta ads playbook',
     description:
-      'How to plan, write and launch Facebook and Instagram campaigns with this server: structure, copy, creative shapes, leads, budget and the learning phase.',
+      'How to plan, write and launch Facebook and Instagram campaigns with this server, by goal (leads, sales, traffic, awareness, messaging, local): structure, copy, creative shapes, tracking, budget and the learning phase.',
   },
   {
     key: 'google-ads',
     title: 'Google Ads playbook',
     description:
-      'Planning Google Search campaigns and writing responsive search ads to Google’s hard limits. Google cannot be launched from this server yet.',
+      'Planning Google Ads campaigns by goal (Search, Shopping, Performance Max, local, YouTube/Demand Gen, App) and writing responsive search ads and Performance Max assets to Google’s hard limits. Google cannot be launched from this server yet.',
+  },
+  {
+    key: 'microsoft-ads',
+    title: 'Microsoft Advertising playbook',
+    description:
+      'Planning Microsoft Advertising (Bing Search with LinkedIn profile bid adjustments, Shopping, Performance Max, Audience Network, Copilot placements, Google Ads import) and writing ads to its limits. Microsoft cannot be launched from this server yet.',
   },
   {
     key: 'tiktok-ads',
     title: 'TikTok ads playbook',
     description:
-      'Vertical creative, the safe zone, budgets and tracking for TikTok. TikTok cannot be launched from this server yet.',
+      'TikTok by goal: vertical creative, the safe zone, Spark Ads and creators, Smart+ and shop campaigns, budgets and tracking. TikTok cannot be launched from this server yet.',
+  },
+  {
+    key: 'snapchat-ads',
+    title: 'Snapchat ads playbook',
+    description:
+      'Snapchat by goal: full-screen vertical creative, formats and safe zones, budgets, pixel and Conversions API. Snapchat cannot be launched from this server yet.',
+  },
+  {
+    key: 'pinterest-ads',
+    title: 'Pinterest ads playbook',
+    description:
+      'Pinterest by goal: planning-mindset audiences, Pin creative and specs, shopping and catalog campaigns, tag and Conversions API. Pinterest cannot be launched from this server yet.',
+  },
+  {
+    key: 'linkedin-ads',
+    title: 'LinkedIn ads playbook',
+    description:
+      'B2B campaigns on LinkedIn: objectives, Lead Gen Forms, Thought Leader and Document ads, company and matched-audience targeting, realistic budgets for high CPCs. LinkedIn cannot be launched from this server yet (API access granted, adapter planned).',
+  },
+  {
+    key: 'x-ads',
+    title: 'X (Twitter) ads playbook',
+    description:
+      'Planning X campaigns: conversation-based targeting, posts and cards to X’s limits, the rebuilt Ads Manager and its Leads objective, pixel and Conversion API. X cannot be launched from this server yet.',
+  },
+  {
+    key: 'reddit-ads',
+    title: 'Reddit ads playbook',
+    description:
+      'Reddit campaigns: community, keyword and interest targeting, writing in Reddit’s native tone, handling comments on ads, and lead generation after the 2026 onsite-form sunset. Reddit cannot be launched from this server yet.',
+  },
+  {
+    key: 'amazon-ads',
+    title: 'Amazon Ads playbook',
+    description:
+      'Amazon Sponsored Products, Sponsored Brands, display and DSP basics to a senior ad manager’s standard: listing readiness before spend, keyword harvesting, ACoS/TACoS and break-even, bids and placements, by goal. Amazon cannot be launched from this server yet.',
+  },
+  {
+    key: 'telegram-ads',
+    title: 'Telegram Ads playbook',
+    description:
+      'Whether Telegram Ads fits, and how to plan its Sponsored Messages: channel, topic, bot and search targeting, the short copy limits, TON/Fragment funding, by goal. Telegram cannot be launched or funded from this server yet.',
   },
 ] as const
 
 export type PlaybookKey = (typeof PLAYBOOKS)[number]['key']
+
+/** For the tool and prompt schemas, so a new playbook is offered everywhere at once. */
+const PLAYBOOK_KEYS = PLAYBOOKS.map((p) => p.key) as [PlaybookKey, ...PlaybookKey[]]
 
 /**
  * Sent to every client when it connects, as the MCP `instructions` field.
@@ -58,8 +109,10 @@ export const SERVER_INSTRUCTIONS = [
   'AdsPilot runs social posting and paid advertising for a business.',
   '',
   'Before planning, writing or changing any ad campaign, read the playbook for that platform with get_playbook',
-  '(meta-ads, google-ads, tiktok-ads) and follow it: choose the objective from what the business wants to pay for,',
+  `(${PLAYBOOKS.map((p) => p.key).join(', ')}) and follow it: choose the objective from what the business wants to pay for,`,
   'use its section for that goal, and apply its copy, creative, budget and tracking rules without waiting to be asked.',
+  'For someone new to Meta ads, run check_ad_setup first: it says what is missing (Page, business, ad account,',
+  'payment, pixel) and who does each step.',
   'For wider marketing work (landing pages, emails, SEO, pricing, launch plans), use list_skills and get_skill.',
   '',
   'Ask for what is missing rather than inventing a URL, price, offer, testimonial or result.',
@@ -88,6 +141,31 @@ function load(): Record<PlaybookKey, string> {
   return out
 }
 
+/** Past this, a playbook says so when read. Platforms change too often to trust older advice. */
+export const PLAYBOOK_STALE_DAYS = 90
+
+/** The date in a playbook's "**Updated YYYY-MM-DD.**" line. */
+export function playbookDate(markdown: string): Date | undefined {
+  const m = /\*\*Updated (\d{4}-\d{2}-\d{2})\.?\*\*/.exec(markdown)
+  return m === null ? undefined : new Date(`${m[1]}T00:00:00Z`)
+}
+
+/**
+ * The playbook as served: with a warning on top once it is old, so the AI checks
+ * the platform's current facts instead of repeating last year's.
+ */
+export function withFreshness(markdown: string, now: Date = new Date()): string {
+  const updated = playbookDate(markdown)
+  if (updated === undefined) return markdown
+  const days = Math.floor((now.getTime() - updated.getTime()) / 86_400_000)
+  if (days <= PLAYBOOK_STALE_DAYS) return markdown
+  return (
+    `> **This playbook is ${days} days old.** Limits, objective names and features may have changed. ` +
+    'Check anything that matters against the platform’s current documentation before relying on it, and tell the user you did.\n\n' +
+    markdown
+  )
+}
+
 const promptText = (text: string) => ({
   messages: [{ role: 'user' as const, content: { type: 'text' as const, text } }],
 })
@@ -100,15 +178,15 @@ export function registerPlaybooks(server: McpServer): void {
       `playbook-${playbook.key}`,
       `adspilot://playbooks/${playbook.key}`,
       { title: playbook.title, description: playbook.description, mimeType: 'text/markdown' },
-      async (uri) => ({ contents: [{ uri: uri.href, mimeType: 'text/markdown', text: text[playbook.key] }] }),
+      async (uri) => ({ contents: [{ uri: uri.href, mimeType: 'text/markdown', text: withFreshness(text[playbook.key]) }] }),
     )
   }
 
   server.tool(
     'get_playbook',
     'Read the built-in expert playbook for an ad platform BEFORE planning, writing or launching anything on it. Covers structure, copy, creative specs, budgets and what this server can and cannot do on that platform.',
-    { platform: z.enum(['meta-ads', 'google-ads', 'tiktok-ads']) },
-    async ({ platform }) => ({ content: [{ type: 'text' as const, text: text[platform] }] }),
+    { platform: z.enum(PLAYBOOK_KEYS) },
+    async ({ platform }) => ({ content: [{ type: 'text' as const, text: withFreshness(text[platform]) }] }),
   )
 
   server.registerPrompt(
@@ -159,7 +237,7 @@ export function registerPlaybooks(server: McpServer): void {
           '',
           '---',
           '',
-          text['meta-ads'],
+          withFreshness(text['meta-ads']),
         ].join('\n'),
       ),
   )
@@ -170,7 +248,7 @@ export function registerPlaybooks(server: McpServer): void {
       title: 'Write ad copy for a platform',
       description: 'Write ad copy variants that follow a platform’s limits and current best practice.',
       argsSchema: {
-        platform: z.enum(['meta-ads', 'google-ads', 'tiktok-ads']),
+        platform: z.enum(PLAYBOOK_KEYS),
         offer: z.string().describe('What is being advertised.'),
         audience: z.string().optional().describe('Who buys it, in their own words if possible.'),
       },
@@ -189,7 +267,7 @@ export function registerPlaybooks(server: McpServer): void {
           '',
           '---',
           '',
-          text[args.platform],
+          withFreshness(text[args.platform]),
         ].join('\n'),
       ),
   )
