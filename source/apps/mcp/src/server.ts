@@ -17,6 +17,7 @@ import {
 import { disconnect, health, queueStats, type TenantScope } from '@social-publisher/db'
 
 import { registerAdsTools } from './ads-tools.ts'
+import { registerPlaybooks } from './playbooks.ts'
 import { currentScope, loadConnections, publishService, targetFor } from './context.ts'
 
 /**
@@ -391,6 +392,9 @@ async function buildDraft(
 // Ads are local-only: the account comes from the owner's environment, which is
 // single-tenant by construction. See ads-tools.ts and decisions/0005.
 registerAdsTools(server)
+
+// Expertise is served on both transports; it is static text and holds no secrets.
+registerPlaybooks(server)
 
 const transport = new StdioServerTransport()
 await server.connect(transport)

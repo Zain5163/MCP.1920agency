@@ -200,12 +200,12 @@ describe('total budget', () => {
 })
 
 describe('the approval summary', () => {
-  test('leads with the monthly cost, not just the daily one', () => {
-    // 50/day reads as small. 1500/month is the number that changes minds.
+  test('shows the total cost, not just the daily one', () => {
+    // 50/day reads as small; the total is the number that changes minds. This
+    // plan has an end date, so the total is the real one, not a monthly guess.
     const summary = describePlan(plan())
     assert.match(summary, /50\.00 USD/)
-    assert.match(summary, /1500\.00 USD/)
-    assert.match(summary, /per month/i)
+    assert.match(summary, /roughly [\d.]+ USD in total/)
   })
 
   test('says plainly that nothing will spend yet', () => {
@@ -258,5 +258,29 @@ describe('ad variants', () => {
 
   test('bodies can stand in for body', () => {
     assert.equal(withAd({ body: '', bodies: ['from the list'] }).ok, true)
+  })
+})
+
+describe('the summary states the real cost', () => {
+  test('a campaign with an end date shows its total, not a monthly guess', () => {
+    const start = new Date('2026-10-01T00:00:00Z')
+    const end = new Date('2026-10-15T00:00:00Z')
+    const p = plan()
+    const summary = describePlan({
+      ...p,
+      adSets: [{ ...p.adSets[0]!, adSet: { ...p.adSets[0]!.adSet, startAt: start, endAt: end } }],
+    })
+    // 50.00/day x 14 days.
+    assert.match(summary, /14 day\(s\): roughly 700\.00 USD in total/)
+    assert.doesNotMatch(summary, /per month/)
+  })
+
+  test('an open-ended one says it keeps spending', () => {
+    const p = plan()
+    const summary = describePlan({
+      ...p,
+      adSets: [{ ...p.adSets[0]!, adSet: { ...p.adSets[0]!.adSet, endAt: undefined } }],
+    })
+    assert.match(summary, /keeps spending until someone stops it/)
   })
 })

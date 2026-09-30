@@ -560,12 +560,38 @@ export function describePlan(plan: AdPlan): string {
     `${plan.adSets.length} ad set(s), ${adCount} ad(s)`,
   ]
 
+  const openEnded = plan.adSets.some((e) => e.adSet.endAt === undefined)
+
   if (total !== undefined) {
     lines.push(`Daily budget: ${formatMoney(total)}`)
-    lines.push(`Roughly ${formatMoney({ minor: total.minor * 30, currency: total.currency })} per month if left running`)
+    /**
+     * The figure a person approves on, so it has to be the real one. A two-week
+     * campaign was summarised as "roughly 150,000 per month" when it would
+     * cost about 70,000 in total — found in the live approval summary.
+     */
+    if (openEnded) {
+      lines.push(
+        `Roughly ${formatMoney({ minor: total.minor * 30, currency: total.currency })} per month, ` +
+          'and it keeps spending until someone stops it',
+      )
+    } else {
+      const now = Date.now()
+      const days = Math.max(
+        1,
+        Math.ceil(
+          Math.max(
+            ...plan.adSets.map(
+              (e) => (e.adSet.endAt!.getTime() - (e.adSet.startAt?.getTime() ?? now)) / 86_400_000,
+            ),
+          ),
+        ),
+      )
+      lines.push(
+        `Runs about ${days} day(s): roughly ${formatMoney({ minor: total.minor * days, currency: total.currency })} in total`,
+      )
+    }
   }
 
-  const openEnded = plan.adSets.some((e) => e.adSet.endAt === undefined)
   if (openEnded) lines.push('At least one ad set has NO end date.')
 
   lines.push('Everything will be created PAUSED. Nothing spends until it is activated separately.')

@@ -276,3 +276,53 @@ describe('a minimum daily spend', () => {
     assert.equal(checkSpend(limit, { dailyMinor: 100_000, currency: 'PKR' }).ok, true)
   })
 })
+
+describe('a campaign with an end date', () => {
+  // The owner's own limits: PKR 10,000/day, PKR 100,000/month.
+  const owner = { dailyMaxMinor: 1_000_000, monthlyMaxMinor: 10_000_000, currency: 'PKR' }
+
+  test('a 7-day campaign at the daily ceiling fits the monthly one', () => {
+    // 10,000 x 7 = 70,000, inside 100,000. Assuming thirty days refused it.
+    assert.equal(checkSpend(owner, { dailyMinor: 1_000_000, currency: 'PKR', durationDays: 7 }).ok, true)
+  })
+
+  test('the same budget with no end date does not', () => {
+    const result = checkSpend(owner, { dailyMinor: 1_000_000, currency: 'PKR' })
+    assert.equal(result.ok, false)
+    assert.ok(!result.ok && /no end date/.test(result.reason))
+  })
+
+  test('running longer than a month is still counted as one month', () => {
+    assert.equal(checkSpend(owner, { dailyMinor: 300_000, currency: 'PKR', durationDays: 90 }).ok, true)
+  })
+
+  test('campaigns already running are counted as running all month', () => {
+    // 60,000 already committed for the month plus 5,000 x 10 days = 110,000.
+    const result = checkSpend(owner, { dailyMinor: 500_000, currency: 'PKR', durationDays: 10 }, 200_000)
+    assert.equal(result.ok, false)
+  })
+})
+
+describe('the approval tells the truth about each action', () => {
+  const ask = (action: string) => {
+    const d = decide({ action, payload: { x: 1 }, describe: () => 'summary' })
+    assert.equal(d.allowed, false)
+    return formatApprovalRequest(d as Extract<typeof d, { allowed: false }>)
+  }
+
+  test('publishing is public and irreversible', () => {
+    assert.match(ask('publish_post'), /public and cannot be undone/)
+  })
+
+  test('activating says it spends money that cannot be recovered', () => {
+    assert.match(ask('activate_campaign'), /spends real money/)
+    assert.doesNotMatch(ask('activate_campaign'), /public/)
+  })
+
+  test('creating a paused plan does not claim to be public or spending', () => {
+    // It said "public and cannot be undone" for every approval until 2026-09-30.
+    const text = ask('create_ad_plan')
+    assert.match(text, /nothing spends yet/)
+    assert.doesNotMatch(text, /cannot be undone/)
+  })
+})

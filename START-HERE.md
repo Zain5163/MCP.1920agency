@@ -31,6 +31,11 @@ one of them by the scheduler with nobody present.
 | **NEXT-STEPS.md** | Known gaps and improvements |
 | **SETUP.md** | Accounts and credentials — the parts only the owner can do |
 | **decisions/** | Why each major choice was made, and what was rejected |
+| **WAITING-LIST.md** | What is blocked on someone else, and what unblocks it |
+| **RULES.md** | Standing rules for how this project is built |
+| **research/** | What was checked, when, against what source |
+| **reference/ad-skills/** | Third-party ad playbooks, licensed and pinned. Source material only |
+| **source/apps/mcp/playbooks/** | Our own Meta, Google and TikTok playbooks, served to AI clients |
 | **architecture/** | How the system is put together |
 
 ---

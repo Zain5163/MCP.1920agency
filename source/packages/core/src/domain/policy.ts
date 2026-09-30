@@ -137,6 +137,12 @@ export const ACTION_POLICY: Readonly<Record<string, ActionPolicy>> = {
     reversible: true,
     spendsMoney: false,
   },
+  get_playbook: {
+    rationale: 'Reads built-in advertising guidance. Changes nothing and touches no account.',
+    risk: 'low',
+    reversible: true,
+    spendsMoney: false,
+  },
   review_ad_plan: {
     rationale: 'Checks a campaign plan and prices it. Calls nothing that creates or spends.',
     risk: 'low',
@@ -251,6 +257,8 @@ export type PolicyDecision =
       readonly summary: string
       /** Echo this back to execute. Only valid for this exact payload. */
       readonly token: string
+      /** What happens if it is approved, stated for the person approving. */
+      readonly consequence: string
     }
 
 export interface DecideOptions {
@@ -282,6 +290,7 @@ export function decide(options: DecideOptions): PolicyDecision {
     risk: policy.risk,
     summary: options.describe(),
     token: confirmationToken(options.action, options.payload),
+    consequence: consequenceOf(policy),
   }
 }
 
@@ -292,14 +301,31 @@ export function decide(options: DecideOptions): PolicyDecision {
  * being asked, and that nothing has happened yet. Per RULES.md R1, a refusal is
  * only useful if it says how to proceed.
  */
+/**
+ * The one sentence a person needs before saying yes.
+ *
+ * Derived from the action's policy rather than written once for everything. It
+ * was "this is public and cannot be undone" for every approval, which was true
+ * of publishing a post and false of creating a paused campaign.
+ */
+function consequenceOf(policy: ActionPolicy): string {
+  if (policy.spendsMoney && !policy.reversible) {
+    return 'This spends real money from the moment it runs, and what is spent cannot be recovered.'
+  }
+  if (!policy.reversible) return 'This is public and cannot be undone.'
+  if (policy.spendsMoney) return 'This changes spending, which takes effect immediately.'
+  return 'Nothing becomes public and nothing spends yet, but this sets up what one more step would start.'
+}
+
 export function formatApprovalRequest(decision: Extract<PolicyDecision, { allowed: false }>): string {
   return [
     'APPROVAL NEEDED — nothing has been sent.',
     '',
     decision.summary,
     '',
-    'This is public and cannot be undone. Show the above to the user and ask them to',
-    'confirm. If they approve, call this tool again with everything identical plus:',
+    decision.consequence,
+    'Show the above to the user and ask them to confirm. If they approve, call this',
+    'tool again with everything identical plus:',
     '',
     `  confirm: "${decision.token}"`,
     '',
@@ -337,7 +363,19 @@ export type SpendCheck =
 
 export function checkSpend(
   limit: SpendLimit,
-  request: { readonly dailyMinor: number; readonly currency: string },
+  request: {
+    readonly dailyMinor: number
+    readonly currency: string
+    /**
+     * How many days this spend runs, when it has an end date. Without one it is
+     * assumed to run all month, because nothing stops it.
+     *
+     * Found when the owner's own limits were checked: PKR 10,000/day against
+     * PKR 100,000/month refused a 7-day campaign that would cost 70,000 in
+     * total, because every campaign was assumed to run for thirty days.
+     */
+    readonly durationDays?: number
+  },
   alreadyCommittedDailyMinor = 0,
 ): SpendCheck {
   if (request.currency !== limit.currency) {
@@ -369,13 +407,22 @@ export function checkSpend(
         `limit of ${format(limit.dailyMaxMinor, limit.currency)}.`,
     }
   }
-  if (total * 30 > limit.monthlyMaxMinor) {
+  // Existing campaigns are assumed to run all month: their end dates are not
+  // known here, and assuming they stop early would understate the commitment.
+  const days = Math.min(30, Math.max(1, Math.ceil(request.durationDays ?? 30)))
+  const monthly = alreadyCommittedDailyMinor * 30 + request.dailyMinor * days
+  if (monthly > limit.monthlyMaxMinor) {
+    const openEnded = request.durationDays === undefined
     return {
       ok: false,
       reason:
-        `At ${format(total, limit.currency)} per day this runs to about ` +
-        `${format(total * 30, limit.currency)} a month, over the limit of ` +
-        `${format(limit.monthlyMaxMinor, limit.currency)}.`,
+        `At ${format(total, limit.currency)} per day ` +
+        (openEnded ? 'with no end date, ' : `for ${days} day(s), `) +
+        `this runs to about ${format(monthly, limit.currency)} in a month, over the limit of ` +
+        `${format(limit.monthlyMaxMinor, limit.currency)}.` +
+        (openEnded
+          ? ` An end date would let a shorter campaign run at a higher daily budget.`
+          : ''),
     }
   }
   return { ok: true }

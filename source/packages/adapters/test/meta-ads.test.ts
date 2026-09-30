@@ -73,9 +73,11 @@ describe('reviewing without creating', () => {
     assert.equal(result.ok, true)
   })
 
-  test('the summary leads with the monthly cost', () => {
+  test('the summary states the total cost', () => {
+    // This plan ends on a fixed date, so the total is real rather than a
+    // monthly guess.
     const { fetchImpl } = mockMeta([OK])
-    assert.match(client(fetchImpl).review(plan()).summary, /per month/i)
+    assert.match(client(fetchImpl).review(plan()).summary, /in total/i)
   })
 
   test('combines platform-neutral and Meta-specific problems', () => {

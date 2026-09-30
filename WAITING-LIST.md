@@ -95,9 +95,11 @@ ever published, because neither has app credentials configured.
 
 The ads tools are built and verified. Three things only the owner can decide:
 
-1. **Spend ceiling.** `META_ADS_DAILY_LIMIT` and `META_ADS_MONTHLY_LIMIT` in the
-   env file, whole PKR. Until both are set, create and activate refuse. No
-   default on purpose.
+1. ~~**Spend ceiling.**~~ **Set 2026-09-30**: 10,000/day, 100,000/month, 1,000
+   minimum. **But they conflict for open-ended campaigns**: 10,000/day left
+   running is 300,000/month, so the real always-on ceiling is ~3,333/day. Either
+   raise the monthly limit to 300,000, or accept that 10,000/day only works for
+   campaigns of 10 days or fewer. Owner's call.
 2. **Orphan campaigns** in the sandbox from retries — all PAUSED, none can spend.
    Keep `120330000132891215`, delete the rest? Awaiting approval.
 3. **The ads token carries 43 permissions and never expires.** Six are needed.

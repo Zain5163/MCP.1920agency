@@ -109,7 +109,16 @@ function loadLimit(currency: string): SpendLimit | { error: string } {
   if (typeof d === 'string') return { error: d }
   if (typeof m === 'string') return { error: m }
 
-  return { dailyMaxMinor: d, monthlyMaxMinor: m, currency }
+  // Optional, unlike the ceiling: a missing floor refuses nothing it should.
+  const minimum = optional('META_ADS_DAILY_MINIMUM')
+  let min: number | undefined
+  if (minimum !== undefined) {
+    const parsed = parse(minimum, 'META_ADS_DAILY_MINIMUM')
+    if (typeof parsed === 'string') return { error: parsed }
+    min = parsed
+  }
+
+  return { dailyMaxMinor: d, monthlyMaxMinor: m, ...(min !== undefined ? { dailyMinMinor: min } : {}), currency }
 }
 
 /**
@@ -121,11 +130,37 @@ function loadLimit(currency: string): SpendLimit | { error: string } {
  */
 const adShape = z.object({
   name: z.string().describe('Short identifier, e.g. "hook-consistency".'),
-  body: z.string().describe('Primary text. Meta truncates around 125 characters.'),
-  headline: z.string().describe('Headline. Truncates around 40 characters.'),
-  landingPageUrl: z.string().describe('https URL the ad sends people to.'),
-  callToAction: z.string().optional().describe('e.g. LEARN_MORE, SHOP_NOW, CONTACT_US.'),
-  imagePath: z.string().optional().describe('Absolute path to a local image for the creative.'),
+  primaryTexts: z
+    .array(z.string())
+    .min(1)
+    .max(5)
+    .describe('1 to 5 primary texts, each a different angle. Hook in the first ~125 characters.'),
+  headlines: z.array(z.string()).min(1).max(5).describe('1 to 5 headlines, each under ~40 characters.'),
+  descriptions: z.array(z.string()).max(5).optional().describe('Up to 5 short descriptions.'),
+  landingPageUrl: z
+    .string()
+    .optional()
+    .describe('https URL the ad sends people to. Not needed for instant-form ads.'),
+  callToAction: z.string().optional().describe('e.g. LEARN_MORE, SIGN_UP, CONTACT_US, SHOP_NOW.'),
+  files: z
+    .array(
+      z.object({
+        path: z.string().describe('Absolute path to a local image or video.'),
+        kind: z.enum(['image', 'video']),
+        aspectRatio: z
+          .enum(['1:1', '4:5', '9:16', '1.91:1'])
+          .describe('4:5 for Feed, 9:16 for Stories and Reels, 1:1 square, 1.91:1 landscape.'),
+        thumbnailPath: z.string().optional().describe('Video only: the frame to show before it plays.'),
+      }),
+    )
+    .max(20)
+    .optional()
+    .describe('Supply several shapes and each placement gets the one that fits.'),
+  leadFormId: z.string().optional().describe('Instant-form ads only: the id of the lead form to open.'),
+  allowMetaEnhancements: z
+    .boolean()
+    .optional()
+    .describe("Let Meta's AI alter the creative. Off unless the user asks for it."),
 })
 
 const planShape = {
@@ -147,6 +182,10 @@ const planShape = {
           .optional()
           .describe('e.g. LINK_CLICKS. Conversion goals also need a conversionEvent and a pixel.'),
         conversionEvent: z.string().optional(),
+        leadDestination: z
+          .enum(['website', 'instant_form'])
+          .optional()
+          .describe('For lead campaigns: a landing page, or a form inside Facebook.'),
         endDate: z.string().optional().describe('ISO date. Without one the campaign runs until stopped.'),
         ads: z.array(adShape),
       }),
@@ -170,20 +209,49 @@ function toPlan(args: PlanArgs, currency: string): AdPlan {
         },
         ...(entry.optimizationGoal !== undefined ? { optimizationGoal: entry.optimizationGoal } : {}),
         ...(entry.conversionEvent !== undefined ? { conversionEvent: entry.conversionEvent } : {}),
+        ...(entry.leadDestination !== undefined ? { leadDestination: entry.leadDestination } : {}),
         ...(entry.endDate !== undefined ? { endAt: new Date(entry.endDate) } : {}),
       },
       ads: entry.ads.map((ad) => ({
         name: ad.name,
-        body: ad.body,
-        headline: ad.headline,
-        landingPageUrl: ad.landingPageUrl,
+        body: ad.primaryTexts[0] ?? '',
+        bodies: ad.primaryTexts,
+        headlines: ad.headlines,
+        ...(ad.descriptions !== undefined ? { descriptions: ad.descriptions } : {}),
+        ...(ad.landingPageUrl !== undefined ? { landingPageUrl: ad.landingPageUrl } : {}),
         ...(ad.callToAction !== undefined ? { callToAction: ad.callToAction } : {}),
-        ...(ad.imagePath !== undefined
-          ? { creative: { kind: 'image' as const, localPath: ad.imagePath } }
+        ...(ad.leadFormId !== undefined ? { leadFormId: ad.leadFormId } : {}),
+        ...(ad.allowMetaEnhancements === true ? { platformEnhancements: true } : {}),
+        ...(ad.files !== undefined
+          ? {
+              assets: ad.files.map((f) => ({
+                kind: f.kind,
+                localPath: f.path,
+                aspectRatio: f.aspectRatio,
+                ...(f.thumbnailPath !== undefined ? { thumbnailPath: f.thumbnailPath } : {}),
+              })),
+            }
           : {}),
       })),
     })),
   }
+}
+
+/**
+ * How many days the plan runs, if every ad set has an end date.
+ *
+ * One open-ended ad set makes the whole plan open-ended, because it keeps
+ * spending after the others stop.
+ */
+function durationDays(plan: AdPlan): number | undefined {
+  const now = Date.now()
+  let longest = 0
+  for (const { adSet } of plan.adSets) {
+    if (adSet.endAt === undefined) return undefined
+    const start = adSet.startAt?.getTime() ?? now
+    longest = Math.max(longest, (adSet.endAt.getTime() - start) / 86_400_000)
+  }
+  return longest > 0 ? longest : undefined
 }
 
 async function audit(action: string, detail: Record<string, unknown>): Promise<void> {
@@ -218,6 +286,23 @@ export function registerAdsTools(server: McpServer): void {
         const plan = toPlan(args, loaded.account.currency)
         const review = loaded.client.review(plan)
         const lines = [review.summary, '']
+        let budgetBlocked = false
+
+        const limit = loadLimit(loaded.account.currency)
+        const total = totalDailyBudget(plan)
+        if (!('error' in limit) && total !== undefined) {
+          const committed = await loaded.client.committedDailySpendMinor()
+          const days = durationDays(plan)
+          const spend = checkSpend(
+            limit,
+            { dailyMinor: total.minor, currency: total.currency, ...(days !== undefined ? { durationDays: days } : {}) },
+            committed,
+          )
+          if (!spend.ok) {
+            lines.push(`WILL NOT BE CREATED — budget: ${spend.reason}`, '')
+            budgetBlocked = true
+          }
+        }
 
         if (review.errors.length > 0) {
           lines.push('WILL NOT BE CREATED — fix these first:', ...review.errors.map((e) => `  • ${e}`), '')
@@ -225,7 +310,9 @@ export function registerAdsTools(server: McpServer): void {
         if (review.warnings.length > 0) {
           lines.push('Warnings (do not block, but read them):', ...review.warnings.map((w) => `  • ${w}`))
         }
-        if (review.ok && review.warnings.length === 0) lines.push('No problems found.')
+        // Only when nothing at all stands in the way. Printing it under a budget
+        // refusal contradicted the line above it.
+        if (review.ok && review.warnings.length === 0 && !budgetBlocked) lines.push('No problems found.')
         return text(lines.join('\n'))
       }),
   )
@@ -258,7 +345,12 @@ export function registerAdsTools(server: McpServer): void {
         const total = totalDailyBudget(plan)
         if (total !== undefined) {
           const committed = await loaded.client.committedDailySpendMinor()
-          const spend = checkSpend(limit, { dailyMinor: total.minor, currency: total.currency }, committed)
+          const days = durationDays(plan)
+          const spend = checkSpend(
+            limit,
+            { dailyMinor: total.minor, currency: total.currency, ...(days !== undefined ? { durationDays: days } : {}) },
+            committed,
+          )
           if (!spend.ok) return text(`Nothing was created. ${spend.reason}`)
         }
 

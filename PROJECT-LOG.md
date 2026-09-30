@@ -1068,6 +1068,76 @@ server gets these once ad accounts are stored per tenant (decision 0005).
 
 515 tests, 13 workspaces typecheck clean.
 
+## 2026-09-30 — One-prompt campaigns: variants, shapes, skills built in
+
+Owner's goal: *"the user just says run my lead generation ads, and any AI tool
+launches everything through our MCP, the best way possible."* Decision 0006
+splits it: **the AI writes, the server knows (playbooks), the server enforces
+(code).** No model call of our own — no cost, no key, no vendor imposed.
+
+### Creative, verified against the live API
+
+Up to 5 primary texts, 5 headlines, 5 descriptions, 10 images and 10 videos per
+ad (Meta's documented `asset_feed_spec` limits, enforced as errors). Files carry
+an aspect ratio and each placement is served the shape that fits.
+
+Three rules found only by being refused, now tests:
+
+1. **Text variants and placement-specific files cannot share a creative** —
+   *"Multiple bodies assets cannot be applied to rule no. 1"*. An ad asking for
+   both is split into one ad per text, each keeping every shape.
+2. **`standard_enhancements` is deprecated and refused.** Enhancements are
+   named individually. Read back from Meta: **all ~85 report `OPT_OUT`**.
+3. **A 1:1 supplied beside a 4:5 was uploaded and never served.** Found only by
+   reading the creative back; it now gets the square placements.
+
+Also: video upload with processing polling and a chosen or preferred
+thumbnail (100 MB cap until chunked upload); instant-form leads needing no pixel
+or landing page; long copy no longer treated as the problem, only where the hook
+sits. Creatives can be created and previewed standalone, which is how all of
+this was tested without leaving more half-built campaigns.
+
+### Skills built in — Meta, Google, TikTok
+
+Researched, licence-checked, and saved to `reference/ad-skills/` at pinned
+commits (59 files, MIT and Apache-2.0) so it is never re-researched. Our own
+playbooks in `source/apps/mcp/playbooks/`, served on **both** servers three ways
+— resources, prompts (`launch_meta_campaign`, `write_ad_copy`), and a
+`get_playbook` tool, because tools are the one thing every client supports.
+
+Left out on purpose: an unlicensed repo, and third-party advice to use a VPN to
+sign up to TikTok from an unsupported country.
+
+Google and TikTok playbooks state up front that **this server cannot launch
+those platforms yet**, so an AI plans and writes for them but never claims a
+campaign exists.
+
+### Budgets — and a conflict in the owner's own limits
+
+Set: PKR 1,000–10,000/day, PKR 100,000/month, and a new **daily minimum**.
+
+Testing them found the ceilings inconsistent for open-ended campaigns: 10,000 a
+day left running is 300,000 a month, so the effective always-on ceiling is
+~3,333/day. Also found our side assumed every campaign runs 30 days. **The
+monthly check now uses the real duration**, so a 7-day campaign at 10,000/day
+(70,000 total) is allowed and an open-ended one is not.
+
+### Two misleading lines in the approval summary, fixed
+
+The figure a person approves on has to be the real one:
+
+- A two-week campaign was summarised as *"roughly 150,000 per month"*. It now
+  says *"runs about 14 days: roughly 70,000 in total"*.
+- Every approval said *"This is public and cannot be undone"* — true of
+  publishing, false of a paused campaign. The sentence now comes from the
+  action's policy.
+
+Verified by driving the real stdio server: resources, prompts, `get_playbook`,
+a 5-text / 3-shape plan reviewed as 5 ads, a below-minimum budget refused, and
+the approval request — stopping there, since approving is the owner's.
+
+547 tests, 13 workspaces typecheck clean.
+
 ## Verified live, not just tested
 
 | What | How it was proven |
