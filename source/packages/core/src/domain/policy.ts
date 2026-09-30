@@ -143,6 +143,19 @@ export const ACTION_POLICY: Readonly<Record<string, ActionPolicy>> = {
     reversible: true,
     spendsMoney: false,
   },
+  preview_ad: {
+    rationale: 'Renders how an ad will look. Uploads its media to the ad account library, which is private; creates no ad and spends nothing.',
+    risk: 'low',
+    reversible: true,
+    spendsMoney: false,
+  },
+  create_lead_form: {
+    rationale:
+      'Creates an instant form on the Page. Not public on its own — nobody sees it until an ad opens it — and it can be archived.',
+    risk: 'medium',
+    reversible: true,
+    spendsMoney: false,
+  },
   review_ad_plan: {
     rationale: 'Checks a campaign plan and prices it. Calls nothing that creates or spends.',
     risk: 'low',

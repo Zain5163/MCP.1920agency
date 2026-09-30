@@ -49,7 +49,7 @@ sources in their footers.
 | What | Why |
 |---|---|
 | `Varnan-Tech/meta-ads-skill` | **No licence.** No licence means no permission to reuse, however public the repository. |
-| Advice in `setup-tiktok.md` to use a VPN to sign up from an unsupported country | Circumvents TikTok's regional restrictions and risks breaking its terms. Kept in the file as fetched, **not** carried into our playbook. |
+| Advice in `setup-tiktok.md` to use a VPN to sign up from an unsupported country | First left out as a terms risk. **Added back 2026-09-30 at the owner's decision**, to the TikTok playbook, stated with its risk and with the safer alternative. |
 | Paid skills (e.g. Gumroad listings seen in search) | Not open licensed. |
 
 ## Refreshing

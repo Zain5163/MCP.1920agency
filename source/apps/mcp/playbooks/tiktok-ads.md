@@ -88,8 +88,13 @@ business-api.tiktok.com with advertiser scopes, and TikTok's approval of those
 scopes. Until the app passes review, posts published through the API land
 private. Recorded in the roadmap; not built.
 
-Sign up from a country TikTok supports. Workarounds that disguise the country
-risk the account.
+**If TikTok for Business is not available in the user's country:** some people
+sign up through a VPN set to a supported country, and the API then works from
+anywhere. It is recorded here because the owner asked for it to be known. Be
+straight with the user about the risk: TikTok's terms expect the real country,
+and an account found to have misstated it can be restricted or closed — along
+with its ad spend history. The safer route is a business entity or agency
+partner in a supported country. Let the user decide; do not do it for them.
 
 ---
 

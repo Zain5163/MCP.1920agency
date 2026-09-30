@@ -1138,6 +1138,44 @@ the approval request — stopping there, since approving is the owner's.
 
 547 tests, 13 workspaces typecheck clean.
 
+## 2026-09-30 — The Meta gaps, closed
+
+Owner: *"I want them built first … we don't want anything left behind."* Every
+item listed as not built for Meta, except image generation, which needs a
+provider decision.
+
+| Built | Verified live |
+|---|---|
+| **Preview of the real ad**, without creating it (`generatepreviews`) | Feed, Instagram Feed and Stories links for both single-shape and three-shape ads |
+| Preview **inside the approval** for `create_ad_plan` | Shown in the approval message from the real server |
+| **Performance reading** with suggestions (`get_ad_performance`) | Live call succeeds; the campaign has never run so reports nothing, as expected |
+| **Instant forms from a prompt** (`create_lead_form`) | Form `1854997695681367` created on the Page, read back ACTIVE with Higher Intent on; a lead creative using it accepted |
+| **Chunked video upload**, streamed from disk, up to 4 GB | `Day 2.mp4` uploaded in chunks and accepted in 41 s including processing |
+
+Details worth keeping:
+
+- **The preview shows the ad that will exist, not the one requested.** A request
+  with five texts and three shapes becomes five ads; previewing the request
+  would render an ad nobody sees. Caught in the live output and fixed.
+- **Performance suggests, never acts.** Enough data means ~3× the target cost
+  spent; without a target no cost verdict is given at all, because there is
+  nothing honest to compare against.
+- **Forms act with the Page's own token**, fetched with the system user's. Higher
+  Intent by default; more than three custom questions refused; https privacy
+  policy required.
+- **One video path, always chunked.** The small-file shortcut held the whole file
+  in memory; Meta names each next byte range, and a stalled server cannot loop
+  forever.
+
+Clutter left in the sandbox and on the Page, for the owner: one test lead form
+(`AdsPilot test form - safe to archive`) and several standalone creatives. None
+public, none spending.
+
+Also, at the owner's decision: the TikTok VPN note is back in the playbook,
+stated with its risk and the safer alternative.
+
+564 tests, 13 workspaces typecheck clean.
+
 ## Verified live, not just tested
 
 | What | How it was proven |

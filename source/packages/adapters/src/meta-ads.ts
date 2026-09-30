@@ -1,4 +1,4 @@
-import { readFile, stat } from 'node:fs/promises'
+import { open, readFile, stat } from 'node:fs/promises'
 import { basename } from 'node:path'
 
 import {
@@ -322,6 +322,135 @@ export const META_CREATIVE_FEATURES = [
   'inline_comment',
 ] as const
 
+/** A question on an instant form. Standard types are pre-filled by Meta. */
+export type LeadQuestion =
+  | { readonly type: 'FULL_NAME' | 'EMAIL' | 'WORK_EMAIL' | 'PHONE' | 'COMPANY_NAME' | 'JOB_TITLE' | 'CITY' }
+  | {
+      readonly type: 'CUSTOM'
+      readonly key: string
+      readonly label: string
+      /** Multiple choice when given; free text otherwise. */
+      readonly options?: readonly string[]
+    }
+
+export interface LeadFormDraft {
+  readonly name: string
+  readonly questions: readonly LeadQuestion[]
+  readonly privacyPolicyUrl: string
+  readonly privacyPolicyText?: string
+  /** Where people can go after submitting. */
+  readonly followUpUrl: string
+  /** Adds a review step before submitting. On unless deliberately turned off. */
+  readonly higherIntent?: boolean
+  readonly thankYouTitle?: string
+  readonly thankYouMessage?: string
+  readonly locale?: string
+}
+
+export interface AdPerformance {
+  readonly adId: string
+  readonly name: string
+  /** In minor units of the account currency. */
+  readonly spendMinor: number
+  readonly impressions: number
+  readonly frequency: number
+  readonly linkClicks: number
+  /** Percent, e.g. 1.2 means 1.2%. */
+  readonly linkCtr: number
+  readonly results: number
+  readonly resultAction: string
+  readonly costPerResultMinor?: number
+  /** Plain-language suggestions. Never executed by this code. */
+  readonly suggestions: readonly string[]
+}
+
+/**
+ * Lead actions Meta reports under different names depending on where the lead
+ * was captured. Checked in order; the first present is the one counted.
+ */
+const LEAD_ACTIONS = ['lead', 'onsite_conversion.lead_grouped', 'offsite_conversion.fb_pixel_lead']
+
+export function assessPerformance(
+  row: Record<string, unknown>,
+  options: { targetCostMinor?: number; resultAction?: string } = {},
+): AdPerformance {
+  const num = (v: unknown) => (v === undefined || v === null || v === '' ? 0 : Number(v))
+  const actions = (row.actions as Array<{ action_type: string; value: string }> | undefined) ?? []
+
+  const resultAction =
+    options.resultAction ??
+    LEAD_ACTIONS.find((a) => actions.some((x) => x.action_type === a)) ??
+    'link_click'
+  const results = num(actions.find((a) => a.action_type === resultAction)?.value)
+
+  // Meta reports spend in major units as a decimal string; convert once.
+  const spendMinor = Math.round(num(row.spend) * 100)
+  const impressions = num(row.impressions)
+  const frequency = num(row.frequency)
+  const linkCtr = num(row.inline_link_click_ctr)
+  const costPerResultMinor = results > 0 ? Math.round(spendMinor / results) : undefined
+
+  const suggestions: string[] = []
+  const target = options.targetCostMinor
+
+  if (spendMinor === 0 && impressions === 0) {
+    suggestions.push('No delivery at all. Check it is active and that its ads passed review before judging anything else.')
+  }
+
+  if (frequency > 4) {
+    suggestions.push(
+      `Frequency ${frequency.toFixed(1)}: people have seen this more than four times. It is worn out — replace it with a fresh version of the same idea.`,
+    )
+  } else if (frequency > 2.5) {
+    suggestions.push(
+      `Frequency ${frequency.toFixed(1)}: getting familiar. Have a replacement ready; do not pause it until one is live.`,
+    )
+  }
+
+  if (impressions >= 1000 && linkCtr < 0.8) {
+    suggestions.push(
+      `Link click-through ${linkCtr.toFixed(2)}% is weak. The hook or the image is not stopping people — test a new opening, not a new audience.`,
+    )
+  }
+
+  if (target !== undefined && target > 0) {
+    const enough = spendMinor >= target * 3
+    if (!enough) {
+      suggestions.push(
+        `Not enough data to judge cost yet: ${(spendMinor / target).toFixed(1)}× the target spent, about 3× is needed.`,
+      )
+    } else if (results === 0) {
+      suggestions.push('Three times the target cost spent with no results. The idea is not working — replace it rather than rework it.')
+    } else if (costPerResultMinor! > target * 1.5) {
+      suggestions.push(
+        `Cost per result is ${(costPerResultMinor! / target).toFixed(1)}× the target with enough data to trust it. Replace the angle.`,
+      )
+    } else if (costPerResultMinor! <= target) {
+      suggestions.push('At or under target cost with enough data. A candidate to keep, and to put more budget behind gradually.')
+    }
+  }
+
+  return {
+    adId: String(row.ad_id ?? ''),
+    name: String(row.ad_name ?? ''),
+    spendMinor,
+    impressions,
+    frequency,
+    linkClicks: num(row.inline_link_clicks),
+    linkCtr,
+    results,
+    resultAction,
+    ...(costPerResultMinor !== undefined ? { costPerResultMinor } : {}),
+    suggestions,
+  }
+}
+
+/** The iframe address inside a preview snippet, with its HTML entities undone. */
+export function previewLink(html: string | undefined): string | undefined {
+  const match = html?.match(/src="([^"]+)"/)
+  return match?.[1]?.replace(/&amp;/g, '&')
+}
+
 /** States in which an ad will never deliver, whatever its own status says. */
 const REJECTED_STATES = new Set(['DISAPPROVED', 'WITH_ISSUES'])
 const IN_REVIEW_STATES = new Set(['IN_PROCESS', 'PENDING_REVIEW'])
@@ -596,6 +725,164 @@ export class MetaAdsClient {
     return out
   }
 
+  /**
+   * Creates an instant form on the Page, so a lead campaign needs nothing made
+   * by hand in Meta first.
+   *
+   * Forms belong to the Page, not the ad account, so this acts with the **Page's
+   * own token**, fetched with the system user's. That only works because the
+   * Page is assigned to the system user — the same assignment the creatives
+   * needed.
+   *
+   * A form is not public on its own. Nobody sees it until an ad opens it.
+   *
+   * Defaults follow the playbook: **Higher Intent** (a review step before
+   * submitting), because frictionless forms produce leads who do not remember
+   * signing up. Turn it off only on purpose.
+   */
+  async createLeadForm(form: LeadFormDraft): Promise<string> {
+    if (form.questions.length === 0) {
+      throw new PublishError('A lead form needs at least one question.', { failureClass: 'permanent' })
+    }
+    const custom = form.questions.filter((q) => q.type === 'CUSTOM').length
+    if (custom > 3) {
+      // The playbook's limit, enforced: four or more custom questions and
+      // people abandon the form.
+      throw new PublishError(
+        `${custom} custom questions. Keep it to three or fewer — more and people abandon the form.`,
+        { failureClass: 'permanent' },
+      )
+    }
+    if (!/^https:\/\//i.test(form.privacyPolicyUrl)) {
+      throw new PublishError('Meta requires an https privacy policy link on every lead form.', {
+        failureClass: 'permanent',
+      })
+    }
+
+    const page = (await this.#get(this.#account.pageId, { fields: 'access_token' })) as { access_token?: string }
+    if (page.access_token === undefined) {
+      throw new PublishError(
+        "Could not act as the Page. Assign the Page to the system user in Business Settings, with 'Manage Page'.",
+        { failureClass: 'credential' },
+      )
+    }
+
+    const questions = form.questions.map((q) =>
+      q.type === 'CUSTOM'
+        ? {
+            type: 'CUSTOM',
+            key: q.key,
+            label: q.label,
+            ...(q.options !== undefined
+              ? { options: q.options.map((value, i) => ({ value, key: `${q.key}_${i + 1}` })) }
+              : {}),
+          }
+        : { type: q.type },
+    )
+
+    const body: Record<string, string> = {
+      name: form.name,
+      questions: JSON.stringify(questions),
+      privacy_policy: JSON.stringify({ url: form.privacyPolicyUrl, link_text: form.privacyPolicyText ?? 'Privacy policy' }),
+      follow_up_action_url: form.followUpUrl,
+      is_optimized_for_quality: String(form.higherIntent ?? true),
+      locale: form.locale ?? 'EN_US',
+      ...(form.thankYouMessage !== undefined
+        ? {
+            thank_you_page: JSON.stringify({
+              title: form.thankYouTitle ?? 'Thanks — we have your details',
+              body: form.thankYouMessage,
+              button_type: 'VIEW_WEBSITE',
+              button_text: 'Visit website',
+              website_url: form.followUpUrl,
+            }),
+          }
+        : {}),
+    }
+
+    const data = (await this.#send(`${GRAPH_BASE}/${this.#version}/${this.#account.pageId}/leadgen_forms`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ ...body, access_token: page.access_token }),
+    })) as { id?: string }
+
+    if (data.id === undefined) {
+      throw new PublishError('Meta accepted the form but returned no id.', { failureClass: 'transient' })
+    }
+    return data.id
+  }
+
+  /**
+   * How each ad in a campaign is doing, with what the numbers suggest.
+   *
+   * Reports and suggests; never acts. Every suggestion is a judgement a person
+   * should make with context this cannot see — a sale that closed offline, a
+   * seasonal dip, an ad still learning. The rules follow the playbook:
+   *
+   * - **Enough data** means about three times the target cost spent. Below that
+   *   a verdict is a guess, and an early "no results" is often just early.
+   * - **Fatigue** by frequency: the same people seeing an ad more than ~2.5
+   *   times is a warning, more than 4 is past the point of return.
+   * - **Weak click-through** below 0.8% once there are enough impressions to
+   *   say so.
+   *
+   * `targetCostMinor` is optional. Without it there is no honest way to call a
+   * cost good or bad, so no cost verdict is given.
+   */
+  async performance(
+    campaignId: string,
+    options: { datePreset?: string; targetCostMinor?: number; resultAction?: string } = {},
+  ): Promise<AdPerformance[]> {
+    const data = (await this.#get(`${campaignId}/insights`, {
+      level: 'ad',
+      date_preset: options.datePreset ?? 'last_7d',
+      fields:
+        'ad_id,ad_name,spend,impressions,reach,frequency,inline_link_clicks,inline_link_click_ctr,cpm,actions,cost_per_action_type',
+      limit: '200',
+    })) as { data?: Array<Record<string, unknown>> }
+
+    return (data.data ?? []).map((row) => assessPerformance(row, options))
+  }
+
+  /**
+   * How a proposed ad will look, before anything exists.
+   *
+   * Meta renders a creative spec directly through `generatepreviews`, so the
+   * approval step can show the actual ad — in Feed, in Stories — rather than a
+   * description of one. Returns a link per placement that opens the render in
+   * a browser.
+   *
+   * The links are short-lived; Meta signs them. They are for looking at now,
+   * not for storing.
+   */
+  async previewAd(
+    ad: AdPlan['adSets'][number]['ads'][number],
+    formats: readonly string[] = ['MOBILE_FEED_STANDARD', 'INSTAGRAM_STANDARD', 'INSTAGRAM_STORY'],
+  ): Promise<Record<string, string>> {
+    const built = await this.#buildCreative(ad, 0)
+    const creative: Record<string, unknown> = {}
+    for (const key of ['object_story_spec', 'asset_feed_spec', 'degrees_of_freedom_spec', 'object_story_id']) {
+      const value = built[key]
+      if (value !== undefined) creative[key] = key === 'object_story_id' ? value : JSON.parse(value)
+    }
+
+    const out: Record<string, string> = {}
+    for (const format of formats) {
+      try {
+        const data = (await this.#get(`act_${this.#account.adAccountId}/generatepreviews`, {
+          creative: JSON.stringify(creative),
+          ad_format: format,
+        })) as { data?: Array<{ body?: string }> }
+        const link = previewLink(data.data?.[0]?.body)
+        if (link !== undefined) out[format] = link
+      } catch {
+        // A placement that cannot preview this creative is not a failure of the
+        // others. It is simply absent from the result.
+      }
+    }
+    return out
+  }
+
   async #get(path: string, params: Record<string, string>): Promise<unknown> {
     const url = new URL(`${GRAPH_BASE}/${this.#version}/${path}`)
     for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v)
@@ -754,15 +1041,28 @@ export class MetaAdsClient {
   }
 
   async #createCreative(ad: AdPlan['adSets'][number]['ads'][number], index: number): Promise<string> {
+    return await this.#post('adcreatives', await this.#buildCreative(ad, index))
+  }
+
+  /**
+   * Everything a creative is made of, without creating it.
+   *
+   * Split out so the same spec can be *previewed* before anything exists:
+   * Meta renders a spec directly, which is what lets an approval show the ad as
+   * people will see it rather than a description of it. Media is uploaded here,
+   * which stores it in the ad account's library but makes nothing public and
+   * spends nothing.
+   */
+  async #buildCreative(
+    ad: AdPlan['adSets'][number]['ads'][number],
+    index: number,
+  ): Promise<Record<string, string>> {
     const name = `${ad.name !== '' ? ad.name : `ad-${index + 1}`}-creative`
 
     // Boosting something already published: the post carries its own copy and
     // link, so supplying them again would be ignored at best.
     if (ad.creative?.kind === 'existing_post') {
-      return await this.#post('adcreatives', {
-        name,
-        object_story_id: ad.creative.postId!,
-      })
+      return { name, object_story_id: ad.creative.postId! }
     }
 
     const texts = effectiveTexts(ad)
@@ -825,7 +1125,7 @@ export class MetaAdsClient {
         }
       }
       body.object_story_spec = JSON.stringify(storySpec)
-      return await this.#post('adcreatives', body)
+      return body
     }
 
     const images: Array<Record<string, unknown>> = []
@@ -871,41 +1171,91 @@ export class MetaAdsClient {
 
     body.object_story_spec = JSON.stringify(storySpec)
     body.asset_feed_spec = JSON.stringify(feed)
-    return await this.#post('adcreatives', body)
+    return body
   }
 
   /**
    * Uploads a video and waits until Meta has processed it.
    *
-   * Upload and readiness are separate events. A creative that references a
-   * video still being processed is refused, so this polls until the video is
-   * ready rather than trusting the upload response.
+   * Always in chunks, whatever the size. Meta's resumable upload is three
+   * phases — start, transfer, finish — and Meta says which byte range it wants
+   * next after every chunk. The file is read from disk one chunk at a time, so
+   * a 2 GB video costs no more memory than a 2 MB one. One code path rather
+   * than a "small file" shortcut, because the shortcut held the whole file in
+   * memory and capped uploads at 100 MB.
    *
-   * The whole file is sent in one request, which caps it at 100 MB here: a
-   * single request holds the file in memory, the same defect fixed for
-   * LinkedIn. Larger files need Meta's chunked upload (IDEAS J1).
+   * Upload and readiness are separate events: a creative that references a
+   * video still processing is refused, so this polls until it is ready.
    */
   async #uploadVideo(asset: AdAsset): Promise<{ id: string; thumbnailUrl?: string; thumbnailHash?: string }> {
     const size = (await stat(asset.localPath).catch(() => undefined))?.size
     if (size === undefined) {
       throw new PublishError(`Could not read the video at ${asset.localPath}`, { failureClass: 'permanent' })
     }
-    if (size > 100 * 1024 * 1024) {
+    // Meta's reported ceiling for ad video files.
+    if (size > 4 * 1024 * 1024 * 1024) {
       throw new PublishError(
-        `The video is ${(size / 1024 / 1024).toFixed(0)} MB. Uploads above 100 MB need chunked upload, ` +
-          'which is not built yet. Export a smaller file, or ask for chunked upload to be built.',
+        `The video is ${(size / 1024 / 1024 / 1024).toFixed(1)} GB, above Meta's 4 GB limit for ad videos.`,
         { failureClass: 'permanent' },
       )
     }
 
-    const form = new FormData()
-    form.append('access_token', this.#token)
-    form.append('source', new Blob([new Uint8Array(await readFile(asset.localPath))]), basename(asset.localPath))
     const url = `${GRAPH_BASE}/${this.#version}/act_${this.#account.adAccountId}/advideos`
-    const uploaded = (await this.#send(url, { method: 'POST', body: form })) as { id?: string }
-    if (uploaded.id === undefined) {
-      throw new PublishError('Meta accepted the video upload but returned no id.', { failureClass: 'transient' })
+    const form = (fields: Record<string, string>, chunk?: Uint8Array) => {
+      const f = new FormData()
+      f.append('access_token', this.#token)
+      for (const [k, v] of Object.entries(fields)) f.append(k, v)
+      if (chunk !== undefined) f.append('video_file_chunk', new Blob([chunk]), basename(asset.localPath))
+      return f
     }
+
+    const started = (await this.#send(url, {
+      method: 'POST',
+      body: form({ upload_phase: 'start', file_size: String(size) }),
+    })) as { upload_session_id?: string; video_id?: string; start_offset?: string; end_offset?: string }
+
+    const session = started.upload_session_id
+    const videoId = started.video_id
+    if (session === undefined || videoId === undefined) {
+      throw new PublishError('Meta did not open an upload session for the video.', { failureClass: 'transient' })
+    }
+
+    const handle = await open(asset.localPath, 'r')
+    try {
+      let from = Number(started.start_offset ?? 0)
+      let to = Number(started.end_offset ?? size)
+      let guard = 0
+      while (from < to) {
+        // Meta chooses each range. A server that stops advancing would
+        // otherwise loop forever, so the number of rounds is bounded.
+        if (++guard > 10_000) {
+          throw new PublishError('The video upload stopped making progress.', { failureClass: 'transient' })
+        }
+        const length = to - from
+        const buffer = Buffer.allocUnsafe(length)
+        const { bytesRead } = await handle.read(buffer, 0, length, from)
+        if (bytesRead !== length) {
+          throw new PublishError('The video file changed while it was being uploaded.', { failureClass: 'transient' })
+        }
+        const next = (await this.#send(url, {
+          method: 'POST',
+          body: form(
+            { upload_phase: 'transfer', upload_session_id: session, start_offset: String(from) },
+            new Uint8Array(buffer),
+          ),
+        })) as { start_offset?: string; end_offset?: string }
+        from = Number(next.start_offset ?? to)
+        to = Number(next.end_offset ?? to)
+      }
+    } finally {
+      await handle.close()
+    }
+
+    await this.#send(url, {
+      method: 'POST',
+      body: form({ upload_phase: 'finish', upload_session_id: session }),
+    })
+    const uploaded = { id: videoId }
 
     const deadline = Date.now() + 5 * 60 * 1000
     for (;;) {

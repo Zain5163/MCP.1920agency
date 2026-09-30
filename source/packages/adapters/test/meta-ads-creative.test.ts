@@ -27,6 +27,7 @@ interface Call {
 function meta(options: { videoStatus?: string[] } = {}) {
   const calls: Call[] = []
   const statuses = [...(options.videoStatus ?? ['ready'])]
+  const chunks: string[] = []
   let images = 0
   const fetchImpl = (async (url: string | URL, init?: RequestInit) => {
     const href = String(url)
@@ -36,13 +37,25 @@ function meta(options: { videoStatus?: string[] } = {}) {
 
     const json = (v: unknown) => new Response(JSON.stringify(v))
     if (href.includes('/adimages')) return json({ images: { f: { hash: `HASH${++images}` } } })
-    if (href.includes('/advideos')) return json({ id: 'VID1' })
+    if (href.includes('/advideos')) {
+      // Meta's resumable upload: it names the next byte range after each chunk.
+      // The test file is 64 bytes, sent as two 32-byte chunks.
+      const form = init?.body instanceof FormData ? init.body : undefined
+      const phase = form?.get('upload_phase')
+      chunks.push(String(phase))
+      if (phase === 'start') return json({ upload_session_id: 'S1', video_id: 'VID1', start_offset: '0', end_offset: '32' })
+      if (phase === 'transfer') {
+        const from = Number(form?.get('start_offset'))
+        return json(from === 0 ? { start_offset: '32', end_offset: '64' } : { start_offset: '64', end_offset: '64' })
+      }
+      return json({ success: true })
+    }
     if (href.includes('/VID1/thumbnails')) return json({ data: [{ uri: 'https://thumb/x.jpg', is_preferred: true }] })
     if (href.includes('/VID1?')) return json({ status: { video_status: statuses.shift() ?? 'ready' } })
     if (href.includes('/adcreatives')) return json({ id: 'CR1' })
     return json({ id: 'OBJ' })
   }) as unknown as typeof globalThis.fetch
-  return { fetchImpl, calls }
+  return { fetchImpl, calls, chunks }
 }
 
 const client = (fetchImpl: typeof globalThis.fetch) =>
@@ -298,5 +311,19 @@ describe('instant-form leads', () => {
     assert.equal(adset.optimization_goal, 'LEAD_GENERATION')
     assert.equal(adset.destination_type, 'ON_AD')
     assert.deepEqual(JSON.parse(adset.promoted_object!), { page_id: 'PAGE' })
+  })
+})
+
+describe('chunked video upload', () => {
+  test('starts, sends each range Meta asks for, then finishes', async () => {
+    const { fetchImpl, chunks } = meta()
+    await client(fetchImpl).createCreative({
+      ...base,
+      body: 'x',
+      headline: 'y',
+      assets: [{ kind: 'video', localPath: join(dir, 'clip.mp4'), aspectRatio: '9:16' }],
+    })
+    // Two 32-byte chunks for a 64-byte file, in the order Meta named them.
+    assert.deepEqual(chunks, ['start', 'transfer', 'transfer', 'finish'])
   })
 })

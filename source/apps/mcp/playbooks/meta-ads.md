@@ -12,11 +12,18 @@ anything here older than six months as needing a check.
 
 | Step | Tool | Spends? |
 |---|---|---|
+| (for instant-form leads) Make the form | `create_lead_form` | no |
 | 1. Price and check the plan | `review_ad_plan` | no |
-| 2. Create it, paused | `create_ad_plan` | no — needs the user's approval |
-| 3. Wait for Meta's review | `get_campaign_status` | no |
-| 4. Start it | `activate_campaign` | **yes** — needs the user's approval |
+| 2. See the actual ad | `preview_ad` | no |
+| 3. Create it, paused | `create_ad_plan` | no — needs the user's approval |
+| 4. Wait for Meta's review | `get_campaign_status` | no |
+| 5. Start it | `activate_campaign` | **yes** — needs the user's approval |
+| Read results | `get_ad_performance` | no — suggests, never acts |
 | Stop it any time | `pause_campaign` | stops spending, no approval needed |
+
+The approval summary from `create_ad_plan` already includes preview links for the
+first ad. Give them to the user: seeing the real ad is worth more than any
+description of it.
 
 **Always in that order. Never skip step 1, and never start a campaign whose ads
 Meta has rejected.** `create_ad_plan` and `activate_campaign` each answer the
@@ -128,7 +135,8 @@ Creative that works now:
   more than production value.
 - **Video: hook in the first 3 seconds, captions always** (most watch without
   sound), and supply a thumbnail — Meta's automatic pick is often a poor frame.
-- Videos above 100 MB cannot be uploaded yet. Ask for a smaller export.
+- Videos upload in chunks, up to Meta's 4 GB limit. A large file takes a while
+  to upload and then to process; that is normal.
 
 **Meta's AI enhancements are off by default** — touch-ups, rewritten text, added
 music, auto-cropping. The business approved specific creative, and a client who
@@ -162,8 +170,10 @@ For instant forms:
 - Frictionless forms produce leads who do not remember signing up. Some friction
   is the point.
 
-The server cannot create lead forms yet. If the user has none, they need to make
-one in Meta's Instant Forms and give you its id.
+Make the form with `create_lead_form`, then use its id as `leadFormId` on each
+ad, with `leadDestination: "instant_form"` on the ad set. Every form needs an
+https privacy policy link — ask for the business's, never invent one. Higher
+Intent is on by default; at most three custom questions are allowed.
 
 ---
 
@@ -191,6 +201,12 @@ Rules that protect a running campaign:
 ---
 
 ## After launch
+
+Use `get_ad_performance` for the numbers. Pass the target cost per result if the
+user has one — without it the tool will not call a cost good or bad, which is
+correct: there is nothing to compare against. Its suggestions follow the rules
+below. **They are suggestions.** Present them; do not act on them without the
+user.
 
 1. **Check `get_campaign_status` a few hours later.** Ads go through Meta's policy
    review after creation and can be rejected even though creation succeeded. A
