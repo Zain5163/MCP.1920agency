@@ -327,3 +327,51 @@ describe('chunked video upload', () => {
     assert.deepEqual(chunks, ['start', 'transfer', 'transfer', 'finish'])
   })
 })
+
+describe('dynamic creative, which the real account enforces', () => {
+  const planWith = (ads: AdPlan['adSets'][number]['ads']): AdPlan => ({
+    campaign: { name: 'c', objective: 'OUTCOME_TRAFFIC' as never },
+    adSets: [{ adSet: { name: 's', dailyBudget: money(50_000, 'PKR'), audience: { countries: ['PK'] } }, ads }],
+  })
+  // A function, because `dir` is only set once the before() hook has run.
+  const multiText = () => ({ ...base, ...texts, assets: [{ kind: 'image' as const, localPath: join(dir, 'sq.png'), aspectRatio: '1:1' as const }] })
+
+  test('an ad set holding a multi-text ad is marked for dynamic creative', async () => {
+    // Real account, 2026-09-30: "Dynamic creative ads can only be created under
+    // dynamic creative ad sets." The sandbox never showed it.
+    const { fetchImpl, calls } = meta()
+    await client(fetchImpl).create(planWith([multiText()]))
+    const adset = calls.find((c) => c.url.endsWith('/adsets'))!.body
+    assert.equal(adset.is_dynamic_creative, 'true')
+  })
+
+  test('an ordinary ad set is not', async () => {
+    const { fetchImpl, calls } = meta()
+    const plain = [1, 2, 3].map((n) => ({ ...base, name: `a${n}`, body: 'one', headline: 'one' }))
+    await client(fetchImpl).create(planWith(plain))
+    assert.equal(calls.find((c) => c.url.endsWith('/adsets'))!.body.is_dynamic_creative, undefined)
+  })
+
+  test('a second ad beside a dynamic creative is refused before anything is created', async () => {
+    const { fetchImpl, calls } = meta()
+    await assert.rejects(
+      () => client(fetchImpl).create(planWith([multiText(), { ...base, name: 'b', body: 'x', headline: 'y' }])),
+      /only ONE such ad per ad set/,
+    )
+    assert.equal(calls.length, 0)
+  })
+
+  test('one multi-text ad is judged by its variants, not by the ad count', () => {
+    const { fetchImpl } = meta()
+    const review = client(fetchImpl).review(planWith([multiText()]))
+    assert.equal(review.warnings.some((w) => /Only 1 ad/.test(w)), false)
+  })
+
+  test('a single description is an ordinary field, not a reason for dynamic creative', async () => {
+    const { fetchImpl, calls } = meta()
+    await client(fetchImpl).createCreative({ ...base, body: 'one', headline: 'one', descriptions: ['only one'] })
+    const sent = sentCreative(calls)
+    assert.equal(sent.asset_feed_spec, undefined)
+    assert.match(sent.object_story_spec!, /"description":"only one"/)
+  })
+})

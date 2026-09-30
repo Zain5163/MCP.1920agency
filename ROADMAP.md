@@ -321,10 +321,10 @@ and images are its own. The ideas below are patterns and are ours to use.
    the differentiator against every competitor** (see the research note).
 3. **Expertise built in**: the playbooks and skills, shown as the roles above.
 4. **One job, end to end**: "run my lead generation ads" as a real transcript.
-5. **Pricing**: **per connected account, around $6–7**, in Zernio's style, with
-   pass-through costs (images, X, data calls) at 3× cost and ad spend never marked
-   up. The owner's decision; see `decisions/0007`. A lower per-account rate at
-   volume keeps it fair for agencies with many clients.
+5. **Pricing**: a **flat $6–7 subscription** to post everywhere; third-party usage
+   (images, X, data calls) paid in **credits at 3× cost**; marketing possibly
+   limited by plan; ad spend never marked up. The owner's decision; see
+   `decisions/0007`. Laid out in Zernio's style.
 6. **Docs, GitHub and community** in the footer.
 
 The website is built only after social publishing and Meta ads are working for

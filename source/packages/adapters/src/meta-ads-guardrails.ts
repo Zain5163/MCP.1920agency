@@ -221,7 +221,29 @@ export function checkMetaAdPlan(plan: AdPlan, context: MetaCheckContext = {}): A
       }
     }
 
-    if (ads.length > 0 && ads.length < guards.minAdsPerAdSet) {
+    const dynamic = ads.filter(isDynamicCreative)
+    if (dynamic.length > 0 && ads.length > 1) {
+      issues.push({
+        severity: 'error',
+        message:
+          'An ad with several texts rotates them inside one ad, and Meta allows only ONE such ad per ad set. ' +
+          'Put each in its own ad set, or combine their texts into one ad (up to 5 of each).',
+        path: `${at}.ads`,
+      })
+    }
+
+    // With a dynamic creative the variants inside it are the test, so "fewer
+    // than three ads" measures the wrong thing. Count the variants instead.
+    const variantCount = dynamic.length === 1 ? effectiveTexts(dynamic[0]!).bodies.length : 0
+    if (dynamic.length === 1 && variantCount < guards.minAdsPerAdSet) {
+      issues.push({
+        severity: 'warning',
+        message:
+          `Only ${variantCount} primary text(s) in this ad. Fewer than ${guards.minAdsPerAdSet} is not a real ` +
+          'creative test — you learn nothing about which angle works.',
+        path: `${at}.ads`,
+      })
+    } else if (dynamic.length === 0 && ads.length > 0 && ads.length < guards.minAdsPerAdSet) {
       issues.push({
         severity: 'warning',
         message:
@@ -343,6 +365,28 @@ export function checkMetaAdPlan(plan: AdPlan, context: MetaCheckContext = {}): A
   }
 
   return issues
+}
+
+/**
+ * Whether an ad is what Meta calls a *dynamic creative*: several texts rotated
+ * inside one ad, with one shape.
+ *
+ * Found on the real ad account on 2026-09-30, and invisible in the sandbox
+ * because standalone creatives never hit it: *"Dynamic creative ads can only be
+ * created under dynamic creative ad sets."* The ad set has to be marked for it
+ * when it is created, and **such an ad set may hold only one ad.**
+ *
+ * An ad with several texts *and* several shapes is not one: it is split into one
+ * ad per text before creation (see `expandForPlacements`), and each of those
+ * carries a single text.
+ */
+export function isDynamicCreative(ad: AdPlan['adSets'][number]['ads'][number]): boolean {
+  const texts = effectiveTexts(ad)
+  const shapes = new Set((ad.assets ?? []).map((a) => a.aspectRatio))
+  return (
+    shapes.size < 2 &&
+    (texts.bodies.length > 1 || texts.headlines.length > 1 || texts.descriptions.length > 1)
+  )
 }
 
 /** Each ad set's share of a campaign-level budget, for the learning-phase check. */

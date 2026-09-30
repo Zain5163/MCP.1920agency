@@ -1,52 +1,57 @@
-# 0007 — Pricing: per connected account, and pass-through costs at 3×
+# 0007 — Pricing: a flat subscription, and third-party costs at 3× as credits
 
-**Date:** 2026-09-30
+**Date:** 2026-09-30, corrected the same day by the owner
 **Status:** accepted (owner's decision)
 **Context:** the owner reviewed the competitors in
-`research/2026-09-30-competitors.md` and preferred Zernio's model.
+`research/2026-09-30-competitors.md` and liked Zernio's pricing page.
 
 ---
 
 ## Decision
 
-**1. Social accounts are charged per connected account, around US$6–7 each.**
+**1. Posting is a flat subscription of about US$6–7 in total.**
 
-The same shape as Zernio ($6 / $3 / $1 per account in tiers, with the first two
-free). It is simple to explain and scales with what a customer actually uses.
+One price, and the customer can post to every platform they connect. It is
+**not** charged per connected account. An earlier version of this record said it
+was; the owner corrected that.
 
-**2. Anything we pay for per use is passed on at 3× what it costs us.**
+**2. Third-party usage is paid for with credits, at 3× what it costs us.**
 
-Several things cost money per call, and the cost is ours until it is charged on:
+When a customer uses a paid third-party service *through* AdsPilot, we pay the
+provider and charge the customer three times that, from a prepaid credit
+balance on their side. Worked example from the owner: if OpenRouter charges us
+$1 for images, the customer pays $3 in credits.
 
 | Pass-through cost | What we pay |
 |---|---|
-| AI image generation (OpenRouter) | ~$0.03–0.08 per image, reported exactly per call |
-| X (Twitter) API | pay per post; more for a post with a link |
+| AI image generation (OpenRouter) | about $0.03–0.08 per image, reported exactly per call |
+| X (Twitter) API | pay per post, and more for a post with a link |
 | Future data calls (rank tracking, backlinks, enrichment) | per call, by provider |
 
-At 3×, a $0.04 image is billed at about $0.12. The multiple covers our margin,
-failed calls, and the cost of carrying the provider accounts.
+The multiple covers our margin, failed calls, and the cost of carrying the
+provider accounts.
 
-**3. Ad spend is never marked up.** The customer's ad budget goes to Meta or Google
-directly from their own ad account and card. We charge for the tool, not a
-percentage of their spend. Taking a percentage would give us a reason to push
-budgets up, which is the opposite of what the spend ceilings are for.
+**3. Marketing (ads) may be limited by plan.** For example, how many ad accounts
+a plan can manage. Free allowances may be offered. Not yet set.
 
-## What this changes
+**4. Ad spend is never marked up.** The customer's budget goes to Meta or Google
+from their own ad account and card. We charge for the tool, not a percentage of
+their spend. Taking a percentage would give us a reason to push budgets up, which
+is the opposite of what the spend ceilings are for.
 
-- **The website pricing section.** `ROADMAP.md` had recommended against
-  per-account pricing, on the grounds that agencies with many clients would pay
-  more. The owner has decided otherwise, and this record replaces that
-  recommendation. The concern is worth keeping in mind for **agency tiers**: a
-  lower per-account rate at volume, as Zernio does, answers it without changing
-  the model.
-- **Metering is needed before charging.** The audit log already records the
-  exact cost of every image (`images.generated`, `costUsd`). The same pattern
-  will be needed for every pass-through cost, per tenant, before an invoice can be
-  produced from it.
+## What this needs before it can be charged
+
+- **A credit ledger per tenant**, debited at 3× on every pass-through call. The
+  audit log already records the exact cost of each image (`images.generated`,
+  `costUsd`), so the source numbers exist. What is missing is the balance, the
+  top-up, and refusing a call when the balance is empty.
+- **Per-tenant limits and settings.** Today the spend ceilings, the ad account and
+  the OpenRouter key come from the owner's environment, which suits 1920 Agency
+  alone. Customers need their own, stored per tenant (decision 0005 records the
+  same need for ad accounts).
 
 ## Not decided yet
 
-- Tier boundaries, and how many accounts are free.
-- Currency and payment provider for Pakistan and abroad.
-- Whether ad accounts count as "accounts" for pricing, or only social ones.
+- The exact price, and whether there is a free tier.
+- How many ad accounts each plan includes.
+- The payment provider and currencies, for Pakistan and abroad.

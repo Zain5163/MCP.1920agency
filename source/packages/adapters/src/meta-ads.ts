@@ -17,6 +17,7 @@ import {
 import {
   META_CONVERSION_GOALS,
   checkMetaAdPlan,
+  isDynamicCreative,
   type MetaCheckContext,
 } from './meta-ads-guardrails.ts'
 import { META_DEFAULT_NAMING, adName, adSetName, campaignName, urlTags } from './meta-ads-naming.ts'
@@ -143,6 +144,11 @@ export interface CampaignStatus {
   readonly rejected: readonly ObjectStatus[]
   /** Ads still waiting on Meta's policy review. */
   readonly inReview: readonly ObjectStatus[]
+  /**
+   * When the last ad set stops, if every ad set has an end date. Undefined means
+   * at least one runs until someone stops it.
+   */
+  readonly endsAt?: Date
 }
 
 /**
@@ -584,7 +590,7 @@ export class MetaAdsClient {
       fields: 'id,name,status,effective_status,daily_budget',
     })
     const adSets = await this.#get(`${campaignId}/adsets`, {
-      fields: 'id,name,status,effective_status,daily_budget',
+      fields: 'id,name,status,effective_status,daily_budget,end_time',
       limit: '100',
     })
     const ads = await this.#get(`${campaignId}/ads`, {
@@ -616,11 +622,18 @@ export class MetaAdsClient {
         ? Number(campaignBudget)
         : adSetRows.reduce((sum, row) => sum + (row.dailyBudgetMinor ?? 0), 0)
 
+    const ends = ((adSets as { data?: Array<{ end_time?: string }> }).data ?? []).map((r) => r.end_time)
+    const endsAt =
+      ends.length > 0 && ends.every((e) => e !== undefined && e !== '')
+        ? new Date(Math.max(...ends.map((e) => new Date(e!).getTime())))
+        : undefined
+
     return {
       campaign: toStatus(campaign as Record<string, unknown>),
       adSets: adSetRows,
       ads: adRows,
       dailyBudgetMinor,
+      ...(endsAt !== undefined ? { endsAt } : {}),
       rejected: adRows.filter((a) => REJECTED_STATES.has(a.effectiveStatus)),
       inReview: adRows.filter((a) => IN_REVIEW_STATES.has(a.effectiveStatus)),
     }
@@ -974,6 +987,10 @@ export class MetaAdsClient {
       body.bid_strategy = 'LOWEST_COST_WITHOUT_CAP'
     }
 
+    // Set at creation or never: Meta will not switch an existing ad set to
+    // dynamic creative, so a mistake here means rebuilding the ad set.
+    if (entry.ads.some(isDynamicCreative)) body.is_dynamic_creative = 'true'
+
     /**
      * The pixel and event are what the algorithm actually optimises toward.
      * Without them a conversion goal is a request Meta cannot act on.
@@ -1096,10 +1113,13 @@ export class MetaAdsClient {
      * is how one ad carries up to five of each and serves each placement the
      * right file.
      */
+    // One description is an ordinary field, not a reason to use the asset
+    // feed: using it for a single description made the ad a dynamic creative,
+    // with all the restrictions that brings, for no benefit.
     const flexible =
       texts.bodies.length > 1 ||
       texts.headlines.length > 1 ||
-      texts.descriptions.length > 0 ||
+      texts.descriptions.length > 1 ||
       assets.length > 1
 
     if (!flexible) {
@@ -1120,6 +1140,7 @@ export class MetaAdsClient {
           link,
           message: texts.bodies[0],
           name: texts.headlines[0],
+          ...(texts.descriptions[0] !== undefined ? { description: texts.descriptions[0] } : {}),
           call_to_action: callToAction,
           ...(asset !== undefined ? { image_hash: await this.#uploadImage(asset.localPath) } : {}),
         }

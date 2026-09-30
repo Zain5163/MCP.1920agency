@@ -1281,6 +1281,60 @@ platform X. The code was changed; the test was left alone.
 
 586 tests, 13 workspaces typecheck clean.
 
+## 2026-09-30 — The first real Meta campaign is live
+
+Campaign `120249127474910366` on the real account "1920Agency 10". **PKR 500/day,
+Pakistan, ends 2026-10-07, about PKR 3,500 in total.** One ad with five text
+variants on the real 1920 Agency graphic, sending people to 1920agency.com.
+Launched on the owner's explicit instruction; the approval token was requested
+and echoed on that instruction, through the real MCP server.
+
+Read back from Meta: campaign ACTIVE, ad set ACTIVE at 50000 paisa/day with the
+end date and targeting as planned; the ad went from `IN_PROCESS` to **ACTIVE** the
+same day, so Meta's review passed.
+
+The owner lowered the daily minimum to PKR 500 for this, which is their call.
+
+### ⚠️ A rule the sandbox never showed
+
+The first attempt failed at the ad:
+
+> *Dynamic creative ads can only be created under dynamic creative ad sets.*
+
+An ad that rotates several texts is a dynamic creative. Its ad set must be marked
+for it **when the ad set is created**, and **may hold only one ad**. The sandbox
+tests created creatives on their own and never made an ad, so they never met
+this. It is exactly the kind of thing R4 exists for.
+
+Fixed:
+
+- An ad set holding a multi-text ad is created with `is_dynamic_creative`.
+- A second ad beside a dynamic creative is refused by the review, before anything
+  is created.
+- For a dynamic creative, the "fewer than three ads" warning now counts its text
+  variants, which are the test.
+- A single description no longer turns an ad into a dynamic creative; it goes in
+  the ordinary description field.
+
+The failed attempt left a paused, unspent campaign on the real account. It was
+deleted after checking its name, status and spend. Meta will not convert an
+existing ad set, so it could not be repaired.
+
+### Another summary that got the money wrong
+
+The activation summary said *"roughly PKR 15,000 per month"* for a campaign
+ending in seven days — the mistake already fixed in the create summary, still
+present in activation. It now reads the ad sets' end dates and states the total
+from the moment of activation. The spend check uses the same duration.
+
+### Pricing corrected
+
+The owner corrected `decisions/0007`: a **flat $6–7 subscription** to post
+everywhere, not per account; third-party usage in **credits at 3× cost**; marketing
+possibly limited by plan. The client-account reach of the token is deliberate.
+
+591 tests, 13 workspaces typecheck clean.
+
 ## Verified live, not just tested
 
 | What | How it was proven |
@@ -1289,6 +1343,7 @@ platform X. The code was changed; the test was left alone.
 | LinkedIn publishing | Real post published 2026-09-26 through the approval gate, `urn:li:share:7509614451189239808` |
 | Little-text escaping | Same post: text with `(` `)` survived intact, escaped `#` rendered as a clean hashtag |
 | Meta ad campaign, end to end | Campaign, ad set, 3 creatives, 3 ads created PAUSED and read back from Meta 2026-09-30 |
+| **A real Meta campaign, live and delivering** | `120249127474910366` on 1920Agency 10, activated and approved by Meta 2026-09-30 |
 | LinkedIn image upload | Real image post 2026-09-26, `urn:li:share:7509616982338461696` — the two-step upload works |
 | LinkedIn VIDEO upload | Real video post 2026-09-26, `urn:li:ugcPost:7509704322323222529` — chunked upload, ETags and finalize all work against the live API |
 | The approval gate | Refused without a token and published with one, on a real irreversible action |

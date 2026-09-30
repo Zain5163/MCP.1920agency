@@ -461,15 +461,36 @@ export function registerAdsTools(server: McpServer): void {
           )
         }
 
+        // Days left, from now: an activation is priced from the moment it starts,
+        // not from when the campaign was created.
+        const daysLeft =
+          status.endsAt !== undefined
+            ? Math.max(1, Math.ceil((status.endsAt.getTime() - Date.now()) / 86_400_000))
+            : undefined
+
         const committed = await loaded.client.committedDailySpendMinor()
         const spend = checkSpend(
           limit,
-          { dailyMinor: status.dailyBudgetMinor, currency: loaded.account.currency },
+          {
+            dailyMinor: status.dailyBudgetMinor,
+            currency: loaded.account.currency,
+            ...(daysLeft !== undefined ? { durationDays: daysLeft } : {}),
+          },
           committed,
         )
         if (!spend.ok) return text(`Not activated. ${spend.reason}`)
 
         const daily = { minor: status.dailyBudgetMinor, currency: loaded.account.currency }
+        /**
+         * The figure the approval rests on. It said "roughly 15,000 per month"
+         * for a campaign ending in seven days — found on the first real
+         * activation, 2026-09-30, the same mistake already fixed in the create
+         * summary.
+         */
+        const costLine =
+          daysLeft !== undefined
+            ? `  ${formatMoney(daily)} per day for about ${daysLeft} day(s): roughly ${formatMoney({ minor: daily.minor * daysLeft, currency: daily.currency })} in total`
+            : `  ${formatMoney(daily)} per day, roughly ${formatMoney({ minor: daily.minor * 30, currency: daily.currency })} per month, with no end date`
         const gate = decide({
           action: 'activate_campaign',
           // The budget is part of what is approved. If it changes between the
@@ -479,7 +500,7 @@ export function registerAdsTools(server: McpServer): void {
           describe: () =>
             [
               `Activate "${status.campaign.name}"`,
-              `  ${formatMoney(daily)} per day, roughly ${formatMoney({ minor: daily.minor * 30, currency: daily.currency })} per month`,
+              costLine,
               `  ${status.ads.length} ad(s)${status.inReview.length > 0 ? `, ${status.inReview.length} still in review` : ''}`,
               '',
               'Money leaves the ad account from this moment until the campaign is paused.',

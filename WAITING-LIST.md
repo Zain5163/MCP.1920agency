@@ -122,12 +122,21 @@ as `generate_ad_images`. Needs, in the env file:
 ~~## 9. Cleanup~~ **Done 2026-09-30**: 9 sandbox campaigns and 9 creatives
 deleted, and the test lead form archived.
 
-## 10. First real Meta campaign: awaiting the owner's approval
+## 10. First real Meta campaign: LIVE since 2026-09-30
 
-Prepared on the real account "1920Agency 10" (`853868739015298`): PKR 1,000/day
-for 7 days, about PKR 7,000 in total, created PAUSED. The approval summary and
-previews were shown; nothing is created until the owner says yes. Nothing spends
-until it is separately activated.
+Campaign `120249127474910366` on "1920Agency 10", **PKR 500/day, ending
+2026-10-07, about PKR 3,500 in total**. Launched on the owner's instruction; Meta
+approved the ad the same day.
+
+**To do:** check results with `get_ad_performance` after a few days of spend.
+Stop at any time with `pause_campaign`.
+
+## 11. The Meta token reaches client ad accounts (deliberate)
+
+The system user can reach client accounts (Muzaree, European Cyprus, Malta, UK
+and others). **The owner granted this deliberately**, to manage client accounts
+through AdsPilot later, and checks it daily. The code acts only on the configured
+account.
 
 ---
 
