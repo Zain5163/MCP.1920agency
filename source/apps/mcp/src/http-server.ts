@@ -9,6 +9,7 @@ import { disconnect, health } from '@social-publisher/db'
 import { createLogger } from '@social-publisher/telemetry'
 
 import { registerPlaybooks } from './playbooks.ts'
+import { registerSkillsLibrary } from './skills-library.ts'
 import { registerTools } from './tools.ts'
 
 /**
@@ -113,6 +114,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   registerTools(mcp, identity, scoped)
   // Playbooks only: static text, no credentials. Ads tools stay local (decision 0005).
   registerPlaybooks(mcp)
+  registerSkillsLibrary(mcp)
 
   const transport = new StreamableHTTPServerTransport({
     // Stateless: every request carries its own token, so there is no session to

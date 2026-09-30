@@ -137,6 +137,18 @@ export const ACTION_POLICY: Readonly<Record<string, ActionPolicy>> = {
     reversible: true,
     spendsMoney: false,
   },
+  list_skills: {
+    rationale: 'Lists the built-in marketing skills. Changes nothing and touches no account.',
+    risk: 'low',
+    reversible: true,
+    spendsMoney: false,
+  },
+  get_skill: {
+    rationale: 'Reads one built-in marketing skill. Changes nothing and touches no account.',
+    risk: 'low',
+    reversible: true,
+    spendsMoney: false,
+  },
   get_playbook: {
     rationale: 'Reads built-in advertising guidance. Changes nothing and touches no account.',
     risk: 'low',

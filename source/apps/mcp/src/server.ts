@@ -18,6 +18,7 @@ import { disconnect, health, queueStats, type TenantScope } from '@social-publis
 
 import { registerAdsTools } from './ads-tools.ts'
 import { registerPlaybooks } from './playbooks.ts'
+import { registerSkillsLibrary } from './skills-library.ts'
 import { currentScope, loadConnections, publishService, targetFor } from './context.ts'
 
 /**
@@ -395,6 +396,7 @@ registerAdsTools(server)
 
 // Expertise is served on both transports; it is static text and holds no secrets.
 registerPlaybooks(server)
+registerSkillsLibrary(server)
 
 const transport = new StdioServerTransport()
 await server.connect(transport)

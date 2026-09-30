@@ -1176,6 +1176,45 @@ stated with its risk and the safer alternative.
 
 564 tests, 13 workspaces typecheck clean.
 
+## 2026-09-30 — 50 marketing skills built into the server
+
+Owner: add everything from the 52k-star repository, because SEO, WordPress and
+Google are coming and should start from this knowledge rather than new research.
+
+`coreyhaines31/marketingskills` (MIT), **all 50 skills, 230 files, 2.7 MB**,
+vendored at commit `5b2c0007766c`. Served on both servers through `list_skills`,
+`get_skill`, and one MCP resource per skill. Verified on the real server: 53
+resources (3 playbooks + 50 skills), `seo-audit` served in full.
+
+Includes SEO audit, AI search visibility, programmatic SEO, schema, site
+architecture, copywriting, CRO, email, SMS, pricing, offers, launch, social,
+video, PR, influencer, referrals, sales enablement and more.
+
+### What made serving third-party text to customers' AIs acceptable
+
+- **Pinned, not live.** A copy at a known commit. Upstream changes reach nobody
+  until fetched, scanned, read and committed.
+- **Scanned on arrival:** instruction-override phrases, fetch-and-run code,
+  hard-coded secrets, hidden and direction-override Unicode. **Clean.**
+- **Framed on every read:** each skill is served under a note saying it is advice,
+  not a control, and that our playbooks win where both apply. It also explains the
+  69 references to `.agents/product-marketing.md` — a file that exists only in
+  the upstream project — so an AI asks the user instead of stalling or inventing
+  its contents.
+- **No path traversal.** A reference file is looked up in the index, never joined
+  onto a path as given. A test asserts `../../../../.social-publisher/.env` and
+  three other escapes are refused.
+
+### A correction recorded, because it affects what we can use
+
+The owner understood a repository with no licence to be open source. **It is the
+reverse:** with no licence the author keeps every right by default, and copying is
+not permitted. Such sources can be read for knowledge — facts and ideas are not
+copyrightable, wording is — and written up in our own words, which is how every
+source here has been handled anyway.
+
+575 tests, 13 workspaces typecheck clean. The MCP app gained its own test suite.
+
 ## Verified live, not just tested
 
 | What | How it was proven |
