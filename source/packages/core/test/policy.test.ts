@@ -262,3 +262,17 @@ describe('ads actions', () => {
     assert.equal(raised.allowed, false, 'a ten-fold budget change must need fresh approval')
   })
 })
+
+describe('a minimum daily spend', () => {
+  const limit = { dailyMaxMinor: 1_000_000, monthlyMaxMinor: 10_000_000, dailyMinMinor: 100_000, currency: 'PKR' }
+
+  test('refuses a budget too small to learn from', () => {
+    const result = checkSpend(limit, { dailyMinor: 50_000, currency: 'PKR' })
+    assert.equal(result.ok, false)
+    assert.ok(!result.ok && /below the minimum of 1000\.00 PKR/.test(result.reason))
+  })
+
+  test('allows the minimum itself', () => {
+    assert.equal(checkSpend(limit, { dailyMinor: 100_000, currency: 'PKR' }).ok, true)
+  })
+})

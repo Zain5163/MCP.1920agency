@@ -221,3 +221,42 @@ describe('the approval summary', () => {
     assert.match(summary, /NO end date/i)
   })
 })
+
+describe('ad variants', () => {
+  const withAd = (ad: Record<string, unknown>) => {
+    const p = plan()
+    return validateAdPlan({ ...p, adSets: [{ ...p.adSets[0]!, ads: [{ name: 'a', body: 'b', ...ad }] }] })
+  }
+
+  test('up to five of each text is allowed', () => {
+    const five = ['1', '2', '3', '4', '5']
+    assert.equal(withAd({ bodies: five, headlines: five, descriptions: five }).ok, true)
+  })
+
+  test('a sixth is refused, naming the limit', () => {
+    const six = ['1', '2', '3', '4', '5', '6']
+    const result = withAd({ headlines: six })
+    assert.equal(result.ok, false)
+    assert.ok(result.issues.some((i) => /above the limit of 5/.test(i.message)))
+  })
+
+  test('more than ten images is refused', () => {
+    const images = Array.from({ length: 11 }, (_, i) => ({ kind: 'image', localPath: `${i}`, aspectRatio: '1:1' }))
+    assert.equal(withAd({ assets: images }).ok, false)
+  })
+
+  test('an unknown aspect ratio is refused', () => {
+    const result = withAd({ assets: [{ kind: 'image', localPath: 'x', aspectRatio: '3:2' }] })
+    assert.equal(result.ok, false)
+  })
+
+  test('a duplicate variant warns — it wastes a slot rather than breaking anything', () => {
+    const result = withAd({ headlines: ['Same', 'same', 'Other'] })
+    assert.equal(result.ok, true)
+    assert.ok(result.issues.some((i) => /identical/.test(i.message)))
+  })
+
+  test('bodies can stand in for body', () => {
+    assert.equal(withAd({ body: '', bodies: ['from the list'] }).ok, true)
+  })
+})

@@ -204,8 +204,11 @@ describe('creative copy and destination', () => {
       },
       { guardrails: guards },
     )
-    const warning = warnings(issues).find((i) => i.path.includes('body'))
+    // Path names the variant now, since an ad can carry up to five texts.
+    const warning = warnings(issues).find((i) => i.path.includes('bodies[0]'))
     assert.match(warning!.message, /See more/)
+    // Long copy is not treated as the problem; where the hook sits is.
+    assert.match(warning!.message, /hook/)
   })
 
   test('rejects an invented call to action', () => {

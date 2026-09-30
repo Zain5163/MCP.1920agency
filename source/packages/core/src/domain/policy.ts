@@ -322,6 +322,12 @@ export function formatApprovalRequest(decision: Extract<PolicyDecision, { allowe
 export interface SpendLimit {
   readonly dailyMaxMinor: number
   readonly monthlyMaxMinor: number
+  /**
+   * The least a campaign may be given per day. Below it a campaign cannot
+   * gather enough results to learn from, so it is refused rather than allowed
+   * to waste its budget slowly.
+   */
+  readonly dailyMinMinor?: number
   readonly currency: string
 }
 
@@ -344,6 +350,14 @@ export function checkSpend(
   }
   if (request.dailyMinor <= 0) {
     return { ok: false, reason: 'A daily budget must be greater than zero.' }
+  }
+  if (limit.dailyMinMinor !== undefined && request.dailyMinor < limit.dailyMinMinor) {
+    return {
+      ok: false,
+      reason:
+        `A daily budget of ${format(request.dailyMinor, limit.currency)} is below the minimum of ` +
+        `${format(limit.dailyMinMinor, limit.currency)}. Too small to gather results worth acting on.`,
+    }
   }
 
   const total = alreadyCommittedDailyMinor + request.dailyMinor

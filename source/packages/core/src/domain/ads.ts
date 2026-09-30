@@ -147,7 +147,46 @@ export interface AdSetDraft {
   readonly optimizationGoal?: string
   /** The conversion the pixel reports, when optimising for conversions. */
   readonly conversionEvent?: string
+  /**
+   * Where a lead is captured. `website` sends people to a landing page and needs
+   * a pixel to report back; `instant_form` opens a form inside the app and needs
+   * a lead form on the Page instead. They have different requirements, which is
+   * why this is explicit rather than inferred from which fields are filled.
+   */
+  readonly leadDestination?: 'website' | 'instant_form'
 }
+
+/**
+ * The shapes a file can be delivered in, by the placements they suit.
+ *
+ * `1:1` and `4:5` for Feed, `9:16` for Stories and Reels, `1.91:1` for
+ * landscape placements. One ad can carry several, and each placement is served
+ * the one that fits, instead of one file being cropped to all of them.
+ */
+export const ASPECT_RATIOS = ['1:1', '4:5', '9:16', '1.91:1'] as const
+export type AspectRatio = (typeof ASPECT_RATIOS)[number]
+
+/** One file an ad can show, and the shape it is. */
+export interface AdAsset {
+  readonly kind: 'image' | 'video'
+  readonly localPath: string
+  readonly aspectRatio: AspectRatio
+  /** Video only. Without one the platform picks a frame, usually badly. */
+  readonly thumbnailPath?: string
+}
+
+/**
+ * Per-ad limits confirmed against Meta's `asset_feed_spec` documentation on
+ * 2026-09-30. Enforced here as errors, not advice: exceeding them is refused
+ * by Meta, and refusing locally names the field and the limit.
+ */
+export const AD_VARIANT_LIMITS = {
+  bodies: 5,
+  headlines: 5,
+  descriptions: 5,
+  images: 10,
+  videos: 10,
+} as const
 
 /** What the ad is made of. */
 export interface AdCreative {
@@ -163,8 +202,29 @@ export interface AdCreative {
 /** One creative. */
 export interface AdDraft {
   readonly name: string
+  /** The primary text. With `bodies` set, this is ignored in favour of them. */
   readonly body: string
   readonly headline?: string
+  /**
+   * Up to five variants of each text. The platform shows different
+   * combinations to different people and learns which work, which is delivery
+   * optimisation rather than an A/B test: it will not report a winner, it will
+   * simply spend more on what performs.
+   */
+  readonly bodies?: readonly string[]
+  readonly headlines?: readonly string[]
+  readonly descriptions?: readonly string[]
+  /** Files in one or more aspect ratios. Each placement gets the shape that fits. */
+  readonly assets?: readonly AdAsset[]
+  /**
+   * Whether the platform may alter the creative with its own AI — touch-ups,
+   * rewritten text, added music. **Off unless explicitly turned on.** An agency
+   * is paid for the creative it approved, and a client who sees rewritten copy
+   * under their name did not approve that.
+   */
+  readonly platformEnhancements?: boolean
+  /** An existing instant form, for `leadDestination: 'instant_form'`. */
+  readonly leadFormId?: string
   readonly landingPageUrl?: string
   readonly callToAction?: string
   readonly creative?: AdCreative
@@ -176,6 +236,23 @@ export interface AdDraft {
    * other is a default.
    */
   readonly urlTags?: string
+}
+
+/** The texts an ad will actually carry, whichever way they were supplied. */
+export function effectiveTexts(ad: AdDraft): {
+  bodies: readonly string[]
+  headlines: readonly string[]
+  descriptions: readonly string[]
+} {
+  const clean = (list: readonly string[] | undefined) =>
+    (list ?? []).map((t) => t.trim()).filter((t) => t !== '')
+  const bodies = clean(ad.bodies)
+  const headlines = clean(ad.headlines)
+  return {
+    bodies: bodies.length > 0 ? bodies : clean([ad.body]),
+    headlines: headlines.length > 0 ? headlines : clean(ad.headline !== undefined ? [ad.headline] : []),
+    descriptions: clean(ad.descriptions),
+  }
 }
 
 /** A whole request: one campaign, its ad sets, and their ads. */
@@ -362,8 +439,52 @@ export function validateAdPlan(plan: AdPlan): AdValidation {
 
     ads.forEach((ad, j) => {
       const adAt = `${at}.ads[${j}]`
-      if (ad.body.trim() === '') {
+      const texts = effectiveTexts(ad)
+      if (texts.bodies.length === 0) {
         issues.push({ severity: 'error', message: 'The ad has no text.', path: `${adAt}.body` })
+      }
+
+      const counts: Array<[keyof typeof AD_VARIANT_LIMITS, number, string]> = [
+        ['bodies', texts.bodies.length, 'primary texts'],
+        ['headlines', texts.headlines.length, 'headlines'],
+        ['descriptions', texts.descriptions.length, 'descriptions'],
+        ['images', (ad.assets ?? []).filter((a) => a.kind === 'image').length, 'images'],
+        ['videos', (ad.assets ?? []).filter((a) => a.kind === 'video').length, 'videos'],
+      ]
+      for (const [key, count, label] of counts) {
+        if (count > AD_VARIANT_LIMITS[key]) {
+          issues.push({
+            severity: 'error',
+            message: `${count} ${label}, above the limit of ${AD_VARIANT_LIMITS[key]} per ad.`,
+            path: `${adAt}.${key}`,
+          })
+        }
+      }
+
+      for (const [label, list] of [
+        ['primary texts', texts.bodies],
+        ['headlines', texts.headlines],
+        ['descriptions', texts.descriptions],
+      ] as const) {
+        if (new Set(list.map((t) => t.toLowerCase())).size < list.length) {
+          // A duplicate is not rejected, it is wasted: the platform tests the
+          // same thing twice and learns nothing from the second copy.
+          issues.push({
+            severity: 'warning',
+            message: `Two of the ${label} are identical, so one variant slot is wasted.`,
+            path: adAt,
+          })
+        }
+      }
+
+      for (const asset of ad.assets ?? []) {
+        if (!(ASPECT_RATIOS as readonly string[]).includes(asset.aspectRatio)) {
+          issues.push({
+            severity: 'error',
+            message: `Aspect ratio "${asset.aspectRatio}" is not one of ${ASPECT_RATIOS.join(', ')}.`,
+            path: `${adAt}.assets`,
+          })
+        }
       }
       if (ad.landingPageUrl !== undefined && !/^https:\/\//i.test(ad.landingPageUrl)) {
         issues.push({
@@ -372,7 +493,13 @@ export function validateAdPlan(plan: AdPlan): AdValidation {
           path: `${adAt}.landingPageUrl`,
         })
       }
-      if ((ad.mediaIds?.length ?? 0) === 0 && ad.landingPageUrl === undefined) {
+      if (
+        (ad.mediaIds?.length ?? 0) === 0 &&
+        (ad.assets?.length ?? 0) === 0 &&
+        ad.creative === undefined &&
+        ad.landingPageUrl === undefined &&
+        ad.leadFormId === undefined
+      ) {
         issues.push({
           severity: 'warning',
           message: 'No media and no landing page: this ad has nothing for anyone to do.',

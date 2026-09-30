@@ -1,4 +1,4 @@
-import type { AdIssue, AdPlan, Money } from '@social-publisher/core'
+import { effectiveTexts, type AdIssue, type AdPlan, type Money } from '@social-publisher/core'
 
 /**
  * Meta advertising guardrails.
@@ -145,7 +145,34 @@ export function checkMetaAdPlan(plan: AdPlan, context: MetaCheckContext = {}): A
     const goal = adSet.optimizationGoal
     const optimisingForConversions = goal !== undefined && META_CONVERSION_GOALS.has(goal)
 
-    if (optimisingForConversions) {
+    /**
+     * Instant-form leads are captured inside Meta, so the website machinery
+     * does not apply: no pixel reports them, no conversion event names them,
+     * and no landing page is visited. Treating them like website leads refused
+     * every instant-form campaign for missing things it never needs.
+     */
+    const instantForm = adSet.leadDestination === 'instant_form'
+
+    if (instantForm) {
+      if (goal !== undefined && goal !== 'LEAD_GENERATION') {
+        issues.push({
+          severity: 'error',
+          message: `Instant-form ads optimise for LEAD_GENERATION, not "${goal}".`,
+          path: `${at}.optimizationGoal`,
+        })
+      }
+      ads.forEach((ad, j) => {
+        if (ad.leadFormId === undefined || ad.leadFormId.trim() === '') {
+          issues.push({
+            severity: 'error',
+            message: 'An instant-form ad needs the id of the lead form it opens.',
+            path: `${at}.ads[${j}].leadFormId`,
+          })
+        }
+      })
+    }
+
+    if (optimisingForConversions && !instantForm) {
       if (context.hasPixel === false) {
         issues.push({
           severity: 'error',
@@ -215,27 +242,39 @@ export function checkMetaAdPlan(plan: AdPlan, context: MetaCheckContext = {}): A
 
     ads.forEach((ad, j) => {
       const adAt = `${at}.ads[${j}]`
+      const texts = effectiveTexts(ad)
 
-      if (ad.headline === undefined || ad.headline.trim() === '') {
+      if (texts.headlines.length === 0) {
         issues.push({ severity: 'error', message: 'Meta ads need a headline.', path: `${adAt}.headline` })
-      } else if (ad.headline.length > guards.maxHeadlineChars) {
-        issues.push({
-          severity: 'warning',
-          message: `Headline is ${ad.headline.length} characters; it truncates around ${guards.maxHeadlineChars}.`,
-          path: `${adAt}.headline`,
-        })
       }
+      texts.headlines.forEach((headline, k) => {
+        if (headline.length > guards.maxHeadlineChars) {
+          issues.push({
+            severity: 'warning',
+            message: `Headline ${k + 1} is ${headline.length} characters; it truncates around ${guards.maxHeadlineChars}.`,
+            path: `${adAt}.headlines[${k}]`,
+          })
+        }
+      })
 
-      if (ad.body.length > guards.maxPrimaryTextChars) {
-        issues.push({
-          severity: 'warning',
-          message:
-            `Primary text is ${ad.body.length} characters. Meta truncates around ` +
-            `${guards.maxPrimaryTextChars} behind "See more", so put the hook in the first ` +
-            `${guards.maxPrimaryTextChars}.`,
-          path: `${adAt}.body`,
-        })
-      }
+      /**
+       * Long copy is not the problem it used to be. Since Meta's 2025 ranking
+       * change, longer primary text often performs better, because it gives the
+       * algorithm more to understand who the ad is for. What still matters is
+       * that the first ~125 characters, all that shows before "See more", carry
+       * the hook. So this warns about where the hook is, not about length.
+       */
+      texts.bodies.forEach((body, k) => {
+        if (body.length > guards.maxPrimaryTextChars) {
+          issues.push({
+            severity: 'warning',
+            message:
+              `Primary text ${k + 1} is ${body.length} characters. Long copy is fine and often better, but ` +
+              `only the first ~${guards.maxPrimaryTextChars} show before "See more" — make sure the hook is there.`,
+            path: `${adAt}.bodies[${k}]`,
+          })
+        }
+      })
 
       if (ad.callToAction !== undefined && !META_CTAS.has(ad.callToAction)) {
         issues.push({
@@ -245,7 +284,11 @@ export function checkMetaAdPlan(plan: AdPlan, context: MetaCheckContext = {}): A
         })
       }
 
-      if (NEEDS_LINK.has(plan.campaign.objective.toUpperCase()) && ad.landingPageUrl === undefined) {
+      if (
+        !instantForm &&
+        NEEDS_LINK.has(plan.campaign.objective.toUpperCase()) &&
+        ad.landingPageUrl === undefined
+      ) {
         issues.push({
           severity: 'error',
           message: `Objective "${plan.campaign.objective}" sends people somewhere, so this ad needs a landing page.`,
@@ -253,7 +296,10 @@ export function checkMetaAdPlan(plan: AdPlan, context: MetaCheckContext = {}): A
         })
       }
 
-      if (ad.creative?.kind === 'video' && ad.creative.thumbnailPath === undefined) {
+      const videoWithoutThumbnail =
+        (ad.creative?.kind === 'video' && ad.creative.thumbnailPath === undefined) ||
+        (ad.assets ?? []).some((a) => a.kind === 'video' && a.thumbnailPath === undefined)
+      if (videoWithoutThumbnail) {
         issues.push({
           severity: 'warning',
           message:

@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises'
+import { readFile, stat } from 'node:fs/promises'
 import { basename } from 'node:path'
 
 import {
@@ -6,7 +6,10 @@ import {
   classifyHttpStatus,
   classifyNetworkError,
   describePlan,
+  effectiveTexts,
   validateAdPlan,
+  type AdAsset,
+  type AspectRatio,
   type AdPlan,
   type Money,
 } from '@social-publisher/core'
@@ -95,6 +98,8 @@ export interface MetaAdsOptions {
   readonly accessToken: string
   readonly apiVersion?: string
   readonly fetch?: typeof globalThis.fetch
+  /** How often to check whether an uploaded video is ready. Injectable for tests. */
+  readonly pollIntervalMs?: number
 }
 
 /** What was created, in the order it was created, so a partial run can be undone. */
@@ -140,6 +145,183 @@ export interface CampaignStatus {
   readonly inReview: readonly ObjectStatus[]
 }
 
+/**
+ * Every file an ad will carry, however it was supplied.
+ *
+ * `assets` is the current form; `creative` with a single file is the older one
+ * and is read as one square asset so existing callers keep working.
+ */
+function assetsOf(ad: AdPlan['adSets'][number]['ads'][number]): AdAsset[] {
+  if ((ad.assets?.length ?? 0) > 0) return [...ad.assets!]
+  const c = ad.creative
+  if ((c?.kind === 'image' || c?.kind === 'video') && c.localPath !== undefined) {
+    return [
+      {
+        kind: c.kind,
+        localPath: c.localPath,
+        aspectRatio: '1:1',
+        ...(c.thumbnailPath !== undefined ? { thumbnailPath: c.thumbnailPath } : {}),
+      },
+    ]
+  }
+  return []
+}
+
+/**
+ * Splits an ad that wants both text variants and placement-specific files.
+ *
+ * Meta will not combine them in one creative: *"Multiple bodies assets cannot
+ * be applied to rule no. 1"* (found live 2026-09-30). When each placement is
+ * given its own file, each placement must also resolve to exactly one text.
+ *
+ * So one ad with five texts and three shapes becomes five ads, each with one
+ * text and all three shapes. Both wishes survive: every placement is served the
+ * right shape, and Meta still learns which text wins — at the ad level rather
+ * than inside one ad. Shorter lists repeat, so five texts with one headline
+ * gives five ads sharing that headline.
+ *
+ * Ads that do not need both are returned untouched.
+ */
+export function expandForPlacements(plan: AdPlan): AdPlan {
+  return {
+    ...plan,
+    adSets: plan.adSets.map((entry) => ({
+      ...entry,
+      ads: entry.ads.flatMap((ad) => {
+        const assets = assetsOf(ad)
+        const shapes = new Set(assets.map((a) => a.aspectRatio))
+        const texts = effectiveTexts(ad)
+        const variants = Math.max(texts.bodies.length, texts.headlines.length, texts.descriptions.length)
+        if (shapes.size < 2 || variants < 2) return [ad]
+
+        const pick = (list: readonly string[], i: number) =>
+          list.length === 0 ? [] : [list[i % list.length]!]
+
+        return Array.from({ length: variants }, (_, i) => ({
+          ...ad,
+          name: `${ad.name}-v${i + 1}`,
+          body: pick(texts.bodies, i)[0] ?? ad.body,
+          bodies: pick(texts.bodies, i),
+          headlines: pick(texts.headlines, i),
+          descriptions: pick(texts.descriptions, i),
+          assets,
+        }))
+      }),
+    })),
+  }
+}
+
+/** A label per aspect ratio, which placement rules then refer to. */
+function labelFor(ratio: AspectRatio): string {
+  return `ratio_${ratio.replace(':', 'x').replace('.', '_')}`
+}
+
+/**
+ * Which file each placement gets.
+ *
+ * Only produced when there is more than one shape to choose between; with one
+ * shape Meta crops it to every placement and no rule is needed. Feed prefers
+ * 4:5 over 1:1 because it occupies more of the screen; Stories and Reels take
+ * 9:16; landscape goes to the right column and the audience network.
+ */
+function placementRules(assets: readonly AdAsset[]): Array<Record<string, unknown>> {
+  const shapes = new Set(assets.map((a) => a.aspectRatio))
+  if (shapes.size < 2) return []
+
+  const rules: Array<Record<string, unknown>> = []
+  const feedShape: AspectRatio | undefined = shapes.has('4:5') ? '4:5' : shapes.has('1:1') ? '1:1' : undefined
+
+  if (shapes.has('9:16')) {
+    rules.push({
+      customization_spec: {
+        publisher_platforms: ['facebook', 'instagram'],
+        facebook_positions: ['story', 'facebook_reels'],
+        instagram_positions: ['story', 'reels'],
+      },
+      image_label: { name: labelFor('9:16') },
+      video_label: { name: labelFor('9:16') },
+    })
+  }
+  if (feedShape !== undefined) {
+    rules.push({
+      customization_spec: {
+        publisher_platforms: ['facebook', 'instagram'],
+        facebook_positions:
+          feedShape === '4:5' && shapes.has('1:1')
+            ? ['feed', 'video_feeds']
+            : ['feed', 'marketplace', 'video_feeds', 'search'],
+        instagram_positions: ['stream', 'explore', 'explore_home', 'profile_feed'],
+      },
+      image_label: { name: labelFor(feedShape) },
+      video_label: { name: labelFor(feedShape) },
+    })
+  }
+  /**
+   * With both 1:1 and 4:5 supplied, Feed takes the 4:5 and the square goes to
+   * the placements that are square by nature. Without this rule the 1:1 file
+   * was uploaded and never served — found by reading the creative back from
+   * Meta on 2026-09-30.
+   */
+  if (feedShape === '4:5' && shapes.has('1:1')) {
+    rules.push({
+      customization_spec: {
+        publisher_platforms: ['facebook'],
+        facebook_positions: ['marketplace', 'search', 'right_hand_column'],
+      },
+      image_label: { name: labelFor('1:1') },
+      video_label: { name: labelFor('1:1') },
+    })
+  }
+  if (shapes.has('1.91:1')) {
+    rules.push({
+      customization_spec: {
+        publisher_platforms: ['facebook', 'audience_network'],
+        // The square rule above claims the right column when it exists.
+        facebook_positions: feedShape === '4:5' && shapes.has('1:1') ? [] : ['right_hand_column'],
+        audience_network_positions: ['classic'],
+      },
+      image_label: { name: labelFor('1.91:1') },
+      video_label: { name: labelFor('1.91:1') },
+    })
+  }
+
+  // Meta applies rules in priority order; numbering them makes that explicit
+  // rather than an accident of array order.
+  return rules.map((rule, i) => ({ ...rule, priority: i + 1 }))
+}
+
+/**
+ * Meta's automatic creative changes, off unless explicitly wanted.
+ *
+ * The owner's instruction, and the right default for an agency: a client
+ * approved specific copy and images, and Meta rewriting or retouching them is
+ * a change nobody approved.
+ */
+function enhancementsSpec(allow: boolean): Record<string, unknown> {
+  const status = allow ? 'OPT_IN' : 'OPT_OUT'
+  return {
+    creative_features_spec: Object.fromEntries(
+      META_CREATIVE_FEATURES.map((feature) => [feature, { enroll_status: status }]),
+    ),
+  }
+}
+
+/**
+ * Meta's automatic creative enhancements, named individually.
+ *
+ * The single `standard_enhancements` switch was deprecated in API v22 (January
+ * 2025) and is now refused outright: *"including standard enhancements field in
+ * creative has been deprecated. Please choose to set individual features
+ * instead."* Found live 2026-09-30. Each feature has to be set on its own, so
+ * opting out means naming every one.
+ */
+export const META_CREATIVE_FEATURES = [
+  'image_templates',
+  'image_touchups',
+  'text_optimizations',
+  'inline_comment',
+] as const
+
 /** States in which an ad will never deliver, whatever its own status says. */
 const REJECTED_STATES = new Set(['DISAPPROVED', 'WITH_ISSUES'])
 const IN_REVIEW_STATES = new Set(['IN_PROCESS', 'PENDING_REVIEW'])
@@ -149,12 +331,14 @@ export class MetaAdsClient {
   readonly #token: string
   readonly #version: string
   readonly #fetch: typeof globalThis.fetch
+  readonly #pollMs: number
 
   constructor(options: MetaAdsOptions) {
     this.#account = options.account
     this.#token = options.accessToken
     this.#version = options.apiVersion ?? META_ADS_API_VERSION
     this.#fetch = options.fetch ?? globalThis.fetch
+    this.#pollMs = options.pollIntervalMs ?? 3000
   }
 
   /**
@@ -164,12 +348,15 @@ export class MetaAdsClient {
    * asking a person to approve, and it must be impossible for it to have side
    * effects.
    */
-  review(plan: AdPlan, context: MetaCheckContext = {}): {
+  review(requested: AdPlan, context: MetaCheckContext = {}): {
     ok: boolean
     errors: string[]
     warnings: string[]
     summary: string
   } {
+    // Reviewed as it will be built, so the ad count and every warning describe
+    // the ads that will exist rather than the ones that were asked for.
+    const plan = expandForPlacements(requested)
     const base = validateAdPlan(plan)
     const meta = checkMetaAdPlan(plan, {
       ...context,
@@ -192,8 +379,9 @@ export class MetaAdsClient {
    * be surfaced — a guardrail you can ignore silently is a guardrail that does
    * nothing.
    */
-  async create(plan: AdPlan, context: MetaCheckContext = {}): Promise<CreateResult> {
-    const review = this.review(plan, context)
+  async create(requested: AdPlan, context: MetaCheckContext = {}): Promise<CreateResult> {
+    const review = this.review(requested, context)
+    const plan = expandForPlacements(requested)
     if (!review.ok) {
       throw new PublishError(
         `This campaign was not created. ${review.errors.length} problem(s):\n  ${review.errors.join('\n  ')}`,
@@ -379,6 +567,35 @@ export class MetaAdsClient {
     return await this.status(campaignId)
   }
 
+  /**
+   * Builds one creative on its own, with no campaign around it.
+   *
+   * A creative is a standalone object in the ad account: it cannot spend and
+   * needs nothing above it. That makes it the safe way to check that a set of
+   * texts and files is accepted, and to preview it, before a campaign exists.
+   */
+  async createCreative(ad: AdPlan['adSets'][number]['ads'][number]): Promise<string> {
+    return await this.#createCreative(ad, 0)
+  }
+
+  /**
+   * How a creative will actually look, rendered by Meta.
+   *
+   * Returns an iframe snippet per placement. Worth more in an approval step
+   * than any description, because it is what people will see.
+   */
+  async preview(creativeId: string, formats: readonly string[] = ['MOBILE_FEED_STANDARD', 'INSTAGRAM_STORY']): Promise<Record<string, string>> {
+    const out: Record<string, string> = {}
+    for (const format of formats) {
+      const data = (await this.#get(`${creativeId}/previews`, { ad_format: format })) as {
+        data?: Array<{ body?: string }>
+      }
+      const body = data.data?.[0]?.body
+      if (body !== undefined) out[format] = body
+    }
+    return out
+  }
+
   async #get(path: string, params: Record<string, string>): Promise<unknown> {
     const url = new URL(`${GRAPH_BASE}/${this.#version}/${path}`)
     for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v)
@@ -430,7 +647,8 @@ export class MetaAdsClient {
     index: number,
   ): Promise<string> {
     const { adSet } = entry
-    const goal = adSet.optimizationGoal ?? 'LINK_CLICKS'
+    const instantForm = adSet.leadDestination === 'instant_form'
+    const goal = adSet.optimizationGoal ?? (instantForm ? 'LEAD_GENERATION' : 'LINK_CLICKS')
 
     const body: Record<string, string> = {
       name: adSetName(META_DEFAULT_NAMING.adSet, {
@@ -473,7 +691,15 @@ export class MetaAdsClient {
      * The pixel and event are what the algorithm actually optimises toward.
      * Without them a conversion goal is a request Meta cannot act on.
      */
-    if (adSet.conversionEvent !== undefined && this.#account.pixelId !== undefined) {
+    /**
+     * An instant form is captured on the Page, inside Meta, so the ad set
+     * promotes the Page and delivers "on ad" rather than to a website. No pixel
+     * is involved.
+     */
+    if (instantForm) {
+      body.promoted_object = JSON.stringify({ page_id: this.#account.pageId })
+      body.destination_type = 'ON_AD'
+    } else if (adSet.conversionEvent !== undefined && this.#account.pixelId !== undefined) {
       body.promoted_object = JSON.stringify({
         pixel_id: this.#account.pixelId,
         custom_event_type: adSet.conversionEvent,
@@ -539,31 +765,183 @@ export class MetaAdsClient {
       })
     }
 
-    const linkData: Record<string, unknown> = {
-      link: ad.landingPageUrl,
-      message: ad.body,
-      name: ad.headline,
-      call_to_action: { type: ad.callToAction ?? 'LEARN_MORE' },
+    const texts = effectiveTexts(ad)
+    const assets = assetsOf(ad)
+
+    // An instant form still needs a link in the creative, even though nobody
+    // is sent there. The Page itself is the honest value when none was given.
+    const link = ad.landingPageUrl ?? `https://www.facebook.com/${this.#account.pageId}`
+    const callToAction: Record<string, unknown> = {
+      type: ad.callToAction ?? (ad.leadFormId !== undefined ? 'SIGN_UP' : 'LEARN_MORE'),
+      value: ad.leadFormId !== undefined ? { lead_gen_form_id: ad.leadFormId, link } : { link },
     }
 
-    if (ad.creative?.kind === 'image' && ad.creative.localPath !== undefined) {
-      linkData.image_hash = await this.#uploadImage(ad.creative.localPath)
+    const storySpec: Record<string, unknown> = {
+      page_id: this.#account.pageId,
+      ...(this.#account.instagramId !== undefined
+        ? { instagram_actor_id: this.#account.instagramId }
+        : {}),
     }
 
     const body: Record<string, string> = {
       name,
-      object_story_spec: JSON.stringify({
-        page_id: this.#account.pageId,
-        ...(this.#account.instagramId !== undefined
-          ? { instagram_actor_id: this.#account.instagramId }
-          : {}),
-        link_data: linkData,
-      }),
       // Meta fills these at click time; they must reach it unexpanded.
       url_tags: urlTags(ad.urlTags),
+      degrees_of_freedom_spec: JSON.stringify(enhancementsSpec(ad.platformEnhancements === true)),
     }
 
+    /**
+     * One text and at most one file is an ordinary creative. Anything more —
+     * several texts, or files in several shapes — uses Meta's asset feed, which
+     * is how one ad carries up to five of each and serves each placement the
+     * right file.
+     */
+    const flexible =
+      texts.bodies.length > 1 ||
+      texts.headlines.length > 1 ||
+      texts.descriptions.length > 0 ||
+      assets.length > 1
+
+    if (!flexible) {
+      const asset = assets[0]
+      if (asset?.kind === 'video') {
+        const video = await this.#uploadVideo(asset)
+        storySpec.video_data = {
+          video_id: video.id,
+          ...(video.thumbnailHash !== undefined
+            ? { image_hash: video.thumbnailHash }
+            : { image_url: video.thumbnailUrl }),
+          message: texts.bodies[0],
+          title: texts.headlines[0],
+          call_to_action: callToAction,
+        }
+      } else {
+        storySpec.link_data = {
+          link,
+          message: texts.bodies[0],
+          name: texts.headlines[0],
+          call_to_action: callToAction,
+          ...(asset !== undefined ? { image_hash: await this.#uploadImage(asset.localPath) } : {}),
+        }
+      }
+      body.object_story_spec = JSON.stringify(storySpec)
+      return await this.#post('adcreatives', body)
+    }
+
+    const images: Array<Record<string, unknown>> = []
+    const videos: Array<Record<string, unknown>> = []
+    for (const asset of assets) {
+      const adlabels = [{ name: labelFor(asset.aspectRatio) }]
+      if (asset.kind === 'image') {
+        images.push({ hash: await this.#uploadImage(asset.localPath), adlabels })
+      } else {
+        const video = await this.#uploadVideo(asset)
+        videos.push({
+          video_id: video.id,
+          ...(video.thumbnailHash !== undefined
+            ? { thumbnail_hash: video.thumbnailHash }
+            : { thumbnail_url: video.thumbnailUrl }),
+          adlabels,
+        })
+      }
+    }
+
+    const rules = placementRules(assets)
+    const feed: Record<string, unknown> = {
+      bodies: texts.bodies.map((text) => ({ text })),
+      titles: texts.headlines.map((text) => ({ text })),
+      ...(texts.descriptions.length > 0
+        ? { descriptions: texts.descriptions.map((text) => ({ text })) }
+        : {}),
+      link_urls: [{ website_url: link }],
+      call_to_action_types: [callToAction.type],
+      ...(images.length > 0 ? { images } : {}),
+      ...(videos.length > 0 ? { videos } : {}),
+      ad_formats: [
+        images.length > 0 && videos.length > 0
+          ? 'AUTOMATIC_FORMAT'
+          : videos.length > 0
+            ? 'SINGLE_VIDEO'
+            : 'SINGLE_IMAGE',
+      ],
+      ...(rules.length > 0
+        ? { optimization_type: 'PLACEMENT', asset_customization_rules: rules }
+        : {}),
+    }
+
+    body.object_story_spec = JSON.stringify(storySpec)
+    body.asset_feed_spec = JSON.stringify(feed)
     return await this.#post('adcreatives', body)
+  }
+
+  /**
+   * Uploads a video and waits until Meta has processed it.
+   *
+   * Upload and readiness are separate events. A creative that references a
+   * video still being processed is refused, so this polls until the video is
+   * ready rather than trusting the upload response.
+   *
+   * The whole file is sent in one request, which caps it at 100 MB here: a
+   * single request holds the file in memory, the same defect fixed for
+   * LinkedIn. Larger files need Meta's chunked upload (IDEAS J1).
+   */
+  async #uploadVideo(asset: AdAsset): Promise<{ id: string; thumbnailUrl?: string; thumbnailHash?: string }> {
+    const size = (await stat(asset.localPath).catch(() => undefined))?.size
+    if (size === undefined) {
+      throw new PublishError(`Could not read the video at ${asset.localPath}`, { failureClass: 'permanent' })
+    }
+    if (size > 100 * 1024 * 1024) {
+      throw new PublishError(
+        `The video is ${(size / 1024 / 1024).toFixed(0)} MB. Uploads above 100 MB need chunked upload, ` +
+          'which is not built yet. Export a smaller file, or ask for chunked upload to be built.',
+        { failureClass: 'permanent' },
+      )
+    }
+
+    const form = new FormData()
+    form.append('access_token', this.#token)
+    form.append('source', new Blob([new Uint8Array(await readFile(asset.localPath))]), basename(asset.localPath))
+    const url = `${GRAPH_BASE}/${this.#version}/act_${this.#account.adAccountId}/advideos`
+    const uploaded = (await this.#send(url, { method: 'POST', body: form })) as { id?: string }
+    if (uploaded.id === undefined) {
+      throw new PublishError('Meta accepted the video upload but returned no id.', { failureClass: 'transient' })
+    }
+
+    const deadline = Date.now() + 5 * 60 * 1000
+    for (;;) {
+      const state = (await this.#get(uploaded.id, { fields: 'status' })) as {
+        status?: { video_status?: string }
+      }
+      const status = state.status?.video_status
+      if (status === 'ready') break
+      if (status === 'error') {
+        throw new PublishError('Meta could not process the video. Check its format and encoding.', {
+          failureClass: 'permanent',
+        })
+      }
+      if (Date.now() > deadline) {
+        throw new PublishError('Meta was still processing the video after 5 minutes.', {
+          failureClass: 'transient',
+        })
+      }
+      await new Promise((resolve) => setTimeout(resolve, this.#pollMs))
+    }
+
+    // A thumbnail the owner chose beats one Meta picked, which is often a poor
+    // frame. Only when none was given is Meta's preferred one used.
+    if (asset.thumbnailPath !== undefined) {
+      return { id: uploaded.id, thumbnailHash: await this.#uploadImage(asset.thumbnailPath) }
+    }
+    const thumbs = (await this.#get(`${uploaded.id}/thumbnails`, { fields: 'uri,is_preferred' })) as {
+      data?: Array<{ uri?: string; is_preferred?: boolean }>
+    }
+    const preferred = thumbs.data?.find((t) => t.is_preferred) ?? thumbs.data?.[0]
+    if (preferred?.uri === undefined) {
+      throw new PublishError('Meta processed the video but offered no thumbnail. Supply one.', {
+        failureClass: 'permanent',
+      })
+    }
+    return { id: uploaded.id, thumbnailUrl: preferred.uri }
   }
 
   /** Uploads an image and returns its hash, which is what a creative references. */
