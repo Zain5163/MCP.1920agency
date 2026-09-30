@@ -137,6 +137,14 @@ export const ACTION_POLICY: Readonly<Record<string, ActionPolicy>> = {
     reversible: true,
     spendsMoney: false,
   },
+  generate_ad_images: {
+    rationale:
+      'Pays for images from an image model. A few cents each, but real money, and it cannot be refunded. ' +
+      'Bounded by a daily cap in code rather than by per-image approval, which would be unworkable at this price.',
+    risk: 'medium',
+    reversible: false,
+    spendsMoney: true,
+  },
   list_skills: {
     rationale: 'Lists the built-in marketing skills. Changes nothing and touches no account.',
     risk: 'low',

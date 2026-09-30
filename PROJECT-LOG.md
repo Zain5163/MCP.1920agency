@@ -1215,6 +1215,72 @@ source here has been handled anyway.
 
 575 tests, 13 workspaces typecheck clean. The MCP app gained its own test suite.
 
+## 2026-09-30 — Real account, image generation, pricing, cleanup
+
+### Limits and cleanup
+
+- Limits revised by the owner: **PKR 10,000/day across all campaigns, PKR
+  300,000/month**. They now fit together (10,000 × 30), so an always-on campaign
+  can reach the daily ceiling. The PKR 1,000 minimum stays.
+- Cleanup approved and done: **9 sandbox campaigns and 9 creatives deleted, the
+  test lead form archived.** The script refused to run unless the configured
+  account was the sandbox, and archived the form only after checking its name.
+
+### Moved to the real ad account
+
+"1920Agency 10", `853868739015298`, PKR, with billing set up. Checked before use:
+the 1920 Agency Page can be advertised; pixel `731641141950428` ("1920agency.com")
+last fired three days earlier and is now configured; one existing campaign is
+active, and the spend ceiling counts it.
+
+⚠️ **The system user token also reaches client ad accounts** (Muzaree,
+European Cyprus, Malta, UK and others). The code only acts on the one configured
+account, but a leaked token could spend on all of them. That is a second reason,
+after its 43 permissions, to narrow it.
+
+**First real campaign prepared, not created.** PKR 1,000/day for 7 days, about
+PKR 7,000 in total, one ad with five text variants on the real 1920 Agency graphic.
+Reviewed and taken to the approval step on the real server, with Meta previews.
+It waits for the owner's yes.
+
+### Image generation, through OpenRouter
+
+The owner chose OpenRouter, paid per call. Verified against OpenRouter's live
+model list first:
+
+- A dedicated endpoint that returns the **exact cost of every image** (`usage.cost`).
+- **Gemini 3.1 Flash Image makes every ad shape**, so it is the default.
+  **OpenAI's GPT Image 2 has no 4:5**, the Feed shape. A request for it is refused
+  before anything is charged.
+- No listed model makes 1.91:1, so landscape is refused rather than faked from
+  16:9.
+
+`generate_ad_images`, local server only:
+
+- **A daily cap in code** (`OPENROUTER_DAILY_LIMIT_USD`), with no default. Today's
+  spend is summed from real charges recorded in the audit log; a run stops at the
+  cap and keeps what it made. At most 15 images per call.
+- Every prompt gets **placement-aware composition** (9:16 keeps the top and bottom
+  clear for app buttons) and **a no-text rule**, because image models misspell
+  words and copy belongs in the ad's text fields.
+- Files go to `media/generated/<date>/`, which is not committed.
+
+Per-image approval was rejected as unworkable at a few cents an image; the cap is
+the control. Recorded in the policy table as medium risk and money-spending.
+
+Found by the architecture test: `'x'` in a filename replacement matched the
+platform X. The code was changed; the test was left alone.
+
+### Decisions recorded
+
+- **Pricing** (`decisions/0007`): per connected account, around $6–7, in
+  Zernio's style; pass-through costs at 3×; ad spend never marked up.
+- **Google Business Profile** joins the posting stage (priority 1), for the UK and
+  Europe especially.
+- The website takes Zernio's pricing presentation as a second reference.
+
+586 tests, 13 workspaces typecheck clean.
+
 ## Verified live, not just tested
 
 | What | How it was proven |

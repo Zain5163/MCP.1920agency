@@ -16,17 +16,19 @@ Two rules apply at every tier, not just at the end:
 In this order, and nothing further down starts before the item above it is
 working for 1920 Agency's own accounts:
 
-1. **Social media automation**: publishing to every connected platform.
+1. **Social media automation**: publishing to every connected platform,
+   **including Google Business Profile** posts. The owner's reasoning: many
+   businesses in Pakistan skip it, but in the UK and Europe it is where local
+   customers look first.
 2. **Meta ads**: plan, write, create, approve, launch and read results from one
    prompt. *Built and verified against the sandbox on 2026-09-30. It still needs
    one real campaign run end to end.*
 3. **Google Ads.**
 4. Everything in "The whole marketing MCP" below.
 
-Decision awaiting the owner: **AI image generation** for ad creative. It needs an
-image model provider (for example OpenAI GPT Image, Google Gemini or Imagen,
-Seedream or Flux through a gateway), an API key, and a per-image cost. See
-`WAITING-LIST.md`.
+**AI image generation: decided and built 2026-09-30.** OpenRouter, paid per
+image, with a daily cap. Needs the owner's OpenRouter key and a daily budget in
+the env file. Pricing is in `decisions/0007`.
 
 ---
 
@@ -293,7 +295,8 @@ when they come up:
 
 ## Website (later)
 
-The owner wants the public site in the style of treg.to. **Style, not code.**
+The owner wants the public site in the style of treg.to, and also likes
+**Zernio's** site, especially how its pricing is laid out. **Style, not code.**
 TREG's licence forbids reusing its code in a hosted product, and its markup, text
 and images are its own. The ideas below are patterns and are ours to use.
 
@@ -318,9 +321,10 @@ and images are its own. The ideas below are patterns and are ours to use.
    the differentiator against every competitor** (see the research note).
 3. **Expertise built in**: the playbooks and skills, shown as the roles above.
 4. **One job, end to end**: "run my lead generation ads" as a real transcript.
-5. **Pricing**: flat or per use, **not per connected account**. Agencies with many
-   clients are the market, and per-account pricing is where Zernio and Ayrshare
-   get expensive.
+5. **Pricing**: **per connected account, around $6–7**, in Zernio's style, with
+   pass-through costs (images, X, data calls) at 3× cost and ad spend never marked
+   up. The owner's decision; see `decisions/0007`. A lower per-account rate at
+   volume keeps it fair for agencies with many clients.
 6. **Docs, GitHub and community** in the footer.
 
 The website is built only after social publishing and Meta ads are working for

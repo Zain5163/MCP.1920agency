@@ -8,3 +8,5 @@ to-post/*
 posted/*
 !to-post/.gitkeep
 !posted/.gitkeep
+# AI-generated creative: large, reproducible, and not source.
+generated/

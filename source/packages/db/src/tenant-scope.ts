@@ -230,6 +230,24 @@ export class TenantScope {
     })
   }
 
+  /**
+   * Money spent on one kind of action since a moment, from the audit log.
+   *
+   * Summed from what was actually charged and recorded, never estimated, so a
+   * spending cap checked against it is checked against real money. Uses the
+   * existing (tenant, created_at) index; the rows for one day are few.
+   */
+  async spentSince(action: string, since: Date, field = 'costUsd'): Promise<number> {
+    const rows = await db().auditLog.findMany({
+      where: { tenantId: this.tenantId, action, createdAt: { gte: since } },
+      select: { detail: true },
+    })
+    return rows.reduce((sum, row) => {
+      const value = (row.detail as Record<string, unknown> | null)?.[field]
+      return sum + (typeof value === 'number' && Number.isFinite(value) ? value : 0)
+    }, 0)
+  }
+
   async record(actor: string, action: string, detail?: Record<string, unknown>) {
     return await db().auditLog.create({
       data: {

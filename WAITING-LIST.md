@@ -110,24 +110,24 @@ Check with `get_campaign_status` whether Meta approved them.
 
 ---
 
-## 8. AI image generation for ad creative (needs a decision)
+## 8. AI image generation: built, needs two values from the owner
 
-Everything else on the Meta list is built. Generating images needs:
+Decided: **OpenRouter, paid per image** (decisions/0007). Built and unit-tested
+as `generate_ad_images`. Needs, in the env file:
 
-- **A provider**: OpenAI GPT Image, Google Gemini or Imagen, Seedream, or Flux
-  through a gateway.
-- **An API key**, kept in the env file like every other credential.
-- **A per-image cost the owner accepts.** Each variant in each shape is a
-  separate image, so 5 variants x 3 shapes is 15 images per ad.
+- `OPENROUTER_API_KEY`, from openrouter.ai/keys.
+- `OPENROUTER_DAILY_LIMIT_USD`, the most to spend on images per day. Nothing is
+  generated while it is empty.
 
-Until then the AI writes the copy and the owner supplies the files. The playbooks
-say so.
+~~## 9. Cleanup~~ **Done 2026-09-30**: 9 sandbox campaigns and 9 creatives
+deleted, and the test lead form archived.
 
-## 9. Clutter on the Page and in the sandbox (cleanup, needs approval)
+## 10. First real Meta campaign: awaiting the owner's approval
 
-Test objects from building, none public, none spending: about eight paused
-campaigns, several standalone creatives, and one lead form named "AdsPilot test
-form - safe to archive". Delete or archive on the owner's word.
+Prepared on the real account "1920Agency 10" (`853868739015298`): PKR 1,000/day
+for 7 days, about PKR 7,000 in total, created PAUSED. The approval summary and
+previews were shown; nothing is created until the owner says yes. Nothing spends
+until it is separately activated.
 
 ---
 

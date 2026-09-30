@@ -47,7 +47,7 @@ splitting a campaign into several.
 4. **Daily budget**, in the ad account's currency. The server knows the currency.
 5. **Where**: countries, as two-letter codes (`PK`, `AE`, `GB`).
 6. **Creative**: file paths for images or videos, and their shape. If they have
-   none, say so — this server does not generate images.
+   none, `generate_ad_images` can make them (see "Creative files").
 7. **Who buys**: their job, their problem, the words they use for it, what they
    have tried. This goes into the *copy*, not the targeting (see below).
 
@@ -126,6 +126,13 @@ file cropped everywhere.
 placement-specific files in one ad. When you supply both, the server splits them
 automatically into one ad per text variant, each keeping every shape. Five texts
 and three shapes becomes five ads. Tell the user this is what will be created.
+
+**Generating images.** `generate_ad_images` makes images for up to five concepts
+in 1:1, 4:5 and 9:16, paid per image within a daily cap the owner sets. Describe
+the *picture* — subject, setting, light, mood — and never ask for words in it:
+image models misspell them, so copy goes in the ad's text fields. The tool adds
+placement-aware composition to every prompt. **Show the user the images before
+using them**, and say what they cost.
 
 Creative that works now:
 
