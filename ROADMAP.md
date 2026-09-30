@@ -11,6 +11,25 @@ Two rules apply at every tier, not just at the end:
 2. **Nothing moves up a tier while the tier below has a known defect.** A missing
    feature is a gap; a broken foundation is a liability.
 
+## Owner's priorities (set 2026-09-30)
+
+In this order, and nothing further down starts before the item above it is
+working for 1920 Agency's own accounts:
+
+1. **Social media automation**: publishing to every connected platform.
+2. **Meta ads**: plan, write, create, approve, launch and read results from one
+   prompt. *Built and verified against the sandbox on 2026-09-30. It still needs
+   one real campaign run end to end.*
+3. **Google Ads.**
+4. Everything in "The whole marketing MCP" below.
+
+Decision awaiting the owner: **AI image generation** for ad creative. It needs an
+image model provider (for example OpenAI GPT Image, Google Gemini or Imagen,
+Seedream or Flux through a gateway), an API key, and a per-image cost. See
+`WAITING-LIST.md`.
+
+---
+
 ## Status at a glance
 
 Updated 2026-09-25. **This table is the source of truth for what is done.** Every
@@ -230,6 +249,83 @@ solid would mean building the riskiest feature on the weakest foundation._
 | # | Item | Notes |
 |---|---|---|
 | 6.1 | **Per-client AI design system, shipped as MCP skills** | The largest item by a wide margin: brand extraction, templating, rendering, quality control. A product in itself. **Gate it with research before any code**, the way `Ads-Platform` was gated — including permission to conclude "not worth it". |
+
+---
+
+## The whole marketing MCP (later, in the owner's words: "all built in")
+
+_Recorded 2026-09-30 so none of it has to be re-described. Competitor research in
+`research/2026-09-30-competitors.md`._
+
+The end state is **one MCP server that a business connects to once and that
+replaces a marketing team**: every social platform, every ad network, SEO, the
+website, analytics, and the tools a video agency uses. Expertise ships with each
+area (see the 50-skill library, already served), and every action that is public
+or spends money goes through the approval layer.
+
+| Area | What it means | Notes |
+|---|---|---|
+| **Google Ads** | Search, Performance Max, YouTube ads | Developer token with Basic access; playbook already written |
+| **More ad networks** | Microsoft, TikTok, LinkedIn (access granted), Pinterest, Snapchat, X | Each needs its own developer approval |
+| **Ad libraries** | Competitor creatives: Meta Ad Library, Google Ads Transparency, TikTok Creative Center, LinkedIn Ad Library (granted) | Read-only; low risk; strong for pitching clients |
+| **SEO** | Keyword and rank tracking, backlinks and authority, site audits, schema | Data comes from providers (DataForSEO, Semrush, Moz and others). The skills library already covers the method |
+| **AI visibility** | How a brand shows up in ChatGPT, Claude, Gemini and Perplexity answers | The `ai-seo` skill is already served |
+| **Trends** | Google Trends, trending topics, trending audio | Feeds content ideas |
+| **WordPress and CMS** | Publish and edit pages and posts, SEO fields, media | A WordPress MCP; Shopify and others later |
+| **Google Business Profile** | Posts, reviews, replies, insights | Local businesses; high value in Pakistan |
+| **YouTube** | Upload, metadata, channel analytics | Quota audit needed (see platform track) |
+| **Measurement** | GA4, Search Console, conversion APIs | Conversions API researched (IDEAS L) |
+| **People and company data** | Enrichment and buying signals, for B2B prospecting | Needs a data-protection decision first, as IDEAS L3 does |
+| **Messaging** | Slack messages and approvals | Slack is already the preferred ops surface |
+| **Video editing** | Premiere Pro, After Effects, DaVinci Resolve | An After Effects MCP ("Prism") already exists in this workspace's tooling. Worth studying before building |
+
+**Two ways to supply the data-heavy areas (SEO, enrichment, trends),** to decide
+when they come up:
+
+- **Bring your own key**: the customer connects their own Semrush or DataForSEO
+  account. Simple, and no reselling.
+- **A TREG-style gateway**: we hold provider accounts and resell calls at a small
+  or zero markup. Easier for customers, but it is a different business with
+  provider contracts and billing. **TREG's code cannot be used for this.** Its
+  licence forbids offering it as a hosted service.
+
+---
+
+## Website (later)
+
+The owner wants the public site in the style of treg.to. **Style, not code.**
+TREG's licence forbids reusing its code in a hosted product, and its markup, text
+and images are its own. The ideas below are patterns and are ours to use.
+
+**Hero, with a rotating role headline:**
+
+> Turn **[Claude / ChatGPT / Claude Code / any AI]** into your
+> **[social media manager / Meta ads buyer / SEO expert / content writer / lead-gen SDR]**
+
+- The left-hand word (the AI) and the right-hand word (the role) animate in turn.
+- **The artwork below changes with the role.** Social media manager shows the
+  platform icons (Facebook, Instagram, LinkedIn, TikTok, YouTube, X, Pinterest,
+  Threads). Ads buyer shows Meta and Google Ads. SEO expert shows a rankings chart.
+- Under the headline: **one setup line**, TREG-style. For example: *"add AdsPilot to
+  your AI: https://.../llms.txt"*, so the AI configures itself.
+
+**Then, in order:**
+
+1. **What it connects**: a grid of every platform, grouped (Social, Ads, SEO,
+   Website, Analytics, Video), with "live" and "coming" marked honestly.
+2. **The safety story**: nothing public or paid happens without your approval,
+   shown as the real approval screen with its cost summary and preview. **This is
+   the differentiator against every competitor** (see the research note).
+3. **Expertise built in**: the playbooks and skills, shown as the roles above.
+4. **One job, end to end**: "run my lead generation ads" as a real transcript.
+5. **Pricing**: flat or per use, **not per connected account**. Agencies with many
+   clients are the market, and per-account pricing is where Zernio and Ayrshare
+   get expensive.
+6. **Docs, GitHub and community** in the footer.
+
+The website is built only after social publishing and Meta ads are working for
+1920 Agency. A site that promises things the product cannot yet do would be worse
+than no site.
 
 ---
 
