@@ -969,6 +969,52 @@ answered it. **Meta's permission errors name the symptom, never the principal or
 the missing association**, so with any code 10 the first move is to ask who the
 token is and what it can reach.
 
+## 2026-09-30 — First complete Meta ad campaign, created paused
+
+Campaign `120330000132891215`, ad set `120330000132892015`, three creatives and
+three ads, in the sandbox ad account. **Read back from Meta afterwards** rather
+than trusted from our own output:
+
+| Object | status / effective_status |
+|---|---|
+| Campaign | PAUSED / PAUSED |
+| Ad set | PAUSED / PAUSED, 500000 paisa (PKR 5,000/day), LINK_CLICKS |
+| 3 ads | PAUSED / **IN_PROCESS** |
+
+`IN_PROCESS` on the ads is Meta's policy review running. It is the state IDEAS K1
+is about: an ad can pass creation and still be rejected hours later. Now observed
+for real, not just predicted.
+
+### What unblocked it
+
+The owner generated a System User token, but it was saved as a **bare line with
+no key**, under a label, so the env loader skipped it and kept reading the old
+sandbox token. Moved onto `META_ADS_ACCESS_TOKEN`. `debug_token` now reports
+**SYSTEM_USER, expires never**, identity *Mysmadspilot*, with full tasks on the
+Page — against *Sandbox Ad Account Owner* with `ADVERTISE` only before. That
+difference was the whole of the creative failure.
+
+### ⚠️ A cross-cutting bug, found by a network blip
+
+One run dropped with `ECONNRESET` and came back labelled **permanent**. Node's
+`fetch` throws `TypeError: fetch failed` and puts the network error in `cause`;
+`classifyNetworkError` read only the top level. So **every dropped connection on
+every platform was classified permanent and never retried by the worker** —
+including scheduled Facebook posts. It now walks the cause chain, with a depth
+limit against cycles. Four tests, one reproducing exactly what fetch throws.
+
+The partial-failure wrapper in the ads client also forced `permanent`, hiding the
+same thing a second time. It now keeps the underlying class.
+
+### Left for the owner
+
+- **Orphan campaigns** from the retries, all PAUSED in a sandbox. Deletion
+  awaiting approval. This is IDEAS K3 made concrete: every retry built a new
+  campaign rather than resuming.
+- The token carries **43 permissions** including WhatsApp messaging and Page
+  inbox access, and never expires. Ads need six. Recommended regenerating with
+  only those; owner's decision.
+
 ## Verified live, not just tested
 
 | What | How it was proven |
@@ -976,7 +1022,7 @@ token is and what it can reach.
 | LinkedIn authorisation | Connected 2026-09-26; person URN stored; visible in `pnpm status` |
 | LinkedIn publishing | Real post published 2026-09-26 through the approval gate, `urn:li:share:7509614451189239808` |
 | Little-text escaping | Same post: text with `(` `)` survived intact, escaped `#` rendered as a clean hashtag |
-| Meta ads auth and creation | Sandbox account read live; campaign and ad set created for real 2026-09-27 |
+| Meta ad campaign, end to end | Campaign, ad set, 3 creatives, 3 ads created PAUSED and read back from Meta 2026-09-30 |
 | LinkedIn image upload | Real image post 2026-09-26, `urn:li:share:7509616982338461696` — the two-step upload works |
 | LinkedIn VIDEO upload | Real video post 2026-09-26, `urn:li:ugcPost:7509704322323222529` — chunked upload, ETags and finalize all work against the live API |
 | The approval gate | Refused without a token and published with one, on a real irreversible action |

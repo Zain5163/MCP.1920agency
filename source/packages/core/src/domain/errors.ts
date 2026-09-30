@@ -66,9 +66,29 @@ export function classifyHttpStatus(status: number): FailureClass {
 }
 
 /** Network-level failures with no HTTP response are always worth retrying. */
+/**
+ * Whether a failure to reach a platform is worth retrying.
+ *
+ * Walks the `cause` chain rather than reading only the top-level error. Node's
+ * `fetch` never throws the network error itself: it throws `TypeError: fetch
+ * failed` and puts the `ECONNRESET` one level down, in `cause`. Reading only the
+ * top level classified **every dropped connection as permanent**, so the worker
+ * never retried a post that failed on a network blip. Found 2026-09-30 when a
+ * Meta ads call reset mid-run and came back labelled permanent.
+ *
+ * The depth limit guards against a cause cycle, which is legal JavaScript.
+ */
 export function classifyNetworkError(error: unknown): FailureClass {
-  const code = (error as { code?: string } | null)?.code
-  const retryable = new Set([
+  let current: unknown = error
+  for (let depth = 0; depth < 5 && current !== null && current !== undefined; depth += 1) {
+    const code = (current as { code?: string }).code
+    if (code !== undefined && RETRYABLE_NETWORK_CODES.has(code)) return 'transient'
+    current = (current as { cause?: unknown }).cause
+  }
+  return 'permanent'
+}
+
+const RETRYABLE_NETWORK_CODES: ReadonlySet<string> = new Set([
     'ECONNRESET',
     'ECONNREFUSED',
     'ETIMEDOUT',
@@ -78,9 +98,7 @@ export function classifyNetworkError(error: unknown): FailureClass {
     'UND_ERR_CONNECT_TIMEOUT',
     'UND_ERR_HEADERS_TIMEOUT',
     'UND_ERR_SOCKET',
-  ])
-  return code !== undefined && retryable.has(code) ? 'transient' : 'permanent'
-}
+])
 
 /**
  * Exponential backoff with full jitter, capped.

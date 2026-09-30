@@ -205,7 +205,12 @@ export class MetaAdsClient {
           `  campaign: ${created.campaignId ?? 'none'}\n` +
           `  ad sets: ${created.adSetIds.length}, creatives: ${created.creativeIds.length}, ads: ${created.adIds.length}\n` +
           'Delete the campaign in Ads Manager before retrying — re-running creates a second one.',
-        { failureClass: 'permanent', cause: error },
+        {
+          // Keep the underlying class. Forcing 'permanent' here hid the fact that
+          // a dropped connection is worth retrying.
+          failureClass: error instanceof PublishError ? error.failureClass : 'permanent',
+          cause: error,
+        },
       )
     }
 

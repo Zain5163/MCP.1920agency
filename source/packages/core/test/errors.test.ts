@@ -85,3 +85,30 @@ describe('backoffMs', () => {
     assert.ok(backoffMs(0, { baseMs: 1000, random: () => 0.5 }) >= 0)
   })
 })
+
+describe('classifyNetworkError reads the cause chain', () => {
+  test("Node's fetch wraps the real error — it must still count as transient", () => {
+    // Exactly what fetch throws on a reset connection. Reading only the top
+    // level classified every dropped connection as permanent, so nothing retried.
+    const wrapped = new TypeError('fetch failed', {
+      cause: Object.assign(new Error('read ECONNRESET'), { code: 'ECONNRESET' }),
+    })
+    assert.equal(classifyNetworkError(wrapped), 'transient')
+  })
+
+  test('finds a retryable code several levels down', () => {
+    const deep = { cause: { cause: { code: 'ETIMEDOUT' } } }
+    assert.equal(classifyNetworkError(deep), 'transient')
+  })
+
+  test('a cause cycle does not hang', () => {
+    const a: { code?: string; cause?: unknown } = {}
+    const b = { cause: a }
+    a.cause = b
+    assert.equal(classifyNetworkError(a), 'permanent')
+  })
+
+  test('an unrecognised failure is still permanent', () => {
+    assert.equal(classifyNetworkError(new TypeError('fetch failed')), 'permanent')
+  })
+})
