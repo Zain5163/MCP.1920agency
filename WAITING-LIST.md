@@ -170,6 +170,14 @@ APIs, brand verification, then apply for Google Ads Basic access, the Business
 Profile API access form, and the YouTube audit (uploads stay private until it
 passes).
 
+**Existing project (found 2026-10-01):** `gen-lang-client-0046538567`, created
+by Google AI Studio, used by SEO-Ops through a **service account** for Search
+Console. Reusable as the owner's own/dev project. A service account cannot post
+to Business Profile or YouTube; those need an **OAuth client** (Web application,
+redirect `http://localhost:8787/google/callback`). The customer-facing production
+project waits for the final product name, because its consent screen and brand
+verification carry the name and domain.
+
 **Waiting on Google:** whether a hosted AdsPilot where each customer signs in
 with their own Google account counts as a banned "programmatic proxy" under the
 2026-08-31 Ads policy. Until answered, Google Ads is built for the owner's own

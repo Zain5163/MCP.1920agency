@@ -293,6 +293,43 @@ the customer telling it how. See `decisions/0008`.
   (notably Telegram, X and Reddit, whose help sites would not load).
 - **Advice, never control.** Anything that must hold stays in code (decision 0006).
 
+### 5b.7 — Meta beyond publishing: Pages, competitor research, a performance team (owner, 2026-10-01)
+
+**Facebook Pages.** Today the connection asks only for `pages_show_list`,
+`pages_read_engagement`, `pages_manage_posts`: posting works, nothing else.
+Possible with more permissions (each needs Meta App Review before customers can
+use it; the owner's own Page works now in development mode):
+
+| Feature | Permission |
+|---|---|
+| Read comments, visitor posts, reviews ("recommendations") | `pages_read_user_content` |
+| Reply to, hide, delete comments; reply to reviews | `pages_manage_engagement` |
+| Messenger inbox replies (24-hour window rule) | `pages_messaging` |
+| Page and post insights | `read_insights` / `pages_read_engagement` |
+| Scheduled posts, edit or delete posts | `pages_manage_posts` (already granted) |
+
+Comment replies are public and go through the approval layer; hiding spam can
+be lower risk.
+
+**Competitor ad research (Ad Library).** Checked 2026-10-01: the Ad Library API
+returns ordinary business ads **only for ads shown in the EU or UK** (with an EU
+reach figure, never spend). Everywhere else, including Pakistan and the Gulf, it
+returns political and issue ads only; those ads are visible on the website but
+not through the API, and scraping it breaks Meta's terms. "Which ads work" is
+inferred, never reported: ads running 30+ days, many variants of one idea, and
+fresh copies of an old winner are the usual signals of a profitable ad.
+
+**A performance team, not just a playbook.** Today: the playbook knows the
+method; `get_ad_performance` reads spend, results, cost per result, frequency
+and CTR per ad. Missing for top-level media buying: revenue and **ROAS**
+(`action_values`, `purchase_roas`), breakdowns (placement, age, gender,
+platform), day-by-day trends for fatigue, account-level audit, and decisions
+(scale, cut, reallocate, refresh creative) proposed as approvable actions.
+Design: data tools first, then role skills (auditor, analyst, creative
+strategist, media buyer, reporter) and a master workflow that runs them in
+order. The connected AI plays the roles; clients with sub-agents can run them
+in parallel. Every change still goes through approval and the spend ceiling.
+
 ---
 
 ## Tier 6 — Design system
