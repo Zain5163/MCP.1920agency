@@ -1431,6 +1431,31 @@ task needs, the terms of service, and staying current.
 
 613 tests, 13 workspaces typecheck clean.
 
+## 2026-10-01 — The settings file was overwritten; restored
+
+The owner added the OpenRouter key and saved `~/.social-publisher/.env`. The file
+that was saved was the **2026-09-30 05:24 version** (most likely an editor still
+holding the old copy), so it silently lost a day of changes: the ad account went
+back to the **sandbox** with the sandbox token, and the three spend limits, the
+pixel id and the OpenRouter settings disappeared. The key itself was on a bare
+line (`Ioen Router Key: sk-or-…`), which the server cannot read.
+
+Found because a read of the paused campaign failed with Meta's permission error
+— the token was the sandbox one. Restored with the owner's approval: the
+2026-09-30 10:57 backup, minimum PKR 500, the key as `OPENROUTER_API_KEY`, and a
+daily image cap of **$2** (owner's choice). The overwritten file is kept as
+`.env.backup-20261001092624-before-restore`. Verified after: the campaign reads
+back `PAUSED`, the OpenRouter key answers, the account has $0 credit.
+
+**Lesson:** the ads tools refuse to spend with no ceiling configured, which is
+why the lost limits could not have cost money. Close and reopen the .env file in
+the editor before editing it.
+
+Also today: the owner paused the first campaign deliberately; the product name
+"AdsPilot" is taken (research/2026-10-01-product-name.md); the LinkedIn content
+system and the Google suite plan were started (see their own folders and
+`architecture/google-suite-plan.md`).
+
 ## Verified live, not just tested
 
 | What | How it was proven |
