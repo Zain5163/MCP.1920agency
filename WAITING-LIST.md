@@ -197,7 +197,14 @@ From `audit_ad_account`, 2026-10-02, read-only:
   conversation than "VES- 5" (PKR 54). Give a target cost per conversation for a
   real verdict.
 
-## 17. Reconnect Facebook — posting and Instagram are broken until then 🔴
+## 17. Facebook reconnected 2026-10-02 ✅ — switch the Meta app back to Live 🔴
+
+**Done:** reconnected in Development mode; every token valid with all
+permissions; flags lifted. **Still waiting on the owner:** switch Mysmadspilot
+back to **Live** before anything is posted (posts made in Development are seen
+only by app roles). Then a first real post re-proves publishing.
+
+### History
 
 Found 2026-10-02: Meta withdrew the Page and Instagram permissions from the
 stored login (details in PROJECT-LOG). **Nothing posts to Facebook or Instagram

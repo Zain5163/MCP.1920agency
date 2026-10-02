@@ -1574,6 +1574,40 @@ Flaky, not broken; noted in NEXT-STEPS.
 
 652 tests, 13 workspaces typecheck clean.
 
+## 2026-10-02 — Facebook reconnected; posting can no longer hit every Page
+
+**The reconnect.** The app was Live with HTTPS enforced, so Facebook refused the
+`localhost` return address. The owner switched the app to Development and
+reconnected. Checked with Meta's `debug_token`: every Facebook and Instagram
+token valid, with all the new permissions (comments, Messenger, insights,
+posting). Posting itself has not been re-proven since: **the app must go back to
+Live first**, because posts made in Development are visible only to app roles.
+
+**A stale flag.** 1920 Agency and its Instagram stayed marked needs-reauth: the
+reconnect revived their tokens (Meta judges Page tokens by the login's current
+permissions) without touching their rows. The monitor now re-checks flagged
+Meta connections too and lifts the flag when Meta says the token works. Run
+live: both lifted.
+
+**A dangerous default, fixed.** The owner connected 35 Facebook Pages and 21
+Instagram accounts, most of them clients'. `publish_post`, `schedule_post`,
+`validate_post` and the CLI `post` sent a post to *every* ready account on the
+platforms named, or on every platform when none was named: "post to Facebook"
+meant 35 Pages. Now (`core/domain/targets.ts`, used by both MCP servers and the
+CLI): accounts can be named (`accounts` / `--account`); a platform with several
+accounts and none named is **refused**, listing them; one account per platform
+still works unnamed, so the LinkedIn automation is unaffected.
+
+**Page tools, live on 1920 Agency (read-only):** comments read (none on the last
+10 posts), 5 reviews (4 recommend, 1 does not), 5 Messenger conversations with
+the 24-hour rule correctly applied, insights (272 views, 713 post engagements,
+2,097 followers, 24,468 media views; `page_impressions_unique` retired by Meta).
+Found on that run: followers were summed across 28 days ("59,162"); a running
+total now takes the latest value. Reply, hide, delete and message have not been
+used live.
+
+658 tests, 13 workspaces typecheck clean.
+
 ## Verified live, not just tested
 
 | What | How it was proven |

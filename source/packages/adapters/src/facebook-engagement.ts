@@ -71,6 +71,9 @@ export interface PageConversation {
   readonly waiting: boolean
 }
 
+/** Page metrics Meta reports as a running total each day rather than a daily amount. */
+const RUNNING_TOTALS = new Set(['page_follows', 'page_fans'])
+
 export interface InsightValue {
   readonly metric: string
   readonly total: number
@@ -251,7 +254,11 @@ export class FacebookPageEngagement {
           unavailable.push(metric)
           continue
         }
-        values.push({ metric, total: series.reduce((t, v) => t + (typeof v.value === 'number' ? v.value : 0), 0) })
+        const nums = series.map((v) => (typeof v.value === 'number' ? v.value : 0))
+        // A running total (followers) is reported again every day: take the
+        // latest, never the sum. Summing 28 days showed "59,162 follows" for a
+        // Page with about 2,100 — found on the first live run, 2026-10-02.
+        values.push({ metric, total: RUNNING_TOTALS.has(metric) ? (nums[nums.length - 1] ?? 0) : nums.reduce((t, v) => t + v, 0) })
       } catch (error) {
         if (error instanceof PublishError && error.httpStatus === 400) unavailable.push(metric)
         else throw error

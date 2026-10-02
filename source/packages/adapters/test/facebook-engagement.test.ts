@@ -127,6 +127,12 @@ describe('insights', () => {
     assert.deepEqual(r.unavailable, ['page_impressions_unique'])
   })
 
+  test('followers are the latest running total, not a sum of days', async () => {
+    const { fetchImpl } = mock(() => ({ body: { data: [{ name: 'page_follows', values: [{ value: 2110 }, { value: 2112 }, { value: 2113 }] }] } }))
+    const r = await new FacebookPageEngagement({ fetch: fetchImpl, now }).insights(PAGE, 'T', ['page_follows'])
+    assert.deepEqual(r.values, [{ metric: 'page_follows', total: 2113 }])
+  })
+
   test('a dead token is still an error, not "unavailable"', async () => {
     const { fetchImpl } = mock(() => ({ status: 401, body: { error: { message: 'Session has expired', code: 190 } } }))
     await assert.rejects(new FacebookPageEngagement({ fetch: fetchImpl }).insights(PAGE, 'T', ['page_post_engagements']), PublishError)

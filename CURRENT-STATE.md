@@ -19,8 +19,8 @@ Working name: **AdsPilot**. It is being renamed because the name is taken (see
 
 | Platform | State | Notes |
 |---|---|---|
-| Facebook Page | ⏸ **Broken since an unknown date, found 2026-10-02** | Worked (4 real posts). Meta withdrew the Page permissions; needs the owner to reconnect (WAITING-LIST #17) |
-| Instagram | ⏸ **Broken, same cause** | Worked (2 real posts). Fixed by the same reconnect |
+| Facebook Page | ✅ token restored 2026-10-02 | 4 real posts earlier. Reconnected with all permissions; 35 Pages connected. Posting not re-proven yet: switch the Meta app back to Live first |
+| Instagram | ✅ token restored 2026-10-02 | 2 real posts earlier; 21 accounts connected |
 | LinkedIn personal profile | ✅ | Text, image and video posts, all proven 2026-09-26 |
 | LinkedIn company page | ⏸ | Waiting on LinkedIn's approval |
 | Threads, Pinterest | 🟡 | Code built; no credentials yet. Pinterest Trial access shows pins only to the owner |
@@ -38,7 +38,9 @@ Around the posting:
 | Several accounts from one login (e.g. five Facebook Pages) | ✅ |
 | Daily token refresh and expiry warnings | ✅ |
 | Monitor asks Meta whether each Facebook/Instagram token still works (2026-10-02) | ✅ Caught both dead connections on its first run |
-| Facebook Page management: comments, replies, hide, delete, reviews, Messenger, insights | 🟡 Built and tested; runs once Facebook is reconnected |
+| Facebook Page management: comments, reviews, Messenger, insights | ✅ Read live on 1920 Agency 2026-10-02 |
+| Replying to comments and messages, hiding, deleting | 🟡 Built and tested; not used live yet |
+| Several accounts on one platform must be named before posting (`accounts`) | ✅ 2026-10-02 |
 
 ## 2. Meta ads
 
@@ -88,7 +90,7 @@ Around the posting:
 | Error catalogue: every error says why and how to fix it | ✅ |
 | Audit log of every action | ✅ |
 | Database lockdown (RLS on all tables) | ✅ |
-| Tests | ✅ 652 passing, 13 workspaces typecheck clean |
+| Tests | ✅ 658 passing, 13 workspaces typecheck clean |
 
 ## 6. Automations running on this PC
 

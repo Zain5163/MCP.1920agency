@@ -13,6 +13,7 @@ import {
   type MediaRef,
   type Platform,
   type PostDraft,
+  selectTargets,
 } from '@social-publisher/core'
 import { db, queueStats, type TenantScope } from '@social-publisher/db'
 import type { Logger } from '@social-publisher/telemetry'
@@ -82,7 +83,11 @@ const draftShape = {
   platforms: z
     .array(z.enum(PLATFORMS))
     .optional()
-    .describe('Which platforms to target. Defaults to every connected, ready account.'),
+    .describe('Which platforms to target. Without accounts, a platform with several accounts is refused.'),
+  accounts: z
+    .array(z.string())
+    .optional()
+    .describe('Which accounts, by name (as list_accounts shows) or id. Required when a platform has more than one connected account.'),
   media: z
     .array(
       z.object({
@@ -172,7 +177,8 @@ export function registerTools(server: McpServer, identity: TokenIdentity, logger
     draftShape,
     async (args) =>
       await guard('validate_post', async () => {
-        const { draft, platforms } = await buildDraft(scope, args)
+        const { draft, platforms, selection } = await buildDraft(scope, args)
+        if (!selection.ok) return text(selection.message)
         const report = publishService().validate(draft, platforms)
 
         const lines = [report.ok ? 'Valid for all targets.' : 'NOT valid — fix these first:']
@@ -190,7 +196,8 @@ export function registerTools(server: McpServer, identity: TokenIdentity, logger
     publishShape,
     async (args) =>
       await guard('publish_post', async () => {
-        const { draft, platforms, connections } = await buildDraft(scope, args)
+        const { draft, platforms, selection } = await buildDraft(scope, args)
+        if (!selection.ok) return text(selection.message)
 
         const validation = publishService().validate(draft, platforms)
         if (!validation.ok) {
@@ -204,7 +211,7 @@ export function registerTools(server: McpServer, identity: TokenIdentity, logger
           return fail('PLATFORM_REJECTED', `Nothing was published. ${problems}`)
         }
 
-        const chosen = connections.filter((c) => platforms.includes(c.platform) && !c.needsReauth)
+        const chosen = selection.chosen
         if (chosen.length === 0) return fail('NO_CONNECTION', 'No ready accounts match those platforms.')
 
         // Proves every connection belongs to this token's tenant.
@@ -308,7 +315,8 @@ export function registerTools(server: McpServer, identity: TokenIdentity, logger
         }
         if (when.getTime() < Date.now()) return fail('SCHEDULED_IN_PAST')
 
-        const { draft, platforms, connections } = await buildDraft(scope, args)
+        const { draft, platforms, selection } = await buildDraft(scope, args)
+        if (!selection.ok) return text(selection.message)
 
         const validation = publishService().validate({ ...draft, scheduledFor: when }, platforms)
         if (!validation.ok) {
@@ -320,7 +328,7 @@ export function registerTools(server: McpServer, identity: TokenIdentity, logger
           return fail('PLATFORM_REJECTED', `Nothing was scheduled. ${problems}`)
         }
 
-        const chosen = connections.filter((c) => platforms.includes(c.platform) && !c.needsReauth)
+        const chosen = selection.chosen
         if (chosen.length === 0) return fail('NO_CONNECTION')
         await scope.requireConnections(chosen.map((c) => c.id))
 
@@ -400,6 +408,7 @@ async function buildDraft(
   args: {
     body: string
     platforms?: Platform[] | undefined
+    accounts?: string[] | undefined
     media?:
       | Array<{
           kind: 'image' | 'video'
@@ -422,8 +431,9 @@ async function buildDraft(
   }))
 
   const draft: PostDraft = { body: args.body, media }
-  const platforms =
-    args.platforms ?? [...new Set(connections.filter((c) => !c.needsReauth).map((c) => c.platform))]
+  // Which accounts, decided once for validate, publish and schedule alike.
+  const selection = selectTargets(connections, { platforms: args.platforms, accounts: args.accounts })
+  const platforms = selection.ok ? [...selection.platforms] : (args.platforms ?? [])
 
-  return { draft, platforms, connections }
+  return { draft, platforms, connections, selection }
 }

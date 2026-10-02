@@ -10,7 +10,7 @@ import {
   LinkedInAdapter,
 } from '@social-publisher/adapters'
 import { mediaHostingReady, optional, required } from '@social-publisher/config'
-import type { Connection, MediaRef, Platform, PostDraft } from '@social-publisher/core'
+import { selectTargets, type Connection, type MediaRef, type Platform, type PostDraft } from '@social-publisher/core'
 import { db, disconnect } from '@social-publisher/db'
 import { MediaStore } from '@social-publisher/media'
 import { PublishService } from '@social-publisher/publisher'
@@ -42,6 +42,7 @@ async function main(): Promise<void> {
       image: { type: 'string', multiple: true },
       video: { type: 'string' },
       platform: { type: 'string', multiple: true },
+      account: { type: 'string', multiple: true },
       publish: { type: 'boolean', default: false },
       at: { type: 'string' },
     },
@@ -96,9 +97,18 @@ async function main(): Promise<void> {
   }))
 
   const wanted = (values.platform ?? []) as Platform[]
-  const targets = connections.filter(
-    (c) => !c.needsReauth && (wanted.length === 0 || wanted.includes(c.platform)),
-  )
+  // Same rule as the MCP: several accounts on one platform must be named.
+  const selection = selectTargets(connections, {
+    ...(wanted.length > 0 ? { platforms: wanted } : {}),
+    ...(values.account !== undefined ? { accounts: values.account } : {}),
+  })
+  if (!selection.ok) {
+    console.error(`
+  ${selection.message.replace(/accounts: \[(.*)\]/, '--account $1')}
+`)
+    process.exit(1)
+  }
+  const targets = [...selection.chosen]
   if (targets.length === 0) {
     console.error('\n  No matching connected accounts.\n')
     process.exit(1)

@@ -45,7 +45,10 @@ async function metaTokenChecks(): Promise<HealthCheck[]> {
   const store = prismaCredentialStore()
   const vault = new TokenVault({ kek: parseKey(required('VAULT_MASTER_KEY'), 'VAULT_MASTER_KEY'), keyVersion: 1, store })
   const rows = await db().connection.findMany({
-    where: { platform: { in: Object.keys(META_REQUIRED_SCOPES) as never }, needsReauth: false },
+    // Flagged ones too: a reconnect can revive a token without touching its
+    // row (Meta judges Page tokens by the login's current permissions), and a
+    // flag nobody lifts keeps a working account switched off.
+    where: { platform: { in: Object.keys(META_REQUIRED_SCOPES) as never } },
   })
   const checks: HealthCheck[] = []
   for (const row of rows) {
@@ -59,7 +62,17 @@ async function metaTokenChecks(): Promise<HealthCheck[]> {
           apiVersion: optional('META_API_VERSION', 'v25.0')!,
         }),
       )
-      if (health.valid) continue
+      if (health.valid) {
+        if (row.needsReauth) {
+          await db().connection.updateMany({
+            where: { id: row.id, tenantId: row.tenantId },
+            data: { needsReauth: false, reauthReason: null },
+          })
+          checks.push({ name: 'meta_token', severity: 'ok', summary: `"${row.displayName}" works again; its reconnect flag was lifted.` })
+        }
+        continue
+      }
+      if (row.needsReauth) continue
       const reason = health.missing.length > 0 ? `permissions withdrawn: ${health.missing.join(', ')}` : (health.reason ?? 'Meta reports the token invalid')
       await store.markNeedsReauth(row.id, row.tenantId, reason)
       checks.push({

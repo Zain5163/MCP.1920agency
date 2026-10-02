@@ -13,6 +13,7 @@ import {
   type MediaRef,
   type Platform,
   type PostDraft,
+  selectTargets,
 } from '@social-publisher/core'
 import { disconnect, health, queueStats, type TenantScope } from '@social-publisher/db'
 
@@ -136,7 +137,11 @@ const draftShape = {
   platforms: z
     .array(z.enum(PLATFORMS))
     .optional()
-    .describe('Platforms to target. Defaults to every connected, ready account.'),
+    .describe('Platforms to target. Without accounts, a platform with several accounts is refused.'),
+  accounts: z
+    .array(z.string())
+    .optional()
+    .describe('Which accounts, by name (as list_accounts shows) or id. Required when a platform has more than one connected account.'),
   media: z
     .array(
       z.object({
@@ -159,7 +164,8 @@ server.tool(
   draftShape,
   async (args) =>
     await guard(async (scope) => {
-      const { draft, platforms } = await buildDraft(scope, args)
+      const { draft, platforms, selection } = await buildDraft(scope, args)
+      if (!selection.ok) return text(selection.message)
       const report = publishService().validate(draft, platforms)
 
       const lines = [report.ok ? 'Valid for all targets.' : 'NOT valid — fix these first:']
@@ -200,7 +206,8 @@ server.tool(
   publishShape,
   async (args) =>
     await guard(async (scope) => {
-      const { draft, platforms, connections } = await buildDraft(scope, args)
+      const { draft, platforms, selection } = await buildDraft(scope, args)
+      if (!selection.ok) return text(selection.message)
 
       // Refuse anything invalid: a partial post is worse than none, because the
       // content is already public wherever it succeeded.
@@ -214,7 +221,7 @@ server.tool(
         return fail('PLATFORM_REJECTED', `Nothing was published. ${problems}`)
       }
 
-      const chosen = connections.filter((c) => platforms.includes(c.platform) && !c.needsReauth)
+      const chosen = selection.chosen
       if (chosen.length === 0) return fail('NO_CONNECTION', 'No ready accounts match those platforms.')
 
       // Proves every id belongs to this tenant. Throws rather than silently
@@ -364,6 +371,7 @@ async function buildDraft(
   args: {
     body: string
     platforms?: Platform[] | undefined
+    accounts?: string[] | undefined
     media?:
       | Array<{
           kind: 'image' | 'video'
@@ -388,10 +396,11 @@ async function buildDraft(
   }))
 
   const draft: PostDraft = { body: args.body, media }
-  const platforms =
-    args.platforms ?? [...new Set(connections.filter((c) => !c.needsReauth).map((c) => c.platform))]
+  // Which accounts, decided once for validate, publish and schedule alike.
+  const selection = selectTargets(connections, { platforms: args.platforms, accounts: args.accounts })
+  const platforms = selection.ok ? [...selection.platforms] : (args.platforms ?? [])
 
-  return { draft, platforms, connections }
+  return { draft, platforms, connections, selection }
 }
 
 // Ads are local-only: the account comes from the owner's environment, which is
