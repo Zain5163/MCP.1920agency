@@ -19,12 +19,12 @@ Agency's own accounts.
 
 | # | What | Why now | Detail |
 |---|---|---|---|
-| 2 | **Facebook Page management**: read and reply to comments and reviews, hide spam, Messenger replies, insights | Owner's Page works without Meta review | ROADMAP 5b.7 |
-| 3 | **Google Business Profile posting** | Owner's priority #1; waiting on Google's access form (up to 14 days) | `architecture/google-suite-plan.md` |
-| 4 | **YouTube posting** | Uploads stay private until Google's audit passes | same |
-| 5 | **Search Console and Google Analytics** reads | | same |
-| 6 | **One-click tracking setup**: Tag Manager, GA4, Google Ads conversions, Search Console verified, events mapped; WordPress fully automatic, others one paste | | same |
-| 7 | **Google Ads** with Keyword Planner | Needs Basic access; customer use waits on Google's answer about MCP "proxies" | same, WAITING-LIST #15 |
+| 1 | **Facebook Page management**: read and reply to comments and reviews, hide spam, Messenger replies, insights | Owner's Page works without Meta review | ROADMAP 5b.7 |
+| 2 | **Google Business Profile posting** | Owner's priority #1; waiting on Google's access form (up to 14 days) | `architecture/google-suite-plan.md` |
+| 3 | **YouTube posting** | Uploads stay private until Google's audit passes | same |
+| 4 | **Search Console and Google Analytics** reads | | same |
+| 5 | **One-click tracking setup**: Tag Manager, GA4, Google Ads conversions, Search Console verified, events mapped; WordPress fully automatic, others one paste | | same |
+| 6 | **Google Ads** with Keyword Planner | Needs Basic access; customer use waits on Google's answer about MCP "proxies" | same, WAITING-LIST #15 |
 
 ## Social posting
 
