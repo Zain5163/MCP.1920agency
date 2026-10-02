@@ -233,6 +233,22 @@ in Meta's developer dashboard for Mysmadspilot:
    the app to **Development** mode at the top of the dashboard, reconnect, then
    switch back to Live.
 
+**Confirmed from the owner's screenshots, 2026-10-02:** the app is in **Live**
+mode; Facebook Login for Business has **Enforce HTTPS locked on**, so
+`http://localhost` cannot be a redirect URI while Live; and the dashboard warns
+that Login for Business in Live mode needs *advanced access* to public_profile,
+which the app does not have. `localhost` was added to App domains (harmless).
+**The working route is step 3:** switch to Development, reconnect, switch back
+to Live. A token obtained in Development keeps working after the switch back.
+Do not publish while the app is in Development: posts made then are visible
+only to people with a role on the app.
+
+**Lasting fix (later):** a public https callback (on the hosted server or
+1920agency.com) so reconnecting works in Live mode, plus advanced access via
+App Review, which customers will need anyway. The app's Terms of Service and
+data-deletion URLs are placeholders (facebook.com) and must be real pages
+before App Review.
+
 Meta's DevTools MCP (added to Claude Code 2026-10-02, needs the owner's
 sign-in via `/mcp`) can read the app's mode and login settings directly to
 confirm which of these applies.
