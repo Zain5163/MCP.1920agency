@@ -54,6 +54,7 @@ After comparing with Meta's own MCP servers (research/2026-10-02-meta-official-m
   playbook currently says are not built.
 - Conversions API alongside the pixel; the Meta pixel installed through the same
   Tag Manager container as Google.
+- Reconnect Facebook without switching the app to Development: an https login callback (hosted server or 1920agency.com), and real Terms of Service and data-deletion pages before App Review.
 - Serving customers: Meta App Review for business and ads permissions, per-customer
   ad accounts (decision 0005), then the setup tools for people with no account.
 
