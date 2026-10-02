@@ -43,6 +43,9 @@ import { META_DEFAULT_NAMING, adName, adSetName, campaignName, urlTags } from '.
 const GRAPH_BASE = 'https://graph.facebook.com'
 export const META_ADS_API_VERSION = 'v25.0'
 
+/** What "automatic placements" means, written out, for excluding one of them. */
+export const ALL_PUBLISHER_PLATFORMS = ['facebook', 'instagram', 'messenger', 'audience_network'] as const
+
 /** Meta takes budgets in minor units, as strings. */
 function minorUnits(value: Money): string {
   return String(value.minor)
@@ -730,6 +733,144 @@ export class MetaAdsClient {
     return await this.status(campaignId)
   }
 
+  // ------------------------------------------------------- performance team
+
+  /**
+   * Raw insights rows for the account or one campaign, ad set or ad, following
+   * Meta's paging up to `maxRows`.
+   *
+   * Breakdowns and daily rows are what separate a media buyer from a summary:
+   * the owner's first campaign looked excellent per ad and was mostly wasted by
+   * placement.
+   */
+  async insights(options: {
+    objectId?: string
+    level: 'account' | 'campaign' | 'adset' | 'ad'
+    datePreset?: string
+    since?: string
+    until?: string
+    breakdowns?: string
+    timeIncrement?: number
+    maxRows?: number
+  }): Promise<Array<Record<string, unknown>>> {
+    const id = options.objectId ?? `act_${this.#account.adAccountId}`
+    const params: Record<string, string> = {
+      level: options.level,
+      fields: [
+        'campaign_id,campaign_name,adset_id,adset_name,ad_id,ad_name',
+        'spend,impressions,reach,frequency,inline_link_clicks,inline_link_click_ctr,cpm',
+        'actions,action_values,purchase_roas',
+      ].join(','),
+      limit: '500',
+    }
+    if (options.since !== undefined && options.until !== undefined) {
+      params.time_range = JSON.stringify({ since: options.since, until: options.until })
+    } else {
+      params.date_preset = options.datePreset ?? 'last_7d'
+    }
+    if (options.breakdowns !== undefined) params.breakdowns = options.breakdowns
+    if (options.timeIncrement !== undefined) params.time_increment = String(options.timeIncrement)
+
+    const rows: Array<Record<string, unknown>> = []
+    let page = (await this.#get(`${id}/insights`, params)) as {
+      data?: Array<Record<string, unknown>>
+      paging?: { next?: string }
+    }
+    const max = options.maxRows ?? 2000
+    for (;;) {
+      rows.push(...(page.data ?? []))
+      if (rows.length >= max || page.paging?.next === undefined) break
+      page = (await this.#send(page.paging.next, { method: 'GET' })) as typeof page
+    }
+    return rows.slice(0, max)
+  }
+
+  /** Every ad set (optionally in one campaign) with what the audit needs to know. */
+  async adSetsOverview(campaignId?: string): Promise<
+    Array<{
+      id: string
+      name: string
+      status: string
+      campaignId: string
+      optimizationGoal?: string
+      customEventType?: string
+      dailyBudgetMinor?: number
+      dynamicCreative: boolean
+      learningStatus?: string
+      ads: Array<{ id: string; name: string; status: string }>
+    }>
+  > {
+    const path = campaignId !== undefined ? `${campaignId}/adsets` : `act_${this.#account.adAccountId}/adsets`
+    const data = (await this.#get(path, {
+      fields:
+        'id,name,effective_status,campaign_id,optimization_goal,promoted_object,daily_budget,is_dynamic_creative,learning_stage_info,ads.limit(50){id,name,effective_status}',
+      limit: '200',
+    })) as { data?: Array<Record<string, unknown>> }
+
+    return (data.data ?? []).map((r) => {
+      const promoted = r.promoted_object as { custom_event_type?: string } | undefined
+      const learning = r.learning_stage_info as { status?: string } | undefined
+      const ads = ((r.ads as { data?: Array<Record<string, unknown>> } | undefined)?.data ?? []).map((a) => ({
+        id: String(a.id),
+        name: String(a.name ?? ''),
+        status: String(a.effective_status ?? ''),
+      }))
+      return {
+        id: String(r.id),
+        name: String(r.name ?? ''),
+        status: String(r.effective_status ?? ''),
+        campaignId: String(r.campaign_id ?? ''),
+        ...(r.optimization_goal !== undefined ? { optimizationGoal: String(r.optimization_goal) } : {}),
+        ...(promoted?.custom_event_type !== undefined ? { customEventType: promoted.custom_event_type } : {}),
+        ...(r.daily_budget !== undefined ? { dailyBudgetMinor: Number(r.daily_budget) } : {}),
+        dynamicCreative: r.is_dynamic_creative === true,
+        ...(learning?.status !== undefined ? { learningStatus: learning.status } : {}),
+        ads,
+      }
+    })
+  }
+
+  /** Reads one object's fields; for checks before a change. */
+  async readObject(id: string, fields: string): Promise<Record<string, unknown>> {
+    return (await this.#get(id, { fields })) as Record<string, unknown>
+  }
+
+  /**
+   * Sets an ad set's or campaign's daily budget. Spends money from the moment it
+   * applies; the approval and the spend ceiling are checked by the caller.
+   */
+  async setDailyBudget(id: string, dailyBudgetMinor: number): Promise<void> {
+    await this.#update(id, { daily_budget: String(Math.round(dailyBudgetMinor)) })
+  }
+
+  /** Switches one ad, ad set or campaign on or off. */
+  async setDelivery(id: string, on: boolean): Promise<void> {
+    await this.#update(id, { status: on ? 'ACTIVE' : 'PAUSED' })
+  }
+
+  /**
+   * Removes placements from an ad set, keeping everything else in its targeting.
+   *
+   * With automatic placements an ad set has no `publisher_platforms` at all, so
+   * "everything except Audience Network" has to be written out as the list of
+   * the others. This restarts Meta's learning for the ad set.
+   *
+   * @returns the platforms the ad set targets afterwards.
+   */
+  async excludePlacements(adSetId: string, exclude: readonly string[]): Promise<string[]> {
+    const current = await this.readObject(adSetId, 'targeting')
+    const targeting = { ...((current.targeting as Record<string, unknown> | undefined) ?? {}) }
+    const before = (targeting.publisher_platforms as string[] | undefined) ?? [...ALL_PUBLISHER_PLATFORMS]
+    const after = before.filter((p) => !exclude.includes(p))
+    if (after.length === 0) {
+      throw new PublishError('Excluding those would leave the ad set with nowhere to show.', { failureClass: 'permanent' })
+    }
+    targeting.publisher_platforms = after
+    for (const platform of exclude) delete targeting[`${platform}_positions`]
+    await this.#update(adSetId, { targeting: JSON.stringify(targeting) })
+    return after
+  }
+
   /**
    * Builds one creative on its own, with no campaign around it.
    *
@@ -969,7 +1110,22 @@ export class MetaAdsClient {
   ): Promise<string> {
     const { adSet } = entry
     const instantForm = adSet.leadDestination === 'instant_form'
-    const goal = adSet.optimizationGoal ?? (instantForm ? 'LEAD_GENERATION' : 'LINK_CLICKS')
+    /**
+     * Traffic optimises for landing page views when a pixel can see them.
+     *
+     * It was LINK_CLICKS for everything not an instant form. The first real
+     * campaign (2026-09-30) showed the cost: a 13.5% click-through rate, 97% of
+     * spend on Audience Network, and only 20% of clicks ever loading the page.
+     * Meta finds the people a goal asks for; ask for clicks and it finds
+     * clickers. Without a pixel Meta cannot count page views, so clicks remain.
+     */
+    const goal =
+      adSet.optimizationGoal ??
+      (instantForm
+        ? 'LEAD_GENERATION'
+        : ['OUTCOME_TRAFFIC', 'traffic'].includes(plan.campaign.objective as string) && this.#account.pixelId !== undefined
+          ? 'LANDING_PAGE_VIEWS'
+          : 'LINK_CLICKS')
 
     const body: Record<string, string> = {
       name: adSetName(META_DEFAULT_NAMING.adSet, {

@@ -19,7 +19,6 @@ Agency's own accounts.
 
 | # | What | Why now | Detail |
 |---|---|---|---|
-| 1 | **Meta performance team**: ROAS, breakdowns, daily trends, account audit; role skills (auditor, analyst, creative strategist, media buyer, reporter) under one master workflow; every change proposed for approval | Biggest value while Google approvals are pending | ROADMAP 5b.7 |
 | 2 | **Facebook Page management**: read and reply to comments and reviews, hide spam, Messenger replies, insights | Owner's Page works without Meta review | ROADMAP 5b.7 |
 | 3 | **Google Business Profile posting** | Owner's priority #1; waiting on Google's access form (up to 14 days) | `architecture/google-suite-plan.md` |
 | 4 | **YouTube posting** | Uploads stay private until Google's audit passes | same |
@@ -38,7 +37,9 @@ Agency's own accounts.
 
 ## Meta ads
 
-- The performance team (above).
+- Performance team, next steps: a scheduled weekly review that writes a report
+  for approval; creative-level (asset) breakdowns; launching the creative
+  strategist's new ads straight from its proposals.
 - Competitor ad research from the Ad Library: full data for ads shown in the EU
   and UK; elsewhere the user shares links or screenshots for analysis. "What
   works" inferred from how long an ad runs and how many versions exist.

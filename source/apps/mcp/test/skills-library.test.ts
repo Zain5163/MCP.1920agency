@@ -112,7 +112,7 @@ describe('our own playbooks', () => {
     registerPlaybooks(server)
     // Every platform except Meta is planning-only, and must say so near the top
     // so the AI tells the user before writing a word.
-    for (const { key } of PLAYBOOKS.filter((p) => p.key !== 'meta-ads')) {
+    for (const { key } of PLAYBOOKS.filter((p) => !p.key.startsWith('meta-'))) {
       const text = await callTool(server, 'get_playbook', { platform: key })
       assert.match(text.slice(0, 900), /cannot (be )?launch/i, key)
     }

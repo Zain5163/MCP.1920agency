@@ -31,6 +31,12 @@ export const PLAYBOOKS = [
       'How to plan, write and launch Facebook and Instagram campaigns with this server, by goal (leads, sales, traffic, awareness, messaging, local): structure, copy, creative shapes, tracking, budget and the learning phase.',
   },
   {
+    key: 'meta-performance',
+    title: 'Meta performance team playbook',
+    description:
+      'Running and improving live Meta campaigns as a five-role team (auditor, analyst, creative strategist, media buyer, reporter): targets and break-even ROAS, click quality, placements, fatigue, and when to scale, cut or wait.',
+  },
+  {
     key: 'google-ads',
     title: 'Google Ads playbook',
     description:
@@ -111,6 +117,8 @@ export const SERVER_INSTRUCTIONS = [
   'Before planning, writing or changing any ad campaign, read the playbook for that platform with get_playbook',
   `(${PLAYBOOKS.map((p) => p.key).join(', ')}) and follow it: choose the objective from what the business wants to pay for,`,
   'use its section for that goal, and apply its copy, creative, budget and tracking rules without waiting to be asked.',
+  'To review or improve campaigns that are already running, read meta-performance and work as its five-role team',
+  '(audit_ad_account, analyze_ad_performance, then propose changes for approval).',
   'For someone new to Meta ads, run check_ad_setup first: it says what is missing (Page, business, ad account,',
   'payment, pixel) and who does each step.',
   'For wider marketing work (landing pages, emails, SEO, pricing, launch plans), use list_skills and get_skill.',
@@ -238,6 +246,48 @@ export function registerPlaybooks(server: McpServer): void {
           '---',
           '',
           withFreshness(text['meta-ads']),
+        ].join('\n'),
+      ),
+  )
+
+  server.registerPrompt(
+    'review_meta_account',
+    {
+      title: 'Review and improve Meta campaigns',
+      description:
+        'Run the five-role performance team over a Meta ad account or campaign: audit, analyse, plan creative, propose budget and delivery changes for approval, and report.',
+      argsSchema: {
+        campaignId: z.string().optional().describe('Omit to review the whole ad account.'),
+        target: z
+          .string()
+          .optional()
+          .describe('What a result is worth, e.g. "PKR 800 per lead" or "ROAS 3" or "40% margin".'),
+      },
+    },
+    async (args) =>
+      promptText(
+        [
+          'You are a senior Meta performance team working for this business through the AdsPilot tools.',
+          'Work through the five roles in the playbook below, in order, and follow its rules exactly.',
+          '',
+          `Scope: ${args.campaignId !== undefined ? `campaign ${args.campaignId}` : 'the whole ad account'}`,
+          `Target: ${args.target ?? 'not given — ask for it first; without it, say that judgements are relative to the account average'}`,
+          '',
+          '1. Auditor: call audit_ad_account (30 days). If it reports missing results, call check_ad_setup.',
+          '2. Analyst: call analyze_ad_performance (7 days; 14–30 if spend is small) with the target.',
+          '   If your app supports sub-agents, steps 1 and 2 may run in parallel.',
+          '3. Creative strategist: from the analysis, name the winning angle, tired ads, and 2–4 new ad ideas.',
+          '4. Media buyer: propose each change with its tool (change_budget, set_ad_delivery, exclude_placements).',
+          '   Call each WITHOUT a token, show the user the approval summary exactly, and only call again with',
+          '   the token after they say yes. Switching something off needs no approval: do it when money is',
+          '   clearly being wasted, and say so.',
+          '5. Reporter: finish with the five-part summary from the playbook.',
+          '',
+          'Never invent a number or a cause. If the data does not show it, say you do not know.',
+          '',
+          '---',
+          '',
+          withFreshness(text['meta-performance']),
         ].join('\n'),
       ),
   )

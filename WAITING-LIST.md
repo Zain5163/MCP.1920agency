@@ -183,6 +183,20 @@ with their own Google account counts as a banned "programmatic proxy" under the
 2026-08-31 Ads policy. Until answered, Google Ads is built for the owner's own
 accounts only. A letter to Google can be drafted.
 
+## 16. What the first audit found in the ad account (owner to decide)
+
+From `audit_ad_account`, 2026-10-02, read-only:
+
+- **4 ads rejected or with issues**: two "55kIg Template" ads disapproved, "Error:
+  03117889091" and "MMTT | WA Messages | 26-03-2024" with issues. Fix, appeal or
+  archive them.
+- The test traffic campaign put 97% of its spend on Audience Network. If it is
+  reused, exclude Audience Network or let the new landing-page-view default
+  apply.
+- Over 30 days, "VES 3999 - 2" and "VES 3999 - 3" cost 1.5–1.6× more per
+  conversation than "VES- 5" (PKR 54). Give a target cost per conversation for a
+  real verdict.
+
 ---
 
 ## How to use this file

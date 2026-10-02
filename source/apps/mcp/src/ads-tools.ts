@@ -41,7 +41,7 @@ export type ToolResult = { content: Array<{ type: 'text'; text: string }> }
 const text = (body: string): ToolResult => ({ content: [{ type: 'text' as const, text: body }] })
 
 /** Reads the account from the environment, or explains exactly what is missing. */
-function loadClient(): { client: MetaAdsClient; account: MetaAdAccount } | { error: string } {
+export function loadClient(): { client: MetaAdsClient; account: MetaAdAccount } | { error: string } {
   const accessToken = optional('META_ADS_ACCESS_TOKEN')
   const adAccountId = optional('META_AD_ACCOUNT_ID')
   const pageId = optional('META_ADS_PAGE_ID')
@@ -85,7 +85,7 @@ function loadClient(): { client: MetaAdsClient; account: MetaAdAccount } | { err
  * budgets; converted to minor units immediately, so nothing downstream sees a
  * float.
  */
-function loadLimit(currency: string): SpendLimit | { error: string } {
+export function loadLimit(currency: string): SpendLimit | { error: string } {
   const daily = optional('META_ADS_DAILY_LIMIT')
   const monthly = optional('META_ADS_MONTHLY_LIMIT')
 

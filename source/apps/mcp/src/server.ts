@@ -18,6 +18,7 @@ import { disconnect, health, queueStats, type TenantScope } from '@social-publis
 
 import { registerAdsTools } from './ads-tools.ts'
 import { registerImageTools } from './image-tools.ts'
+import { registerPerformanceTools } from './performance-tools.ts'
 import { registerSetupTools } from './setup-tools.ts'
 import { SERVER_INSTRUCTIONS, registerPlaybooks } from './playbooks.ts'
 import { registerSkillsLibrary } from './skills-library.ts'
@@ -396,6 +397,7 @@ async function buildDraft(
 // single-tenant by construction. See ads-tools.ts and decisions/0005.
 registerAdsTools(server)
 registerSetupTools(server)
+registerPerformanceTools(server)
 // Local only too: the OpenRouter key and the image budget are the owner's.
 registerImageTools(server)
 

@@ -1456,6 +1456,59 @@ Also today: the owner paused the first campaign deliberately; the product name
 system and the Google suite plan were started (see their own folders and
 `architecture/google-suite-plan.md`).
 
+## 2026-10-02 — The Meta performance team
+
+Built so any connected AI can run live campaigns like a senior performance team,
+not just launch them (FUTURE-PLANS #1, ROADMAP 5b.7).
+
+**What the first real campaign showed, read for the first time with breakdowns:**
+its 13.5% click-through rate looked excellent, but **97% of the spend (PKR
+277.70 of 285.35) went to Audience Network**, and only **20% of the 243 clicks
+loaded the page**. A per-ad summary could not see it. This is exactly what the
+team is for.
+
+**And the cause was ours:** every ad set without an explicit goal optimised for
+`LINK_CLICKS`, while our own playbook says traffic should optimise for landing
+page views. Fixed: traffic now defaults to `LANDING_PAGE_VIEWS` when a pixel is
+configured (clicks remain without one). *Not yet proven live:* no ad set has been
+created with the new default on a real account.
+
+**Built:**
+
+- `analyze_ad_performance` (the analyst): totals and ROAS, every ad, placements,
+  age and gender, this period against the last, and a scale / keep / cut / wait
+  call per ad. Ads are totalled and judged per goal, never mixed.
+- `audit_ad_account` (the auditor): rejected ads, clicks-as-the-goal,
+  learning-limited ad sets, budgets under the learning floor, too few or too many
+  ads, junk placements, spend with no tracked results.
+- `change_budget`, `set_ad_delivery`, `exclude_placements` (the media buyer):
+  each behind approval with its own accurate warning; budget and switching on
+  also inside the spend ceiling; switching off is instant with no approval.
+- The `meta-performance` playbook (five roles: auditor, analyst, creative
+  strategist, media buyer, reporter; fix order tracking → delivery → structure →
+  creative → budget) and the `review_meta_account` prompt that runs them in
+  order, in parallel where the AI app supports sub-agents.
+- Break-even ROAS from the margin is a floor: below it is always "cut".
+
+**Run live (read-only) on the owner's account.** Three flaws found and fixed on
+that run, each now with a test:
+
+1. Click quality counted WhatsApp and Messenger ads, whose clicks open a chat, and
+   called the account "91% wasted". It now counts only website ad sets.
+2. One ad with no target was judged against its own average ("KEEP, 100% of the
+   target"). It now says there is nothing to compare with.
+3. Account totals added conversations to link clicks. Totals and verdicts are now
+   per goal.
+
+**What the audit found in the account:** 4 ads rejected or with issues (two
+"55kIg Template" ads disapproved; "Error: 03117889091" and "MMTT | WA Messages"
+with issues). Over 30 days the WhatsApp ads spent PKR 8,271 for 149
+conversations (PKR 55.51 each); against the account average, "VES 3999 - 2" and
+"- 3" cost 1.5–1.6× more per conversation than "VES- 5". These are relative
+verdicts, and nothing was changed.
+
+641 tests, 13 workspaces typecheck clean.
+
 ## Verified live, not just tested
 
 | What | How it was proven |

@@ -50,7 +50,10 @@ Around the posting:
 | Real previews of the ad before it exists | ✅ |
 | Website pixel on every ad, whatever the goal | ✅ Fixed 2026-09-30 after the owner spotted it |
 | Spend ceilings: PKR 10,000/day, 300,000/month, minimum 500 (owner's) | ✅ Refuses to spend if no ceiling is set |
-| Performance reading with suggestions (spend, results, cost, frequency, CTR) | ✅ No ROAS or breakdowns yet |
+| Performance reading with suggestions (spend, results, cost, frequency, CTR) | ✅ |
+| **Performance team** (2026-10-02): analyst with ROAS, placements, age/gender, period vs period, scale/keep/cut/wait per ad; auditor; budget, on/off and placement changes behind approval | ✅ Reading verified live on the owner's account; the change tools are tested but have not been used on a real ad yet |
+| `meta-performance` playbook and `review_meta_account` workflow (five roles) | ✅ |
+| Traffic campaigns optimise for landing page views when a pixel exists | 🟡 Built and tested; not yet created on a real account |
 | Meta's AI enhancements off by default | ✅ |
 | Account setup check: Page, business, ad account, payment, pixel, pixel firing | ✅ Verified read-only on the owner's account |
 | Create business, ad account, pixel for someone new | 🟡 Built with approval; never run for real |
@@ -82,7 +85,7 @@ Around the posting:
 | Error catalogue: every error says why and how to fix it | ✅ |
 | Audit log of every action | ✅ |
 | Database lockdown (RLS on all tables) | ✅ |
-| Tests | ✅ 613 passing, 13 workspaces typecheck clean |
+| Tests | ✅ 641 passing, 13 workspaces typecheck clean |
 
 ## 6. Automations running on this PC
 
@@ -110,7 +113,6 @@ They run only while this PC is on.
 
 - Every Facebook/Instagram limit is checked; other platforms' limits are from
   documentation, not tested live.
-- `get_ad_performance` has no revenue, ROAS, breakdowns or trends.
 - Facebook Pages: posting only. No comments, inbox or insights yet.
 - Ads tools work only on the owner's own account (single-tenant by design until
   per-customer ad accounts exist).

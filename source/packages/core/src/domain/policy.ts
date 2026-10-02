@@ -175,6 +175,41 @@ export const ACTION_POLICY: Readonly<Record<string, ActionPolicy>> = {
     reversible: true,
     spendsMoney: false,
   },
+  analyze_ad_performance: {
+    rationale: 'Reads Meta results with breakdowns and trends, and proposes decisions. Changes nothing.',
+    risk: 'low',
+    reversible: true,
+    spendsMoney: false,
+  },
+  audit_ad_account: {
+    rationale: 'Reads an ad account’s structure and results to find problems. Changes nothing.',
+    risk: 'low',
+    reversible: true,
+    spendsMoney: false,
+  },
+  change_budget: {
+    rationale: 'Changes how much an ad set or campaign may spend per day, from the moment it applies.',
+    risk: 'high',
+    reversible: true,
+    spendsMoney: true,
+    consequence:
+      'This changes real daily spending from the moment it applies. It can be changed back, but what is spent meanwhile is spent.',
+  },
+  set_ad_delivery: {
+    rationale: 'Switches an ad, ad set or campaign on, which starts it spending. Switching off is not gated.',
+    risk: 'high',
+    reversible: true,
+    spendsMoney: true,
+    consequence: 'This starts spending from the moment it is switched on, until it is switched off again.',
+  },
+  exclude_placements: {
+    rationale: 'Changes where an ad set can show. Reversible, but restarts Meta’s learning for that ad set.',
+    risk: 'high',
+    reversible: true,
+    spendsMoney: false,
+    consequence:
+      'This changes where the ads can appear and restarts Meta’s learning for the ad set, so results may be unsteady for a few days. It can be undone.',
+  },
   check_ad_setup: {
     rationale: 'Reads which Page, business, ad account, payment method and pixel exist. Changes nothing.',
     risk: 'low',

@@ -361,3 +361,94 @@ describe('website tracking', () => {
     assert.equal(calls.find((c) => c.url.endsWith('/ads'))!.body.tracking_specs, undefined)
   })
 })
+
+describe('the goal a traffic ad set optimises for', () => {
+  const traffic = (pixelId: string | undefined) => {
+    const p = plan()
+    const { fetchImpl, calls } = mockMeta([OK])
+    const c = new MetaAdsClient({ account: { ...account, pixelId }, accessToken: 'T', fetch: fetchImpl })
+    return {
+      calls,
+      run: () =>
+        c.create({
+          ...p,
+          campaign: { ...p.campaign, objective: 'OUTCOME_TRAFFIC' as never },
+          adSets: [{ ...p.adSets[0]!, adSet: { ...p.adSets[0]!.adSet, optimizationGoal: undefined, conversionEvent: undefined } }],
+        }),
+    }
+  }
+
+  test('is landing page views when a pixel can count them', async () => {
+    // The first real campaign optimised for clicks and got a 13.5% CTR with
+    // only 20% of clicks reaching the page.
+    const t = traffic('999')
+    await t.run()
+    assert.equal(t.calls.find((c) => c.url.endsWith('/adsets'))!.body.optimization_goal, 'LANDING_PAGE_VIEWS')
+  })
+
+  test('stays link clicks without a pixel, because Meta could not count page views', async () => {
+    const t = traffic(undefined)
+    await t.run()
+    assert.equal(t.calls.find((c) => c.url.endsWith('/adsets'))!.body.optimization_goal, 'LINK_CLICKS')
+  })
+})
+
+describe('performance team calls', () => {
+  test('insights follow Meta’s paging and send breakdowns as given', async () => {
+    const { fetchImpl, calls } = mockMeta([
+      { body: { data: [{ ad_id: '1' }], paging: { next: 'https://graph.facebook.com/v25.0/next-page' } } },
+      { body: { data: [{ ad_id: '2' }] } },
+    ])
+    const rows = await client(fetchImpl).insights({ level: 'ad', since: '2026-09-25', until: '2026-10-01', breakdowns: 'age,gender' })
+    assert.deepEqual(rows.map((r) => r.ad_id), ['1', '2'])
+    const first = new URL(calls[0]!.url)
+    assert.equal(first.searchParams.get('breakdowns'), 'age,gender')
+    assert.deepEqual(JSON.parse(first.searchParams.get('time_range')!), { since: '2026-09-25', until: '2026-10-01' })
+    assert.equal(first.searchParams.get('date_preset'), null)
+  })
+
+  test('excluding Audience Network from automatic placements writes out the others and keeps the rest of targeting', async () => {
+    const { fetchImpl, calls } = mockMeta([
+      { body: { targeting: { geo_locations: { countries: ['PK'] }, age_min: 18 } } },
+      { body: { success: true } },
+    ])
+    const after = await client(fetchImpl).excludePlacements('AS1', ['audience_network'])
+    assert.deepEqual(after, ['facebook', 'instagram', 'messenger'])
+    const sent = JSON.parse(calls[1]!.body.targeting!) as Record<string, unknown>
+    assert.deepEqual(sent.geo_locations, { countries: ['PK'] })
+    assert.deepEqual(sent.publisher_platforms, ['facebook', 'instagram', 'messenger'])
+  })
+
+  test('refuses to exclude every placement', async () => {
+    const { fetchImpl } = mockMeta([{ body: { targeting: { publisher_platforms: ['audience_network'] } } }])
+    await assert.rejects(client(fetchImpl).excludePlacements('AS1', ['audience_network']), /nowhere to show/)
+  })
+
+  test('the ad set overview carries the goal, event, learning status and ads', async () => {
+    const { fetchImpl } = mockMeta([
+      {
+        body: {
+          data: [
+            {
+              id: 'AS1',
+              name: 'Leads',
+              effective_status: 'ACTIVE',
+              campaign_id: 'C1',
+              optimization_goal: 'OFFSITE_CONVERSIONS',
+              promoted_object: { custom_event_type: 'LEAD' },
+              daily_budget: '50000',
+              is_dynamic_creative: true,
+              learning_stage_info: { status: 'FAIL' },
+              ads: { data: [{ id: 'A1', name: 'a', effective_status: 'DISAPPROVED' }] },
+            },
+          ],
+        },
+      },
+    ])
+    const [s] = await client(fetchImpl).adSetsOverview()
+    assert.equal(s!.customEventType, 'LEAD')
+    assert.equal(s!.learningStatus, 'FAIL')
+    assert.equal(s!.dailyBudgetMinor, 50000)
+    assert.equal(s!.ads[0]!.status, 'DISAPPROVED')
+  })
+})
