@@ -37,6 +37,13 @@ Agency's own accounts.
 
 ## Meta ads
 
+After comparing with Meta's own MCP servers (research/2026-10-02-meta-official-mcps.md):
+
+- **Signal health**: event match quality and the Conversions API, so the auditor sees weak tracking.
+- **WhatsApp inbox and templates**: the owner's ads are mostly WhatsApp conversation campaigns; the same AI should answer the leads they create.
+- **A/B tests and conversion lift** with Meta's split-test objects.
+- **Webhooks** for new comments and messages, so the Page tools can alert instead of being asked.
+
 - Performance team, next steps: a scheduled weekly review that writes a report
   for approval; creative-level (asset) breakdowns; launching the creative
   strategist's new ads straight from its proposals.

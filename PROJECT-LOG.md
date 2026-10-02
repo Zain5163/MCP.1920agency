@@ -1548,6 +1548,32 @@ reconnects Facebook. Tested against Meta's documented shapes only.
 
 651 tests, 13 workspaces typecheck clean.
 
+## 2026-10-02 — Meta's own MCP servers, compared
+
+The owner asked what Meta's new MCP servers mean for us. Full comparison in
+`research/2026-10-02-meta-official-mcps.md`.
+
+- Meta now hosts an **Ads MCP** (since 2026-04-29), a **DevTools MCP** and a
+  **WhatsApp Business Tools MCP**. The Ads one writes live, with no approval, no
+  spend ceiling, no paused default and URLs-only creative; it adds catalogs,
+  signal health, A/B and lift tests, Help Center search and activity logs.
+- **Decision:** keep our own write path (approval, ceiling, validation, files,
+  expertise, every platform); do not proxy Meta's. Close the useful gaps.
+- **Done today:** `get_ad_activity`, the account's change history, verified live.
+  It showed the test campaign was switched off on 2026-09-30 at 22:31 Pakistan
+  time, about 2.5 hours after Meta approved the ad: that is why it spent only
+  PKR 285. The auditor role now reads it before blaming creative.
+- **Next in line:** signal health, WhatsApp inbox and templates, A/B tests,
+  catalogs (FUTURE-PLANS).
+- Suggested to the owner: connect Meta's DevTools MCP to Claude Code for
+  building (App Review status, permissions, webhooks).
+
+The auth test "records last use without failing the request" failed twice under
+load and passed on rerun both times: a 300 ms wait in a timing-sensitive test.
+Flaky, not broken; noted in NEXT-STEPS.
+
+652 tests, 13 workspaces typecheck clean.
+
 ## Verified live, not just tested
 
 | What | How it was proven |

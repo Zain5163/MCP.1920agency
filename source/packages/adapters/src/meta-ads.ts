@@ -830,6 +830,44 @@ export class MetaAdsClient {
     })
   }
 
+  /**
+   * The ad account's change history: who changed what, when, from what to what.
+   *
+   * The auditor's answer to "what changed just before results dropped?". Meta's
+   * own Ads MCP offers activity logs (2026-04); this reads the same history
+   * through the Marketing API with the token already held.
+   */
+  async activity(options: { since?: Date; limit?: number } = {}): Promise<
+    Array<{ at: Date; what: string; objectType: string; objectName: string; by?: string; from?: string; to?: string }>
+  > {
+    const params: Record<string, string> = {
+      fields: 'event_time,event_type,translated_event_type,object_type,object_name,actor_name,extra_data',
+      limit: String(options.limit ?? 50),
+    }
+    if (options.since !== undefined) params.since = String(Math.floor(options.since.getTime() / 1000))
+    const data = (await this.#get(`act_${this.#account.adAccountId}/activities`, params)) as { data?: Array<Record<string, unknown>> }
+    return (data.data ?? []).map((a) => {
+      let from: string | undefined
+      let to: string | undefined
+      try {
+        const extra = JSON.parse(String(a.extra_data ?? '{}')) as { old_value?: unknown; new_value?: unknown }
+        if (extra.old_value !== undefined) from = typeof extra.old_value === 'object' ? JSON.stringify(extra.old_value) : String(extra.old_value)
+        if (extra.new_value !== undefined) to = typeof extra.new_value === 'object' ? JSON.stringify(extra.new_value) : String(extra.new_value)
+      } catch {
+        // extra_data is free-form; a value that is not JSON is simply not shown.
+      }
+      return {
+        at: new Date(String(a.event_time)),
+        what: String(a.translated_event_type ?? a.event_type ?? ''),
+        objectType: String(a.object_type ?? ''),
+        objectName: String(a.object_name ?? ''),
+        ...(a.actor_name !== undefined ? { by: String(a.actor_name) } : {}),
+        ...(from !== undefined ? { from } : {}),
+        ...(to !== undefined ? { to } : {}),
+      }
+    })
+  }
+
   /** Reads one object's fields; for checks before a change. */
   async readObject(id: string, fields: string): Promise<Record<string, unknown>> {
     return (await this.#get(id, { fields })) as Record<string, unknown>

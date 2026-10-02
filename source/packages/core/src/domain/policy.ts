@@ -226,6 +226,12 @@ export const ACTION_POLICY: Readonly<Record<string, ActionPolicy>> = {
     spendsMoney: false,
     consequence: 'This sends a private message to this person as the business. It cannot be unsent.',
   },
+  get_ad_activity: {
+    rationale: 'Reads the ad account’s change history. Changes nothing.',
+    risk: 'low',
+    reversible: true,
+    spendsMoney: false,
+  },
   analyze_ad_performance: {
     rationale: 'Reads Meta results with breakdowns and trends, and proposes decisions. Changes nothing.',
     risk: 'low',

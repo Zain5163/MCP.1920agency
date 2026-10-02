@@ -452,3 +452,24 @@ describe('performance team calls', () => {
     assert.equal(s!.ads[0]!.status, 'DISAPPROVED')
   })
 })
+
+describe('the activity log', () => {
+  test('reads who changed what, from what to what, and survives free-form extra data', async () => {
+    const { fetchImpl, calls } = mockMeta([
+      {
+        body: {
+          data: [
+            { event_time: '2026-09-30T17:31:09+0000', translated_event_type: 'Campaign status updated', object_type: 'CAMPAIGN_GROUP', object_name: 'TRAFFIC|test', actor_name: 'Owner', extra_data: '{"old_value":"Active","new_value":"Inactive"}' },
+            { event_time: '2026-09-30T10:00:00+0000', event_type: 'update_ad_set_budget', object_type: 'CAMPAIGN', object_name: 'Broad PK', extra_data: 'not json' },
+          ],
+        },
+      },
+    ])
+    const rows = await client(fetchImpl).activity({ since: new Date('2026-09-20T00:00:00Z'), limit: 10 })
+    assert.equal(rows[0]!.what, 'Campaign status updated')
+    assert.equal(rows[0]!.from, 'Active')
+    assert.equal(rows[0]!.to, 'Inactive')
+    assert.equal(rows[1]!.from, undefined)
+    assert.equal(new URL(calls[0]!.url).searchParams.get('since'), String(Date.parse('2026-09-20T00:00:00Z') / 1000))
+  })
+})

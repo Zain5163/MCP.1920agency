@@ -55,6 +55,7 @@ Around the posting:
 | Performance reading with suggestions (spend, results, cost, frequency, CTR) | ✅ |
 | **Performance team** (2026-10-02): analyst with ROAS, placements, age/gender, period vs period, scale/keep/cut/wait per ad; auditor; budget, on/off and placement changes behind approval | ✅ Reading verified live on the owner's account; the change tools are tested but have not been used on a real ad yet |
 | `meta-performance` playbook and `review_meta_account` workflow (five roles) | ✅ |
+| Activity log: who changed what and when (`get_ad_activity`) | ✅ Verified live 2026-10-02 |
 | Traffic campaigns optimise for landing page views when a pixel exists | 🟡 Built and tested; not yet created on a real account |
 | Meta's AI enhancements off by default | ✅ |
 | Account setup check: Page, business, ad account, payment, pixel, pixel firing | ✅ Verified read-only on the owner's account |
@@ -87,7 +88,7 @@ Around the posting:
 | Error catalogue: every error says why and how to fix it | ✅ |
 | Audit log of every action | ✅ |
 | Database lockdown (RLS on all tables) | ✅ |
-| Tests | ✅ 651 passing, 13 workspaces typecheck clean |
+| Tests | ✅ 652 passing, 13 workspaces typecheck clean |
 
 ## 6. Automations running on this PC
 

@@ -263,6 +263,32 @@ export function registerPerformanceTools(server: McpServer): void {
   )
 
   server.tool(
+    'get_ad_activity',
+    'The ad account’s change history: who changed what and when (status, budgets, targeting, review results). Use it to answer "what changed before results moved?". Reads only.',
+    { days: z.number().int().min(1).max(90).default(14), limit: z.number().int().min(1).max(200).default(50) },
+    async ({ days, limit }) =>
+      await guarded(async () => {
+        const loaded = loadClient()
+        if ('error' in loaded) return text(loaded.error)
+        const rows = await loaded.client.activity({ since: new Date(Date.now() - days * 86_400_000), limit })
+        if (rows.length === 0) return text(`No changes recorded in the last ${days} days.`)
+        const kind: Record<string, string> = { CAMPAIGN_GROUP: 'campaign', CAMPAIGN: 'ad set', ADGROUP: 'ad', AD_ACCOUNT: 'account' }
+        return text(
+          [
+            `${rows.length} change(s) in the last ${days} days, newest first:`,
+            '',
+            ...rows.map(
+              (r) =>
+                `• ${r.at.toISOString().slice(0, 16).replace('T', ' ')} UTC — ${r.what} — ${kind[r.objectType] ?? r.objectType.toLowerCase()} "${r.objectName}"` +
+                (r.from !== undefined || r.to !== undefined ? `: ${r.from ?? '?'} → ${r.to ?? '?'}` : '') +
+                (r.by !== undefined ? ` (by ${r.by})` : ''),
+            ),
+          ].join('\n'),
+        )
+      }),
+  )
+
+  server.tool(
     'change_budget',
     'The media buyer’s main lever: set the daily budget of a Meta ad set (or a campaign using campaign budget). Needs the user’s approval and stays inside the spend ceiling. Warns when the change is over 20%, which restarts Meta’s learning.',
     { id: z.string().describe('Ad set id, or campaign id when the budget is set on the campaign.'), newDailyBudget: budgetArg, confirm: confirmArg },

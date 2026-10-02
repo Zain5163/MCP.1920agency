@@ -18,7 +18,7 @@ parallel and hand their results to the media buyer.
 
 | # | Role | Tool | Answers |
 |---|---|---|---|
-| 1 | **Auditor** | `audit_ad_account`, `check_ad_setup` | Is anything broken that wastes money whatever the ads say? |
+| 1 | **Auditor** | `audit_ad_account`, `check_ad_setup`, `get_ad_activity` | Is anything broken that wastes money whatever the ads say? What changed recently? |
 | 2 | **Analyst** | `analyze_ad_performance` | What happened, where did the money go, what changed? |
 | 3 | **Creative strategist** | the analyst's report, `get_playbook meta-ads` | Which angles work, which are tired, what to make next? |
 | 4 | **Media buyer** | `change_budget`, `set_ad_delivery`, `exclude_placements` | What to scale, cut, move or fix — proposed for approval |
@@ -68,6 +68,9 @@ might not be firing. Report only what is true in the data. The usual offenders:
   results a week. Ten ad sets at a tenth of that each never learn. Fewer, larger
   ad sets win.
 - **Fewer than 3 ads** (no real test) or **more than 6** (most starve).
+- **What changed.** When results moved, read `get_ad_activity` for the same days
+  before blaming the creative: a budget jump, a targeting edit or a re-review
+  restarts learning and explains most sudden swings.
 
 ## 2. Analyst
 

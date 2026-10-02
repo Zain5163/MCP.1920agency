@@ -1,4 +1,8 @@
 # AdsPilot — what is built, what is next, what to improve
+> **Flaky test (2026-10-02):** `packages/auth` "records last use without failing
+> the request" waits a fixed 300 ms for a background write and fails when the
+> machine is busy (twice on 2026-10-02, both passed on rerun). Replace the
+> sleep with polling for the write.
 
 Updated 2026-09-24. Read `PROJECT-CONTEXT.md` for purpose and decisions, the files in
 `decisions/` for why choices were made, and this file for where the work stands.
