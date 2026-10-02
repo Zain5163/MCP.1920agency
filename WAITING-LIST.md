@@ -219,6 +219,24 @@ for permissions directly, as it did when Facebook first connected. If Meta's
 window shows "Invalid Scopes", note which permission it names: it is then
 removed from the request in code and the reconnect is tried again.
 
+**Tried 2026-10-02: Facebook answered "Can't load URL — the domain of this URL
+isn't included in the app's domains."** Our login returns to
+`http://localhost:8787/callback`; the app (Mysmadspilot, same App ID as before,
+which the ads token also belongs to) has no domains registered, and Facebook
+only allows localhost automatically while an app is in Development mode. Fix,
+in Meta's developer dashboard for Mysmadspilot:
+
+1. App settings → Basic → **App domains**: add `localhost` → Save changes.
+2. Facebook Login for Business → Settings → **Valid OAuth Redirect URIs**: add
+   `http://localhost:8787/callback` → Save.
+3. Reconnect again. If it still refuses (Live apps can insist on https), switch
+   the app to **Development** mode at the top of the dashboard, reconnect, then
+   switch back to Live.
+
+Meta's DevTools MCP (added to Claude Code 2026-10-02, needs the owner's
+sign-in via `/mcp`) can read the app's mode and login settings directly to
+confirm which of these applies.
+
 Then the next monitor run confirms both connections, and the Page tools are
 checked live.
 
