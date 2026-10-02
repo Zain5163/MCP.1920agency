@@ -1,7 +1,10 @@
 import {
+  googleProviderConfigFromEnv,
+  registerGoogleProvider,
   registerMetaProvider,
   registerThreadsProvider,
   providerFor,
+  type Provider,
 } from '@social-publisher/adapters'
 import { optional, required } from '@social-publisher/config'
 import {
@@ -14,7 +17,7 @@ import {
   recordRefreshed,
 } from '@social-publisher/db'
 import { createLogger } from '@social-publisher/telemetry'
-import { TokenVault, parseKey } from '@social-publisher/vault'
+import { TokenVault, parseKey, type StoredCredential } from '@social-publisher/vault'
 
 /**
  * `refresh` — keeps expiring authorisations alive.
@@ -56,6 +59,30 @@ function registerProviders(): void {
       redirectUri: optional('THREADS_REDIRECT_URI', 'http://localhost:8787/threads/callback')!,
     })
   }
+
+  /**
+   * Google, optional for the same reason. Its authorisations usually record no
+   * end date, so they are rarely listed here at all — the hour-long access
+   * token renews itself whenever it is used. A grant Google gave for a fixed
+   * time is listed, and renewing it proves it is still accepted.
+   */
+  const google = googleProviderConfigFromEnv((key) => optional(key))
+  if (google !== undefined) registerGoogleProvider(google)
+}
+
+/**
+ * Renews one credential, merged over the old one.
+ *
+ * A refresh-token provider gets the whole credential; one that refreshes with
+ * the access token gets just that. Either way the result is merged rather than
+ * stored as it came back: an earlier version stored only the new access token
+ * and expiry, which silently dropped any refresh token.
+ */
+async function renew(provider: Provider, current: StoredCredential): Promise<StoredCredential> {
+  if (provider.refreshCredential !== undefined) {
+    return { ...current, ...(await provider.refreshCredential(current)) }
+  }
+  return { ...current, ...(await provider.refresh!(current.accessToken)) }
 }
 
 async function main(): Promise<void> {
@@ -102,7 +129,7 @@ async function main(): Promise<void> {
       skipped += 1
       continue
     }
-    if (provider.refresh === undefined) {
+    if (provider.refresh === undefined && provider.refreshCredential === undefined) {
       // Not a failure: this provider's credentials do not expire on their own.
       console.log(`  SKIP      ${auth.provider.padEnd(10)} does not support refresh`)
       skipped += 1
@@ -113,20 +140,32 @@ async function main(): Promise<void> {
       const next = await vault.withCredential(
         auth.id,
         auth.tenantId,
-        async (cred) => await provider.refresh!(cred.accessToken),
+        async (cred) => {
+          const renewed = await renew(provider, cred)
+          // Stored from inside the callback, so the credential never leaves it.
+          // Store the new token first, then the new expiry — if the process dies
+          // between them, a stale expiry is recoverable but a lost token is not.
+          await vault.store(auth.id, auth.tenantId, renewed)
+          return { expiresAt: renewed.expiresAt, authorisationExpiresAt: renewed.authorisationExpiresAt }
+        },
+        // A refresh-token provider's stored access token is usually long
+        // expired by now; without this the vault would mark the authorisation
+        // dead on the way in. When it renews here, the callback renews once
+        // more — one extra token call, on a path that runs once a day.
+        provider.refreshCredential?.bind(provider),
       )
 
-      // Store the new token first, then the new expiry — if the process dies
-      // between them, a stale expiry is recoverable but a lost token is not.
-      await vault.store(auth.id, auth.tenantId, {
-        accessToken: next.accessToken,
-        expiresAt: next.expiresAt,
-      })
-      await recordRefreshed(auth.id, next.expiresAt)
+      // The column records when the authorisation ends: for most providers the
+      // token's expiry, for Google whatever end its grant has, often none.
+      const until =
+        next.authorisationExpiresAt !== undefined ? next.authorisationExpiresAt : (next.expiresAt ?? null)
+      await recordRefreshed(auth.id, until)
 
       refreshed += 1
       console.log(
-        `  REFRESHED ${auth.provider.padEnd(10)} now valid until ${next.expiresAt.toISOString().slice(0, 10)}`,
+        `  REFRESHED ${auth.provider.padEnd(10)} ${
+          until === null ? 'no fixed end date' : `now valid until ${until.toISOString().slice(0, 10)}`
+        }`,
       )
     } catch (error) {
       failed += 1

@@ -171,20 +171,57 @@ export const CAPABILITIES: Readonly<Record<Platform, CapabilityRecord>> = {
     verified: false,
   },
 
-  // ---- Wave 2 and 3. Declared so the UI and types are complete; not implemented. ----
+  // ---- Wave 2 and 3. YouTube, LinkedIn and Pinterest have adapters; the rest are ----
+  // ---- declared so the UI and types are complete, and are not implemented.       ----
 
   youtube: {
+    // The description. Google documents its limit as 5,000 BYTES, which this
+    // grapheme count cannot express, so the adapter checks the byte length too.
     maxTextLength: 5_000,
+    titleMaxLength: 100,
     mediaKinds: ['video'],
     maxMediaCount: 1,
     minMediaCount: 1,
+    // 12 hours or 256 GB, whichever comes first. Over 15 minutes also needs a
+    // verified channel, which only the channel itself can tell us.
+    videoMaxSeconds: 43_200,
+    maxVideoBytes: 274_877_906_944,
     requiresPublicMediaUrl: false,
     supportsNativeScheduling: true,
     allowsMixedMedia: false,
+    preview: {
+      label: 'YouTube',
+      accountLabel: 'YouTube Channel',
+      accent: '#ff0000',
+      // How much of a description shows before "...more" is not documented;
+      // about this much is commonly reported. Unverified.
+      captionTruncateAt: 150,
+      captionPosition: 'below',
+      mediaFit: 'original',
+      showsCarouselDots: false,
+      moreLabel: '...more',
+    },
     verified: false,
     notes:
-      'Title is a separate 100-char field, not part of the description. Quota is per-project ' +
-      'and shared across all tenants: 10,000 units/day at 1,600 per upload is ~6 uploads/day total.',
+      'Title is a separate field of at most 100 characters with no < or >; without one the ' +
+      'adapter uses the first line of the text. The description is the text, at most 5,000 ' +
+      'BYTES with no < or >, so non-Latin text and emoji fit fewer characters than the limit ' +
+      'suggests. Tags total at most 500 characters, commas included. ' +
+      'QUOTA: since 2026-06-01 videos.insert has its own bucket of 100 uploads a day per Google ' +
+      'Cloud project, shared by every tenant and channel and reset at midnight Pacific; other ' +
+      'calls share 10,000 units a day (channels.list and videos.list cost 1). The old figure of ' +
+      '1,600 units per upload is stale. ' +
+      'PRIVATE UNTIL AUDIT: uploads from API projects created after 2020-07-28 that have not ' +
+      'passed the YouTube API audit are restricted to private, with no appeal, so the adapter ' +
+      'uploads private until YOUTUBE_UPLOADS_AUDITED=true and reports it as uploaded, private — ' +
+      'never as published. ' +
+      'Every upload states privacyStatus, selfDeclaredMadeForKids and containsSyntheticMedia ' +
+      'explicitly, because the defaults are undocumented. ' +
+      'Native scheduling (status.publishAt) exists but only for private videos and is not used ' +
+      'yet; the queue schedules instead, and a scheduled upload needs its file in the media ' +
+      'bucket, which caps file size. Limits checked against Google documentation on ' +
+      '2026-10-02 (research/2026-10-02-youtube-api-facts.md); nothing has been uploaded for ' +
+      'real yet, so verified stays false.',
   },
 
   tiktok: {
@@ -204,9 +241,21 @@ export const CAPABILITIES: Readonly<Record<Platform, CapabilityRecord>> = {
 
   linkedin: {
     maxTextLength: 3_000,
-    mediaKinds: ['image', 'video'],
+    // The title of a DOCUMENT post, shown above its pages; no other LinkedIn post
+    // here sends one. 200 is LinkedIn's stated maximum for a document ad's
+    // headline (LinkedIn Help a493903). No limit is documented for an organic
+    // post, and LinkedIn's own composer is reported to stop at 58, so the adapter
+    // warns past 58 and keeps a title it makes from the text within it.
+    titleMaxLength: 200,
+    mediaKinds: ['image', 'video', 'document'],
     maxMediaCount: 20,
     minMediaCount: 0,
+    // A document post is one document and its text: never two documents, and
+    // never a document with images or video (allowsMixedMedia below).
+    maxDocumentCount: 1,
+    // "The file size can't exceed 100MB and 300 pages" (Documents API). Read as
+    // 100,000,000 bytes, the stricter reading. Pages are not counted here.
+    maxDocumentBytes: 100_000_000,
     // Neither: LinkedIn is the only platform here that takes uploaded bytes and
     // will not fetch a URL, so the adapter reads from disk or downloads first.
     // Reported as 3 seconds to 30 minutes for the API. Feed video in the app is
@@ -262,8 +311,18 @@ export const CAPABILITIES: Readonly<Record<Platform, CapabilityRecord>> = {
       'empirically before promising a customer a large upload. ' +
       'Video is a SEPARATE endpoint from images: /rest/videos, split into 4 MB parts, ' +
       'each PUT returning an ETag that must be collected and handed to finalizeUpload. ' +
-      'Losing one ETag wastes the whole upload. A post carries images OR one video, ' +
-      'never both. ' +
+      'Losing one ETag wastes the whole upload. A post carries images, one video, or ' +
+      'one document, never a mix. ' +
+      'DOCUMENT posts (PDF carousels), checked against the Documents and Posts API docs ' +
+      '2026-10-02 (research/2026-10-02-linkedin-documents.md): /rest/documents ' +
+      'initializeUpload with the owner returns an uploadUrl and a urn:li:document id; the ' +
+      'whole file goes up in ONE PUT (no parts, no finalize); the post is content.media ' +
+      '{ id, title }, and the title is required for a document. PDF, PPT, PPTX, DOC or ' +
+      'DOCX, at most 100 MB and 300 pages. Processing status (PROCESSING, AVAILABLE, ' +
+      'PROCESSING_FAILED, WAITING_UPLOAD) is read back where the token may read it; a ' +
+      'member token is documented as write-only for image reads and reported to be the ' +
+      'same for documents, so the adapter then pauses and posts. Nothing has been posted ' +
+      'as a document for real yet. ' +
       'Remaining limits here are unverified.',
   },
 

@@ -51,6 +51,14 @@ describe('PublishError', () => {
     assert.equal(new PublishError('x', { failureClass: 'credential' }).isRetryable, false)
   })
 
+  test('carries the catalogue code when the adapter knows the precise cause', () => {
+    // A 403 can mean quota, permissions or a switched-off API; the class alone
+    // cannot say which, so the adapter names the resolution.
+    const err = new PublishError('quota', { failureClass: 'transient', code: 'QUOTA_EXHAUSTED' })
+    assert.equal(err.code, 'QUOTA_EXHAUSTED')
+    assert.equal(new PublishError('x', { failureClass: 'permanent' }).code, undefined)
+  })
+
   test('preserves the platform message verbatim for display', () => {
     const err = new PublishError('Publish failed', {
       failureClass: 'permanent',

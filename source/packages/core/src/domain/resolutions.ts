@@ -29,6 +29,9 @@ export type ErrorCode =
   | 'TOKEN_REVOKED'
   | 'SCOPE_MISSING'
   | 'NO_CONNECTION'
+  | 'GOOGLE_SCOPE_NOT_GRANTED'
+  | 'GOOGLE_API_NOT_ENABLED'
+  | 'GOOGLE_TOKEN_REVOKED'
   // content
   | 'TEXT_TOO_LONG'
   | 'MEDIA_REQUIRED'
@@ -45,6 +48,9 @@ export type ErrorCode =
   | 'MEDIA_PROCESSING_TIMEOUT'
   | 'STORAGE_NOT_PUBLIC'
   | 'STORAGE_REJECTED'
+  | 'YOUTUBE_NO_CHANNEL'
+  | 'YOUTUBE_WRONG_CHANNEL'
+  | 'YOUTUBE_CHANNEL_UPLOAD_LIMIT'
   // internal
   | 'UNKNOWN'
 
@@ -163,6 +169,38 @@ const CATALOGUE: Readonly<Record<ErrorCode, Omit<Resolution, 'code'>>> = {
     retryable: false,
     needsHuman: true,
   },
+  GOOGLE_SCOPE_NOT_GRANTED: {
+    what: 'The Google connection is missing a permission this needs.',
+    why: 'Google lets people untick individual permissions on its consent screen, and one this action depends on was not granted, or was removed later in the Google Account. Refreshing the token cannot add a permission that was never given.',
+    fix: [
+      'In source/apps/cli run pnpm connect:provider google followed by the product, e.g. pnpm connect:provider google youtube',
+      'On the Google consent screen, leave every requested permission ticked',
+      'If Google does not ask again, remove the app at https://myaccount.google.com/permissions and connect once more',
+    ],
+    retryable: false,
+    needsHuman: true,
+  },
+  GOOGLE_API_NOT_ENABLED: {
+    what: 'The Google API this needs is switched off in the Google Cloud project.',
+    why: 'Every Google API must be enabled in the Cloud project that owns the OAuth client. Until it is, Google refuses each call with accessNotConfigured, whatever permissions the account granted.',
+    fix: [
+      'Open https://console.cloud.google.com/apis/library in the project that holds GOOGLE_CLIENT_ID',
+      'Enable the API named in the detail; uploading videos needs the YouTube Data API v3',
+      'Wait a few minutes for the change to reach Google’s servers, then try again',
+    ],
+    retryable: false,
+    needsHuman: true,
+  },
+  GOOGLE_TOKEN_REVOKED: {
+    what: 'Google no longer accepts this connection’s authorisation.',
+    why: 'Google cancels a refresh token when access is removed from the Google Account, when it goes six months unused, when the account passes 100 newer tokens for the same app, or after 7 days while the app’s consent screen is still in Testing.',
+    fix: [
+      'In source/apps/cli run pnpm connect:provider google youtube and approve access again',
+      'If it dies again about a week later, publish the app to production in Google Cloud (Google Auth Platform, Audience) so its tokens stop expiring after 7 days',
+    ],
+    retryable: false,
+    needsHuman: true,
+  },
 
   TEXT_TOO_LONG: {
     what: 'The text is longer than this platform allows.',
@@ -232,8 +270,8 @@ const CATALOGUE: Readonly<Record<ErrorCode, Omit<Resolution, 'code'>>> = {
     needsHuman: false,
   },
   QUOTA_EXHAUSTED: {
-    what: 'This account has hit its posting limit for now.',
-    why: 'Platforms cap posts per rolling window — Instagram allows 50 per 24 hours, YouTube limits uploads per day.',
+    what: 'The posting limit for this period has been reached.',
+    why: 'Platforms cap how much can be posted per window — Instagram allows 100 posts per 24 hours per account, and YouTube allows 100 API uploads a day per Google Cloud project, shared by every connected channel and reset at midnight Pacific time.',
     fix: ['Wait for the window to roll over', 'Spread scheduled posts across more days'],
     retryable: true,
     needsHuman: false,
@@ -251,17 +289,18 @@ const CATALOGUE: Readonly<Record<ErrorCode, Omit<Resolution, 'code'>>> = {
   },
   MEDIA_PROCESSING_FAILED: {
     what: 'The platform could not process the media.',
-    why: 'The file was downloaded but rejected during transcoding — usually an unsupported codec, corrupt file, or out-of-range aspect ratio.',
+    why: 'The file was received but rejected while the platform processed it — usually an unsupported codec, a corrupt file, or an out-of-range aspect ratio; for a document, a password-protected or damaged file, or one over the size or page limit.',
     fix: [
       'Re-export as H.264 MP4 for video, or JPEG/PNG for images',
       'Check the aspect ratio is within the platform’s accepted range',
+      'For a document, export a plain PDF without a password, within the platform’s size and page limits',
     ],
     retryable: false,
     needsHuman: true,
   },
   MEDIA_PROCESSING_TIMEOUT: {
     what: 'The platform is still processing the media.',
-    why: 'Large videos can take longer than the wait allows. The upload itself succeeded.',
+    why: 'Large videos and long documents can take longer than the wait allows. The upload itself succeeded, and nothing was posted.',
     fix: ['No action needed — it will retry automatically', 'Smaller files process faster if this recurs'],
     retryable: true,
     needsHuman: false,
@@ -287,6 +326,36 @@ const CATALOGUE: Readonly<Record<ErrorCode, Omit<Resolution, 'code'>>> = {
     ],
     retryable: false,
     needsHuman: true,
+  },
+  YOUTUBE_NO_CHANNEL: {
+    what: 'This Google account has no YouTube channel to upload to.',
+    why: 'Videos are uploaded to a channel, and a Google account has none until one is created. YouTube refuses uploads from an account without a channel, however the authorisation was granted.',
+    fix: [
+      'Sign in at https://www.youtube.com with the same Google account and create a channel',
+      'Then run pnpm connect:provider google youtube in source/apps/cli and pick that account',
+    ],
+    retryable: false,
+    needsHuman: true,
+  },
+  YOUTUBE_WRONG_CHANNEL: {
+    what: 'The stored YouTube authorisation belongs to a different channel than this account.',
+    why: 'A Google token reaches exactly one channel, and this one answered with another channel’s id, usually because the same Google login was reconnected for a different channel. Uploading would have put the video on the wrong channel, so nothing was sent.',
+    fix: [
+      'Run pnpm connect:provider google youtube and sign in to the channel named in the detail',
+      'Run list_accounts to confirm that channel shows as ready before posting again',
+    ],
+    retryable: false,
+    needsHuman: true,
+  },
+  YOUTUBE_CHANNEL_UPLOAD_LIMIT: {
+    what: 'This YouTube channel has reached its daily upload limit.',
+    why: 'YouTube caps how many videos one channel may upload in a day, separately from the API quota, and channels that are not verified get the lower limit.',
+    fix: [
+      'Nothing to do for a scheduled post: it is tried again after a day',
+      'To raise the limit, verify the channel at https://www.youtube.com/verify',
+    ],
+    retryable: true,
+    needsHuman: false,
   },
 
   UNKNOWN: {

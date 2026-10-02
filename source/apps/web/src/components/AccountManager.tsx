@@ -91,7 +91,7 @@ export function AccountManager({
       <section className="card">
         <h2 className="mb-1 text-base font-semibold">Available to connect</h2>
         <p className="mb-4 text-[0.85rem] text-muted">
-          Every Page your Meta authorisation can reach. Connecting one takes no new sign-in.
+          Every account your stored authorisations can reach. Connecting one takes no new sign-in.
         </p>
 
         {loadError !== undefined && (
@@ -108,11 +108,13 @@ export function AccountManager({
 
         {notConnected.map((account) => (
           <form
-            key={account.externalId}
+            key={`${account.providerAuthId}:${account.externalId}`}
             action={action}
             className="flex flex-wrap items-center gap-3 border-b border-line py-3 last:border-b-0"
           >
             <input type="hidden" name="externalId" value={account.externalId} />
+            {/* Which authorisation found it, so connecting uses that one. */}
+            <input type="hidden" name="providerAuthId" value={account.providerAuthId} />
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="truncate text-[0.9rem]">{account.name}</span>

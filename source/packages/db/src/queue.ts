@@ -74,6 +74,28 @@ export async function reclaimStale(olderThanMs = 15 * 60 * 1000): Promise<number
   return result.count
 }
 
+/**
+ * Extends this worker's lock on a job it is still working on.
+ *
+ * reclaimStale treats a lock older than 15 minutes as a dead worker. A large
+ * video upload can take longer than that while being perfectly alive, and
+ * reclaiming it then means a second worker starts the same upload — with no
+ * idempotency key on the platform side, that is a second copy of the video. So
+ * the worker calls this every minute while a job runs, and only a lock that
+ * genuinely stopped being touched goes stale.
+ *
+ * Scoped to this worker's own running lock: if the job was already reclaimed
+ * and claimed by someone else, their lock is not ours to extend. Returns
+ * whether the lock was still held.
+ */
+export async function touchJob(jobId: string, workerId: string = WORKER_ID): Promise<boolean> {
+  const result = await db().job.updateMany({
+    where: { id: jobId, state: 'running', lockedBy: workerId },
+    data: { lockedAt: new Date() },
+  })
+  return result.count > 0
+}
+
 export async function completeJob(jobId: string): Promise<void> {
   await db().job.update({
     where: { id: jobId },

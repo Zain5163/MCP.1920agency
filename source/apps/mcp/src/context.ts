@@ -4,6 +4,8 @@ import {
   ThreadsAdapter,
   PinterestAdapter,
   LinkedInAdapter,
+  YouTubeAdapter,
+  youTubeOptionsFromEnv,
 } from '@social-publisher/adapters'
 import { optional, required } from '@social-publisher/config'
 import { TenantScope, db, prismaCredentialStore } from '@social-publisher/db'
@@ -39,8 +41,11 @@ export function publishService(): PublishService {
       new ThreadsAdapter(),
       // Pinterest uses its own API and its own token, so no Meta config either.
       new PinterestAdapter(),
-    // LinkedIn uses its own API, its own token and its own version header.
-    new LinkedInAdapter(),
+      // LinkedIn uses its own API, its own token and its own version header.
+      new LinkedInAdapter(),
+      // Google's token and settings. Uploads stay private, and are reported as
+      // private, until YOUTUBE_UPLOADS_AUDITED says the API audit has passed.
+      new YouTubeAdapter(youTubeOptionsFromEnv((key) => optional(key))),
     ])
   }
   return service
@@ -93,13 +98,23 @@ export async function loadConnections(scope: TenantScope): Promise<Connection[]>
   }))
 }
 
-/** Binds a connection to its vault-held credential without ever exposing the token. */
+/**
+ * Binds a connection to its vault-held credential without ever exposing the token.
+ *
+ * The adapter's refresh function goes along, so an hour-long token is renewed
+ * on the way in instead of the connection being marked dead. For every adapter
+ * whose tokens do not renew it is undefined, which is exactly the old behaviour.
+ */
 export function targetFor(connection: Connection): TargetSpec {
+  const adapter = publishService().adapterFor(connection.platform)
   return {
     connection,
     withCredential: async (fn) =>
-      await tokenVault().withCredential(connection.id, connection.tenantId, async (cred) =>
-        await fn(cred.accessToken),
+      await tokenVault().withCredential(
+        connection.id,
+        connection.tenantId,
+        async (cred) => await fn(cred.accessToken),
+        adapter?.refreshCredential?.bind(adapter),
       ),
   }
 }

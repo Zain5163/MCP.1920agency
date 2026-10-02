@@ -69,6 +69,38 @@ describe('classification steers agent behaviour', () => {
     // Retrying content the platform already refused just burns quota.
     assert.equal(resolutionFor('PLATFORM_REJECTED').retryable, false)
   })
+
+  test('the Google and YouTube failures each have their own diagnosis', () => {
+    const codes = allCodes()
+    for (const expected of [
+      'GOOGLE_SCOPE_NOT_GRANTED',
+      'GOOGLE_API_NOT_ENABLED',
+      'GOOGLE_TOKEN_REVOKED',
+      'YOUTUBE_NO_CHANNEL',
+      'YOUTUBE_WRONG_CHANNEL',
+      'YOUTUBE_CHANNEL_UPLOAD_LIMIT',
+    ] as const) {
+      assert.ok(codes.includes(expected), `missing catalogue entry: ${expected}`)
+    }
+  })
+
+  test('only a person can fix a missing permission, a switched-off API or a dead Google token', () => {
+    for (const code of ['GOOGLE_SCOPE_NOT_GRANTED', 'GOOGLE_API_NOT_ENABLED', 'GOOGLE_TOKEN_REVOKED'] as const) {
+      const r = resolutionFor(code)
+      assert.equal(r.retryable, false, code)
+      assert.equal(r.needsHuman, true, code)
+    }
+  })
+
+  test("a channel's daily upload limit waits it out rather than asking anyone", () => {
+    const r = resolutionFor('YOUTUBE_CHANNEL_UPLOAD_LIMIT')
+    assert.equal(r.retryable, true)
+    assert.equal(r.needsHuman, false)
+  })
+
+  test('the quota explanation no longer carries the stale Instagram figure', () => {
+    assert.ok(!resolutionFor('QUOTA_EXHAUSTED').why.includes('50 per 24 hours'))
+  })
 })
 
 describe('formatResolution', () => {

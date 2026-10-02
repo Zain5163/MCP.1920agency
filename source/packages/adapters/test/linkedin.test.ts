@@ -1,12 +1,25 @@
 import { strict as assert } from 'node:assert'
-import { mkdtemp, writeFile } from 'node:fs/promises'
+import { mkdtemp, rm, truncate, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test, describe } from 'node:test'
 
-import { PublishError, type MediaRef, type PostDraft, type PublishContext } from '@social-publisher/core'
+import {
+  CAPABILITIES,
+  PublishError,
+  countGraphemes,
+  validateAgainstCapabilities,
+  type MediaRef,
+  type PostDraft,
+  type PublishContext,
+} from '@social-publisher/core'
 
-import { LinkedInAdapter, escapeLittleText } from '../src/linkedin.ts'
+import {
+  LINKEDIN_DOCUMENT_TITLE_SHOWN,
+  LinkedInAdapter,
+  escapeLittleText,
+  type LinkedInAdapterOptions,
+} from '../src/linkedin.ts'
 import {
   LinkedInProvider,
   buildLinkedInAuthUrl,
@@ -25,6 +38,8 @@ interface Call {
 interface Reply {
   status?: number
   body?: unknown
+  /** Sent as is instead of JSON, e.g. the bytes of a downloaded file. */
+  raw?: string | Uint8Array
   headers?: Record<string, string>
 }
 
@@ -49,7 +64,7 @@ function mockLinkedIn(replies: Reply[]) {
 
     const next = replies[Math.min(index, replies.length - 1)] ?? {}
     index += 1
-    return new Response(next.body === undefined ? '' : JSON.stringify(next.body), {
+    return new Response(next.raw !== undefined ? next.raw : next.body === undefined ? '' : JSON.stringify(next.body), {
       status: next.status ?? 200,
       headers: next.headers ?? {},
     })
@@ -629,5 +644,484 @@ describe('large media is never held in memory whole', () => {
     // The declared size is ignored; the real file length is what is sent.
     const init = calls[0]!.body.initializeUploadRequest as { fileSizeBytes: number }
     assert.equal(init.fileSizeBytes, size)
+  })
+})
+
+describe('documents (PDF carousels)', () => {
+  /**
+   * Request shapes from the Documents API on Microsoft Learn, checked
+   * 2026-10-02: initializeUpload with the owner, one PUT of the whole file to
+   * the uploadUrl, then content.media { id, title } on the post.
+   */
+  const PDF_BYTES = Buffer.from('%PDF-1.7\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n<< >>\n%%EOF\n', 'latin1')
+
+  const DOC_INIT: Reply = {
+    body: {
+      value: {
+        uploadUrlExpiresAt: 1650567510704,
+        uploadUrl: 'https://www.linkedin.com/dms-uploads/DOC1/uploadedDocument/0',
+        document: 'urn:li:document:DOC1',
+      },
+    },
+  }
+  const DOC_PUT: Reply = { status: 201 }
+  const DOC_STATUS = (status: string): Reply => ({
+    body: { id: 'urn:li:document:DOC1', owner: 'urn:li:person:ABC123', status },
+  })
+
+  const doc = (over: Partial<MediaRef> = {}): MediaRef => ({
+    id: 'd1',
+    kind: 'document',
+    mime: 'application/pdf',
+    bytes: PDF_BYTES.length,
+    ...over,
+  })
+
+  async function onDisk(bytes: Uint8Array = PDF_BYTES, name = 'carousel.pdf'): Promise<string> {
+    const dir = await mkdtemp(join(tmpdir(), 'li-doc-'))
+    const file = join(dir, name)
+    await writeFile(file, bytes)
+    return file
+  }
+
+  const makeDocs = (replies: Reply[], options: Partial<LinkedInAdapterOptions> = {}) => {
+    const { fetchImpl, calls } = mockLinkedIn(replies)
+    const sleeps: number[] = []
+    const li = new LinkedInAdapter({
+      fetch: fetchImpl,
+      sleep: async (ms) => {
+        sleeps.push(ms)
+      },
+      ...options,
+    })
+    return { li, calls, sleeps }
+  }
+
+  const posts = (calls: Call[]) => calls.filter((c) => c.url.endsWith('/rest/posts'))
+  const codes = (issues: readonly { severity: string; code: string }[], severity: string) =>
+    issues.filter((i) => i.severity === severity).map((i) => i.code)
+  const sentTitle = (calls: Call[]) => (posts(calls)[0]!.body.content as { media: { title?: string } }).media.title
+
+  test('from disk: initialise with the owner, one PUT of the whole file, then a post naming the document', async () => {
+    const file = await onDisk()
+    const { li, calls, sleeps } = makeDocs([DOC_INIT, DOC_PUT, DOC_STATUS('AVAILABLE'), CREATED])
+    const result = await li.publish(
+      ctx(),
+      draft({
+        body: 'The limits (checked) #MetaAds',
+        title: 'What one Meta ad can carry',
+        media: [doc({ localPath: file })],
+      }),
+    )
+
+    assert.equal(calls.length, 4)
+
+    const init = calls[0]!
+    assert.equal(init.method, 'POST')
+    assert.equal(init.url, 'https://api.linkedin.com/rest/documents?action=initializeUpload')
+    assert.deepEqual(init.body, { initializeUploadRequest: { owner: 'urn:li:person:ABC123' } })
+    assert.match(init.headers['LinkedIn-Version']!, /^\d{6}$/)
+    assert.equal(init.headers['X-Restli-Protocol-Version'], '2.0.0')
+    assert.equal(init.headers.Authorization, 'Bearer LI_TOKEN')
+
+    const put = calls[1]!
+    assert.equal(put.method, 'PUT')
+    assert.equal(put.url, 'https://www.linkedin.com/dms-uploads/DOC1/uploadedDocument/0')
+    assert.equal(put.headers.Authorization, 'Bearer LI_TOKEN')
+    assert.equal(put.headers['content-type'], 'application/pdf')
+    // The whole file in one piece: no parts and no finalize call for a document.
+    assert.deepEqual(Buffer.from(put.rawBody as Uint8Array), PDF_BYTES)
+    assert.equal(calls.some((c) => c.url.includes('finalizeUpload')), false)
+
+    const status = calls[2]!
+    assert.equal(status.method, 'GET')
+    assert.equal(status.url, 'https://api.linkedin.com/rest/documents/urn%3Ali%3Adocument%3ADOC1')
+    assert.equal(status.rawBody, undefined)
+    assert.match(status.headers['LinkedIn-Version']!, /^\d{6}$/)
+    assert.equal(status.headers['X-Restli-Protocol-Version'], '2.0.0')
+
+    const post = calls[3]!
+    assert.equal(post.url, 'https://api.linkedin.com/rest/posts')
+    assert.deepEqual(post.body.content, {
+      media: { id: 'urn:li:document:DOC1', title: 'What one Meta ad can carry' },
+    })
+    assert.equal(post.body.commentary, 'The limits \\(checked\\) \\#MetaAds')
+    assert.equal(post.body.lifecycleState, 'PUBLISHED')
+
+    assert.equal(result.platformPostId, 'urn:li:share:999')
+    assert.equal(result.notice, undefined)
+    assert.deepEqual(sleeps, [])
+  })
+
+  test('the title is plain text, never escaped like the commentary', async () => {
+    const file = await onDisk()
+    const { li, calls } = makeDocs([DOC_INIT, DOC_PUT, DOC_STATUS('AVAILABLE'), CREATED])
+    await li.publish(ctx(), draft({ title: 'Meta "code 10" (#permissions)', media: [doc({ localPath: file })] }))
+    assert.equal(sentTitle(calls), 'Meta "code 10" (#permissions)')
+  })
+
+  test("LinkedIn's own title override wins over the draft's", async () => {
+    const file = await onDisk()
+    const { li, calls } = makeDocs([DOC_INIT, DOC_PUT, DOC_STATUS('AVAILABLE'), CREATED])
+    await li.publish(
+      ctx(),
+      draft({
+        title: 'Shared title',
+        overrides: { linkedin: { title: 'LinkedIn title' } },
+        media: [doc({ localPath: file })],
+      }),
+    )
+    assert.equal(sentTitle(calls), 'LinkedIn title')
+  })
+
+  test('without a title, the first line of the text becomes it, shortened at a word, and validation says so', async () => {
+    const file = await onDisk()
+    const body = '\nOne Meta ad can carry a lot more than most people ever put in it, by far.\nSecond line.'
+    const { li, calls } = makeDocs([DOC_INIT, DOC_PUT, DOC_STATUS('AVAILABLE'), CREATED])
+    const d = draft({ body, title: '   ', media: [doc({ localPath: file })] })
+
+    const validation = li.validate(d)
+    assert.equal(validation.ok, true)
+    assert.ok(codes(validation.issues, 'warning').includes('document_title_from_text'))
+
+    await li.publish(ctx(), d)
+    const title = sentTitle(calls)!
+    assert.ok(countGraphemes(title) <= LINKEDIN_DOCUMENT_TITLE_SHOWN, `"${title}" is too long`)
+    assert.ok(title.endsWith('…'))
+    assert.ok(title.startsWith('One Meta ad can carry'))
+    assert.ok(!title.includes(' …'), 'cut at a word, without a dangling space')
+  })
+
+  test('a short first line is used whole', () => {
+    const li = new LinkedInAdapter()
+    const validation = li.validate(draft({ body: 'Three gates.\nMore text', media: [doc({ localPath: 'x.pdf' })] }))
+    const issue = validation.issues.find((i) => i.code === 'document_title_from_text')!
+    assert.match(issue.message, /"Three gates\."/)
+  })
+
+  test('with no title and no text, the file name is the title', async () => {
+    const file = await onDisk(PDF_BYTES, 'Meta ad limits.pdf')
+    const { li, calls } = makeDocs([DOC_INIT, DOC_PUT, DOC_STATUS('AVAILABLE'), CREATED])
+    const d = draft({ body: '', media: [doc({ localPath: file })] })
+
+    assert.ok(codes(li.validate(d).issues, 'warning').includes('document_title_from_file'))
+    await li.publish(ctx(), d)
+    assert.equal(sentTitle(calls), 'Meta ad limits')
+  })
+
+  test('a hosted copy with no title or text is titled "Document", never by its hash', () => {
+    const li = new LinkedInAdapter()
+    const validation = li.validate(
+      draft({
+        body: '',
+        media: [doc({ publicUrl: 'https://media.example.com/t1/9f86d081884c7d659a2feaa0c55ad015.pdf' })],
+      }),
+    )
+    const issue = validation.issues.find((i) => i.code === 'document_title_default')!
+    assert.match(issue.message, /"Document"/)
+  })
+
+  test("a title past LinkedIn's composer limit is a warning, and is sent unchanged", async () => {
+    const title = 'Meta "code 10" permission errors: stop guessing, ask 3 questions'
+    assert.ok(countGraphemes(title) > LINKEDIN_DOCUMENT_TITLE_SHOWN)
+    const file = await onDisk()
+    const { li, calls } = makeDocs([DOC_INIT, DOC_PUT, DOC_STATUS('AVAILABLE'), CREATED])
+    const d = draft({ title, media: [doc({ localPath: file })] })
+
+    const validation = li.validate(d)
+    assert.equal(validation.ok, true)
+    const warning = validation.issues.find((i) => i.code === 'document_title_long')!
+    assert.equal(warning.severity, 'warning')
+    assert.match(warning.message, /64 characters/)
+
+    await li.publish(ctx(), d)
+    assert.equal(sentTitle(calls), title)
+  })
+
+  test('a title over 200 characters is refused before anything is sent', async () => {
+    const { li, calls } = makeDocs([CREATED])
+    const d = draft({ title: 'a'.repeat(201), media: [doc({ localPath: 'x.pdf' })] })
+    assert.ok(codes(li.validate(d).issues, 'error').includes('title_too_long'))
+    await assert.rejects(() => li.publish(ctx(), d), PublishError)
+    assert.equal(calls.length, 0)
+  })
+
+  test('a document with an image, or with a video, is refused before any call', async () => {
+    const clip: MediaRef = { id: 'v', kind: 'video', mime: 'video/mp4', bytes: 9, localPath: 'v.mp4' }
+    for (const other of [img(), clip]) {
+      const { li, calls } = makeDocs([CREATED])
+      const d = draft({ media: [doc({ localPath: 'x.pdf' }), other] })
+      assert.ok(codes(li.validate(d).issues, 'error').includes('mixed_media'), `with ${other.kind}`)
+      await assert.rejects(
+        () => li.publish(ctx(), d),
+        (error: unknown) => {
+          assert.ok(error instanceof PublishError)
+          assert.equal(error.failureClass, 'permanent')
+          return true
+        },
+      )
+      assert.equal(calls.length, 0)
+    }
+  })
+
+  test('two documents in one post are refused before any call', async () => {
+    const { li, calls } = makeDocs([CREATED])
+    const d = draft({ media: [doc({ id: 'a', localPath: 'a.pdf' }), doc({ id: 'b', localPath: 'b.pdf' })] })
+    assert.ok(codes(li.validate(d).issues, 'error').includes('too_many_documents'))
+    await assert.rejects(() => li.publish(ctx(), d), PublishError)
+    assert.equal(calls.length, 0)
+  })
+
+  test('a document type LinkedIn does not take is refused', async () => {
+    const { li, calls } = makeDocs([CREATED])
+    const d = draft({ media: [doc({ mime: 'text/plain', localPath: 'notes.txt' })] })
+    const validation = li.validate(d)
+    assert.ok(codes(validation.issues, 'error').includes('document_type_unsupported'))
+    assert.match(validation.issues.find((i) => i.code === 'document_type_unsupported')!.message, /text\/plain/)
+    await assert.rejects(() => li.publish(ctx(), d), PublishError)
+    assert.equal(calls.length, 0)
+  })
+
+  test('PowerPoint and Word files pass as LinkedIn documents', () => {
+    const li = new LinkedInAdapter()
+    for (const mime of [
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'application/vnd.ms-powerpoint',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    ]) {
+      const validation = li.validate(draft({ title: 'T', media: [doc({ mime, localPath: 'deck.x' })] }))
+      assert.equal(validation.ok, true, mime)
+    }
+  })
+
+  test('an empty file is refused before anything is registered with LinkedIn', async () => {
+    const file = await onDisk(new Uint8Array(0))
+    const { li, calls } = makeDocs([DOC_INIT, DOC_PUT, DOC_STATUS('AVAILABLE'), CREATED])
+    await assert.rejects(
+      () => li.publish(ctx(), draft({ title: 'T', media: [doc({ localPath: file, bytes: 0 })] })),
+      (error: unknown) => {
+        assert.ok(error instanceof PublishError)
+        assert.equal(error.failureClass, 'permanent')
+        assert.match(error.message, /empty/)
+        return true
+      },
+    )
+    assert.equal(calls.length, 0)
+  })
+
+  test('a file labelled PDF that is not one is refused before anything is registered', async () => {
+    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3])
+    const file = await onDisk(png, 'fake.pdf')
+    const { li, calls } = makeDocs([DOC_INIT, DOC_PUT, DOC_STATUS('AVAILABLE'), CREATED])
+    await assert.rejects(
+      () => li.publish(ctx(), draft({ title: 'T', media: [doc({ localPath: file })] })),
+      (error: unknown) => {
+        assert.ok(error instanceof PublishError)
+        assert.equal(error.failureClass, 'permanent')
+        assert.match(error.message, /does not start like one/)
+        return true
+      },
+    )
+    assert.equal(calls.length, 0)
+  })
+
+  test('a PDF signature a little way into the file still counts, as PDF readers allow', async () => {
+    const file = await onDisk(Buffer.concat([Buffer.from('\r\n\r\n'), PDF_BYTES]))
+    const { li, calls } = makeDocs([DOC_INIT, DOC_PUT, DOC_STATUS('AVAILABLE'), CREATED])
+    await li.publish(ctx(), draft({ title: 'T', media: [doc({ localPath: file })] }))
+    assert.equal(posts(calls).length, 1)
+  })
+
+  test('the 100 MB limit is checked against the real file, not the declared size', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'li-doc-big-'))
+    const file = join(dir, 'big.pdf')
+    try {
+      await writeFile(file, '')
+      await truncate(file, 100_000_001)
+      const { li, calls } = makeDocs([DOC_INIT, DOC_PUT, DOC_STATUS('AVAILABLE'), CREATED])
+      // Declared small, so validation passes and only the real size can catch it.
+      await assert.rejects(
+        () => li.publish(ctx(), draft({ title: 'T', media: [doc({ localPath: file, bytes: 1_000 })] })),
+        (error: unknown) => {
+          assert.ok(error instanceof PublishError)
+          assert.equal(error.failureClass, 'permanent')
+          assert.match(error.message, /over LinkedIn's limit/)
+          return true
+        },
+      )
+      assert.equal(calls.length, 0)
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  test('a hosted document (a scheduled post) is downloaded first, then uploaded byte for byte', async () => {
+    const { li, calls } = makeDocs([{ raw: PDF_BYTES }, DOC_INIT, DOC_PUT, DOC_STATUS('AVAILABLE'), CREATED])
+    await li.publish(ctx(), draft({ title: 'T', media: [doc({ publicUrl: 'https://media.example.com/t1/abc.pdf' })] }))
+
+    assert.equal(calls[0]!.url, 'https://media.example.com/t1/abc.pdf')
+    assert.match(calls[1]!.url, /\/rest\/documents\?action=initializeUpload$/)
+    assert.equal(calls[2]!.method, 'PUT')
+    assert.deepEqual(Buffer.from(calls[2]!.rawBody as Uint8Array), PDF_BYTES)
+    assert.equal(posts(calls).length, 1)
+  })
+
+  test('waits while LinkedIn processes the document, then posts', async () => {
+    const file = await onDisk()
+    const { li, calls, sleeps } = makeDocs(
+      [DOC_INIT, DOC_PUT, DOC_STATUS('WAITING_UPLOAD'), DOC_STATUS('PROCESSING'), DOC_STATUS('AVAILABLE'), CREATED],
+      { documentPollIntervalMs: 1_234 },
+    )
+    await li.publish(ctx(), draft({ title: 'T', media: [doc({ localPath: file })] }))
+    assert.deepEqual(sleeps, [1_234, 1_234])
+    assert.equal(calls.filter((c) => c.method === 'GET').length, 3)
+    assert.equal(posts(calls).length, 1)
+  })
+
+  test('a document LinkedIn could not process is never posted, and says why', async () => {
+    const file = await onDisk()
+    const { li, calls } = makeDocs([DOC_INIT, DOC_PUT, DOC_STATUS('PROCESSING_FAILED'), CREATED])
+    await assert.rejects(
+      () => li.publish(ctx(), draft({ title: 'T', media: [doc({ localPath: file })] })),
+      (error: unknown) => {
+        assert.ok(error instanceof PublishError)
+        assert.equal(error.failureClass, 'permanent')
+        assert.equal(error.code, 'MEDIA_PROCESSING_FAILED')
+        assert.match(error.message, /nothing was posted/)
+        return true
+      },
+    )
+    assert.equal(posts(calls).length, 0)
+  })
+
+  test('still processing after the last check: transient, and nothing is posted', async () => {
+    const file = await onDisk()
+    const { li, calls, sleeps } = makeDocs(
+      [DOC_INIT, DOC_PUT, DOC_STATUS('PROCESSING'), DOC_STATUS('PROCESSING'), DOC_STATUS('PROCESSING'), CREATED],
+      { documentStatusChecks: 3 },
+    )
+    await assert.rejects(
+      () => li.publish(ctx(), draft({ title: 'T', media: [doc({ localPath: file })] })),
+      (error: unknown) => {
+        assert.ok(error instanceof PublishError)
+        assert.equal(error.failureClass, 'transient')
+        assert.equal(error.code, 'MEDIA_PROCESSING_TIMEOUT')
+        return true
+      },
+    )
+    assert.equal(sleeps.length, 2)
+    assert.equal(posts(calls).length, 0)
+  })
+
+  test('a token that may not read the status (a member token) pauses once, then posts', async () => {
+    const file = await onDisk()
+    const forbidden: Reply = {
+      status: 403,
+      body: {
+        message: 'Accessing this document resource is forbidden. Please check your permissions for this resource',
+        status: 403,
+      },
+    }
+    const { li, calls, sleeps } = makeDocs([DOC_INIT, DOC_PUT, forbidden, CREATED], { documentUnreadableWaitMs: 999 })
+    const result = await li.publish(ctx(), draft({ title: 'T', media: [doc({ localPath: file })] }))
+    assert.deepEqual(sleeps, [999])
+    assert.equal(calls.filter((c) => c.method === 'GET').length, 1, 'one read, no retry loop on a 403')
+    assert.equal(posts(calls).length, 1)
+    assert.equal(result.platformPostId, 'urn:li:share:999')
+  })
+
+  test('the default pause for an unreadable status is 15 seconds', async () => {
+    const file = await onDisk()
+    const { li, sleeps } = makeDocs([DOC_INIT, DOC_PUT, { body: {} }, CREATED])
+    await li.publish(ctx(), draft({ title: 'T', media: [doc({ localPath: file })] }))
+    assert.deepEqual(sleeps, [15_000])
+  })
+
+  test('no upload address: transient, and nothing is uploaded or posted', async () => {
+    const file = await onDisk()
+    const { li, calls } = makeDocs([{ body: { value: { document: 'urn:li:document:X' } } }, DOC_PUT, CREATED])
+    await assert.rejects(
+      () => li.publish(ctx(), draft({ title: 'T', media: [doc({ localPath: file })] })),
+      (error: unknown) => {
+        assert.ok(error instanceof PublishError)
+        assert.equal(error.failureClass, 'transient')
+        return true
+      },
+    )
+    assert.equal(calls.some((c) => c.method === 'PUT'), false)
+    assert.equal(posts(calls).length, 0)
+  })
+
+  test('a refused upload is not posted; a 5xx is worth retrying, a 4xx is not', async () => {
+    for (const [status, failureClass] of [
+      [400, 'permanent'],
+      [503, 'transient'],
+    ] as const) {
+      const file = await onDisk()
+      const { li, calls } = makeDocs([DOC_INIT, { status }, DOC_STATUS('AVAILABLE'), CREATED])
+      await assert.rejects(
+        () => li.publish(ctx(), draft({ title: 'T', media: [doc({ localPath: file })] })),
+        (error: unknown) => {
+          assert.ok(error instanceof PublishError)
+          assert.equal(error.failureClass, failureClass)
+          assert.equal(error.httpStatus, status)
+          return true
+        },
+      )
+      assert.equal(calls.some((c) => c.method === 'GET'), false)
+      assert.equal(posts(calls).length, 0)
+    }
+  })
+
+  test('a post refused because its media is still waiting for upload is retried later', async () => {
+    const file = await onDisk()
+    const waiting: Reply = {
+      status: 400,
+      body: { message: 'Media asset is waiting upload', code: 'MEDIA_ASSET_WAITING_UPLOAD', status: 400 },
+    }
+    const { li } = makeDocs([DOC_INIT, DOC_PUT, DOC_STATUS('AVAILABLE'), waiting])
+    await assert.rejects(
+      () => li.publish(ctx(), draft({ title: 'T', media: [doc({ localPath: file })] })),
+      (error: unknown) => {
+        assert.ok(error instanceof PublishError)
+        assert.equal(error.failureClass, 'transient')
+        return true
+      },
+    )
+  })
+
+  test('a post refused because its media failed processing is not retried, and has its own diagnosis', async () => {
+    const file = await onDisk()
+    const failed: Reply = { status: 400, body: { message: 'Media asset failed processing', status: 400 } }
+    const { li } = makeDocs([DOC_INIT, DOC_PUT, DOC_STATUS('AVAILABLE'), failed])
+    await assert.rejects(
+      () => li.publish(ctx(), draft({ title: 'T', media: [doc({ localPath: file })] })),
+      (error: unknown) => {
+        assert.ok(error instanceof PublishError)
+        assert.equal(error.failureClass, 'permanent')
+        assert.equal(error.code, 'MEDIA_PROCESSING_FAILED')
+        return true
+      },
+    )
+  })
+
+  test('text, image and video posts are validated exactly as before documents existed', () => {
+    const li = new LinkedInAdapter()
+    const clip: MediaRef = { id: 'v', kind: 'video', mime: 'video/mp4', bytes: 9, localPath: 'v.mp4' }
+    for (const d of [draft(), draft({ title: 'ignored here', media: [img()] }), draft({ media: [clip] })]) {
+      assert.deepEqual(li.validate(d), validateAgainstCapabilities(d, 'linkedin', CAPABILITIES.linkedin))
+    }
+  })
+
+  test('an image post still sends no title', async () => {
+    const { fetchImpl, calls } = mockLinkedIn([
+      { body: { value: { uploadUrl: 'https://upload.linkedin.example/abc', image: 'urn:li:image:IMG1' } } },
+      { body: {} },
+      {},
+      CREATED,
+    ])
+    await new LinkedInAdapter({ fetch: fetchImpl }).publish(ctx(), draft({ title: 'Not for images', media: [img()] }))
+    assert.deepEqual(posts(calls)[0]!.body.content, { media: { id: 'urn:li:image:IMG1' } })
   })
 })

@@ -8,10 +8,21 @@ import {
   ThreadsAdapter,
   PinterestAdapter,
   LinkedInAdapter,
+  YouTubeAdapter,
+  youTubeOptionsFromEnv,
 } from '@social-publisher/adapters'
 import { mediaHostingReady, optional, required } from '@social-publisher/config'
-import { selectTargets, type Connection, type MediaRef, type Platform, type PostDraft } from '@social-publisher/core'
-import { db, disconnect } from '@social-publisher/db'
+import {
+  mediaKindForMime,
+  overridesForStorage,
+  selectTargets,
+  type Connection,
+  type MediaKind,
+  type MediaRef,
+  type Platform,
+  type PostDraft,
+} from '@social-publisher/core'
+import { TenantScope, db, disconnect } from '@social-publisher/db'
 import { MediaStore } from '@social-publisher/media'
 import { PublishService } from '@social-publisher/publisher'
 import { TokenVault, parseKey } from '@social-publisher/vault'
@@ -22,6 +33,18 @@ import { TokenVault, parseKey } from '@social-publisher/vault'
  * Defaults to a dry run. Publishing is public and irreversible, so it takes an
  * explicit `--publish` flag rather than happening because someone pressed up-arrow
  * and enter.
+ *
+ * `--title` sets a title for platforms that keep one (a YouTube video, a
+ * LinkedIn document); without it they use the first line of the text.
+ * `--title-file <path>` reads it from a UTF-8 file instead, for callers whose
+ * shell mangles quotes.
+ * `--synthetic` declares that the media is realistic AI-generated or altered
+ * content, which YouTube, Meta and TikTok ask to be disclosed.
+ *
+ * `--document <pdf>` attaches a PDF that a platform taking documents shows as
+ * swipeable pages: a LinkedIn document post, the way carousels go out there.
+ * One document per post, on its own; every other platform refuses it at
+ * validation, before anything is published.
  */
 
 const MIME_BY_EXT: Record<string, string> = {
@@ -32,6 +55,14 @@ const MIME_BY_EXT: Record<string, string> = {
   '.webp': 'image/webp',
   '.mp4': 'video/mp4',
   '.mov': 'video/quicktime',
+  '.pdf': 'application/pdf',
+}
+
+/** The flag that attaches each kind, for messages. */
+const FLAG_FOR_KIND: Record<MediaKind, string> = {
+  image: '--image',
+  video: '--video',
+  document: '--document',
 }
 
 async function main(): Promise<void> {
@@ -41,12 +72,21 @@ async function main(): Promise<void> {
       'text-file': { type: 'string' },
       image: { type: 'string', multiple: true },
       video: { type: 'string' },
+      document: { type: 'string' },
       platform: { type: 'string', multiple: true },
       account: { type: 'string', multiple: true },
       publish: { type: 'boolean', default: false },
       at: { type: 'string' },
+      title: { type: 'string' },
+      'title-file': { type: 'string' },
+      synthetic: { type: 'boolean', default: false },
     },
   })
+
+  if (values.title !== undefined && values['title-file'] !== undefined) {
+    console.error('\n  Pass --title or --title-file, not both.\n')
+    process.exit(1)
+  }
 
   const scheduledFor = values.at !== undefined ? new Date(values.at) : undefined
   if (scheduledFor !== undefined && Number.isNaN(scheduledFor.getTime())) {
@@ -59,17 +99,29 @@ async function main(): Promise<void> {
       ? readFileSync(values['text-file'], 'utf8').trimEnd()
       : (values.text ?? '')
 
-  if (body.trim() === '' && values.image === undefined && values.video === undefined) {
-    console.error('\n  Nothing to post. Pass --text "..." or --text-file <path>, and optionally --image <path>.\n')
+  if (body.trim() === '' && values.image === undefined && values.video === undefined && values.document === undefined) {
+    console.error(
+      '\n  Nothing to post. Pass --text "..." or --text-file <path>, and optionally --image, --video or --document <path>.\n',
+    )
     process.exit(1)
   }
 
   const media: MediaRef[] = []
   for (const path of values.image ?? []) media.push(toMedia(path, 'image'))
   if (values.video !== undefined) media.push(toMedia(values.video, 'video'))
+  if (values.document !== undefined) media.push(toMedia(values.document, 'document'))
+
+  // --title-file exists for the same reason as --text-file: a title holding
+  // double quotes does not survive Windows PowerShell 5.1's command line, which
+  // passes them to node unescaped and splits the argument in two.
+  const title = (values['title-file'] !== undefined ? readFileSync(values['title-file'], 'utf8') : values.title)?.trim()
+  const extras: Pick<PostDraft, 'title' | 'syntheticMedia'> = {
+    ...(title !== undefined && title !== '' ? { title } : {}),
+    ...(values.synthetic === true ? { syntheticMedia: true } : {}),
+  }
 
   // Rebuilt after any upload step so publicUrl is present.
-  let draft: PostDraft = { body, media }
+  let draft: PostDraft = { body, media, ...extras }
 
   const tenant = await db().tenant.findFirst({ orderBy: { createdAt: 'asc' } })
   if (tenant === null) {
@@ -123,6 +175,8 @@ async function main(): Promise<void> {
     new PinterestAdapter(),
     // LinkedIn uses its own API, its own token and its own version header.
     new LinkedInAdapter(),
+    // Google's token and settings; uploads stay private until the API audit passes.
+    new YouTubeAdapter(youTubeOptionsFromEnv((key) => optional(key))),
   ])
 
   const platforms = [...new Set(targets.map((t) => t.platform))]
@@ -146,7 +200,9 @@ async function main(): Promise<void> {
   if (needsPublicUrl && media.length > 0) {
     if (!mediaHostingReady()) {
       console.error(
-        '\n  Instagram needs media hosting, which is not configured.' +
+        (scheduledFor !== undefined
+          ? '\n  A scheduled post needs its media hosted, and media hosting is not configured.'
+          : '\n  A platform here fetches media by URL, and media hosting is not configured.') +
           '\n  Set SUPABASE_SERVICE_ROLE_KEY and create a PUBLIC bucket. See SETUP.md.\n',
       )
       await disconnect()
@@ -163,7 +219,25 @@ async function main(): Promise<void> {
     for (let i = 0; i < media.length; i += 1) {
       const item = media[i]!
       if (item.publicUrl !== undefined || item.localPath === undefined) continue
-      const result = await store.uploadFile(item.localPath, { tenantId: tenant.id })
+      let result: Awaited<ReturnType<typeof store.uploadFile>>
+      try {
+        // The type is passed rather than guessed again from the extension, which
+        // the store's own table does not know for a PDF.
+        result = await store.uploadFile(item.localPath, { tenantId: tenant.id, mime: item.mime })
+      } catch (error) {
+        console.error(`\n  Could not host ${item.localPath}: ${error instanceof Error ? error.message : String(error)}`)
+        if (scheduledFor !== undefined) {
+          // The usual cause for a video, and the one with a way round it.
+          console.error(
+            '  A scheduled post is published later by the worker, which can only use media hosted in the' +
+              '\n  bucket, and the bucket caps file size. For a large video, publish now instead (drop --at):' +
+              '\n  platforms that take uploads then read the file straight from disk.',
+          )
+        }
+        console.error('')
+        await disconnect()
+        process.exit(1)
+      }
       media[i] = { ...item, publicUrl: result.publicUrl }
       uploaded.set(item.id, { key: result.key, publicUrl: result.publicUrl, sha256: result.sha256 })
       console.log(`    ${result.reused ? 'reused' : 'uploaded'}  ${result.publicUrl}`)
@@ -180,11 +254,13 @@ async function main(): Promise<void> {
       }
     }
     // Explicit rebuild rather than relying on the array being mutated in place.
-    draft = { body, media }
+    draft = { body, media, ...extras }
   }
 
   console.log('\n  Targets:')
   for (const t of targets) console.log(`    ${t.platform.padEnd(15)} ${t.displayName}`)
+  if (draft.title !== undefined) console.log(`\n  Title: ${draft.title}`)
+  if (draft.syntheticMedia === true) console.log('\n  Declared as realistic AI-generated or altered media.')
   console.log(`\n  Text (${body.length} chars):\n`)
   for (const line of body.split('\n')) console.log(`    ${line}`)
   if (media.length > 0) {
@@ -221,6 +297,15 @@ async function main(): Promise<void> {
   }
 
   /**
+   * The posts table has no title or disclosure column, so both travel in the
+   * per-platform overrides, where the worker reads them back. Stored for an
+   * immediate post too: retrying a failed target rebuilds it from this row, and
+   * a retry must not lose the AI disclosure.
+   */
+  const overrides = overridesForStorage(draft, platforms)
+  const tenantScope = new TenantScope(tenant.id)
+
+  /**
    * Scheduled path: persist the post, its media and one job per target, then stop.
    * The worker picks it up when it is due.
    *
@@ -228,8 +313,10 @@ async function main(): Promise<void> {
    * runs in another process and rebuilds the draft purely from the database.
    */
   if (scheduledFor !== undefined) {
-    const post = await db().post.create({
-      data: { tenantId: tenant.id, body, createdBy: 'cli' },
+    const post = await tenantScope.createPost({
+      body,
+      createdBy: 'cli',
+      ...(overrides !== undefined ? { overrides } : {}),
     })
 
     for (const [position, item] of media.entries()) {
@@ -282,19 +369,29 @@ async function main(): Promise<void> {
     store: credentialStore(),
   })
 
-  const post = await db().post.create({
-    data: { tenantId: tenant.id, body, createdBy: 'cli' },
+  const post = await tenantScope.createPost({
+    body,
+    createdBy: 'cli',
+    ...(overrides !== undefined ? { overrides } : {}),
   })
 
   const report = await service.publish(
     draft,
-    targets.map((connection) => ({
-      connection,
-      withCredential: async <T,>(fn: (token: string) => Promise<T>): Promise<T> =>
-        await vault.withCredential(connection.id, connection.tenantId, async (cred) =>
-          await fn(cred.accessToken),
-        ),
-    })),
+    targets.map((connection) => {
+      const adapter = service.adapterFor(connection.platform)
+      return {
+        connection,
+        withCredential: async <T,>(fn: (token: string) => Promise<T>): Promise<T> =>
+          await vault.withCredential(
+            connection.id,
+            connection.tenantId,
+            async (cred) => await fn(cred.accessToken),
+            // Renews an hour-long token on the way in. Undefined for every
+            // adapter whose tokens do not renew, which changes nothing for them.
+            adapter?.refreshCredential?.bind(adapter),
+          ),
+      }
+    }),
     { idempotencyKeyFor: (connectionId) => `${post.id}:${connectionId}` },
   )
 
@@ -312,6 +409,8 @@ async function main(): Promise<void> {
               publishedAt: new Date(),
               platformPostId: outcome.result!.platformPostId,
               platformUrl: outcome.result!.url ?? null,
+              // Kept with the target, so the post list shows it too.
+              platformMessage: outcome.result!.notice ?? null,
             }
           : {
               failureClass: outcome.error!.failureClass,
@@ -322,8 +421,12 @@ async function main(): Promise<void> {
     })
 
     if (outcome.ok) {
-      console.log(`    PUBLISHED  ${outcome.displayName}`)
+      // A notice means it went through but is not what "published" implies,
+      // such as a video uploaded private. Never print that as PUBLISHED.
+      const notice = outcome.result!.notice
+      console.log(`    ${notice === undefined ? 'PUBLISHED' : 'UPLOADED '}  ${outcome.displayName}`)
       console.log(`               ${outcome.result!.url ?? outcome.result!.platformPostId}`)
+      if (notice !== undefined) console.log(`               NOTE: ${notice}`)
     } else {
       console.log(`    FAILED     ${outcome.displayName}`)
       console.log(`               ${outcome.error!.message}${outcome.error!.retryable ? '  [retryable]' : ''}`)
@@ -334,7 +437,7 @@ async function main(): Promise<void> {
   await disconnect()
 }
 
-function toMedia(path: string, kind: 'image' | 'video'): MediaRef {
+function toMedia(path: string, kind: MediaKind): MediaRef {
   if (!existsSync(path)) {
     console.error(`\n  File not found: ${path}\n`)
     process.exit(1)
@@ -345,7 +448,18 @@ function toMedia(path: string, kind: 'image' | 'video'): MediaRef {
     console.error(`\n  Unsupported file type: ${ext}\n`)
     process.exit(1)
   }
+  // A file under the wrong flag would be sent as the wrong kind: a PDF passed
+  // as --image would go to LinkedIn's image upload and fail there, less clearly.
+  const actual = mediaKindForMime(mime)
+  if (actual !== kind) {
+    console.error(`\n  ${FLAG_FOR_KIND[kind]} cannot take ${path}: it is ${articleFor(actual)} ${actual}. Use ${FLAG_FOR_KIND[actual]} for it.\n`)
+    process.exit(1)
+  }
   return { id: path, kind, mime, bytes: statSync(path).size, localPath: path }
+}
+
+function articleFor(kind: MediaKind): string {
+  return kind === 'image' ? 'an' : 'a'
 }
 
 function credentialStore() {

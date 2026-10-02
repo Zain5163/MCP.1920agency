@@ -1,6 +1,7 @@
 export * from './domain/types.ts'
 export * from './domain/errors.ts'
 export * from './domain/validate.ts'
+export * from './domain/media.ts'
 export * from './domain/resolutions.ts'
 export * from './domain/policy.ts'
 export * from './domain/ads.ts'

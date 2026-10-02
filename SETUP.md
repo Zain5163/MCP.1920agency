@@ -33,8 +33,12 @@ people accidentally discard work they have already done.
    - ⚠️ The App Secret is a credential. Do **not** paste it into this workspace, into
      chat, or into any file under `D:\My AI Works`. It goes only in the env file in
      step 5.
-5. Under **App Settings → Basic**, set the OAuth redirect URI to
-   `http://localhost:3000/api/auth/callback/facebook` for local development.
+5. Under **Facebook Login for Business → Settings → Valid OAuth Redirect URIs**, add
+   `http://localhost:8787/callback` — the address the connect command listens on
+   (`META_REDIRECT_URI` overrides it) — and add `localhost` under **App settings →
+   Basic → App domains**. While the app is **Live**, Meta enforces HTTPS and refuses
+   this localhost address: switch the app to Development to connect, then back to
+   Live (WAITING-LIST #17). A public https callback is the lasting fix.
 6. Permissions needed later, at Advanced Access (these require App Review — do not
    submit until we have a working demo to show):
    - `pages_show_list`, `pages_read_engagement`, `pages_manage_posts`
@@ -70,6 +74,11 @@ rather than accepting an upload.
 Using **Supabase Storage**, not Cloudflare R2 — the account already exists and R2
 requires a payment card even on its free tier. A public bucket named `media` is
 configured and verified working.
+
+A *scheduled* LinkedIn document post (PDF carousel) is stored here too, so the
+bucket must take `application/pdf`. If the bucket has an allowed-types list, add
+it. Not checked yet (2026-10-02): if PDFs are refused, the CLI says so when the
+post is scheduled and nothing is queued.
 
 ## 5. The env file — OUTSIDE this workspace
 
@@ -147,6 +156,75 @@ platform here whose connections go stale on their own if nothing refreshes them.
 
 ---
 
+## 8. Google — YouTube (optional)
+
+The code is built and unit-tested; **nothing has been connected or uploaded for
+real yet.** These steps are yours, in the Google Cloud project
+`gen-lang-client-0046538567` (the owner's own/dev project; it already exists,
+created by Google AI Studio). Its existing **service account** cannot upload to
+YouTube — that needs an **OAuth client**, below.
+
+1. **console.cloud.google.com → APIs & Services → Library → YouTube Data API v3 →
+   Enable.** Without it every call fails with `accessNotConfigured`
+   (`GOOGLE_API_NOT_ENABLED`).
+2. **Google Auth Platform (OAuth consent screen)**: user type **External**. Then
+   either add yourself under **Audience → Test users**, or **publish the app to
+   production**:
+   - **Testing**: Google ends the authorisation **7 days** after you consent, so you
+     would reconnect weekly (`GOOGLE_TOKEN_REVOKED`).
+   - **In production** (unverified): you see an "unverified app" warning when
+     connecting, which is expected for personal use, and there is no 7-day limit.
+     Unverified production apps are capped at 100 users in total.
+3. **Clients → Create client → Application type: Web application.** Under
+   **Authorized redirect URIs** add exactly:
+   ```
+   http://localhost:8787/google/callback
+   ```
+   It must match character for character: `localhost` (not `127.0.0.1`), port
+   8787, no trailing slash.
+4. Copy the **Client ID** and **Client secret** into
+   `%USERPROFILE%\.social-publisher\.env` (never into this workspace or a chat —
+   the secret starts `GOCSPX-`):
+   ```
+   GOOGLE_CLIENT_ID=
+   GOOGLE_CLIENT_SECRET=
+   ```
+5. In `source/apps/cli` run:
+   ```
+   pnpm connect:provider google youtube
+   ```
+   On Google's screen, choose the account (or brand account) that owns the
+   channel and **leave both YouTube permissions ticked**: "Manage your YouTube
+   videos" (uploads) and "View your YouTube account" (finding the channel, and
+   the check before every upload that the token belongs to that channel).
+
+**Uploads are private until the YouTube API audit passes.** Google restricts
+every upload from an unaudited API project to private viewing, with no appeal.
+AdsPilot therefore uploads as private and reports **"uploaded, private"** —
+never "published" — while `YOUTUBE_UPLOADS_AUDITED=false`. The audit is the
+YouTube API Services Audit and Quota Extension Form
+(https://support.google.com/youtube/contact/yt_api_form), separate from Google's
+OAuth app verification. Only after it passes, set `YOUTUBE_UPLOADS_AUDITED=true`
+and choose `YOUTUBE_DEFAULT_PRIVACY` (`private`, `unlisted` or `public`).
+
+Other things worth knowing:
+
+- **Quota:** 100 uploads a day for the whole project, reset at midnight Pacific
+  time. A quota error waits for the reset and retries; it never says "reconnect".
+- **Large videos:** publish them now, straight from disk
+  (`pnpm post --video <file> --title "..." --platform youtube --publish`, or
+  `publish_post` with a `localPath`). A *scheduled* post needs its file in the
+  Supabase media bucket, which caps file size.
+- **AI disclosure:** add `--synthetic` (or `syntheticMedia: true`) when the video
+  contains realistic AI-generated or altered content. Every upload states it
+  either way, along with "not made for kids".
+- **Videos over 15 minutes** need a verified channel: https://www.youtube.com/verify.
+- **Reconnect only when needed.** Google keeps at most 100 refresh tokens per
+  account for one client; each connect issues a new one and the oldest silently
+  stops working.
+
+---
+
 ## Status
 
 | Step | Blocks | Status |
@@ -158,6 +236,7 @@ platform here whose connections go stale on their own if nothing refreshes them.
 | 5. Env file | Running anything | ✅ at `%USERPROFILE%\.social-publisher\.env` |
 | 6. Threads | Posting to Threads | ☐ needs its own Meta app use case and credentials |
 | 7. Other platforms | Nothing yet | ☐ optional |
+| 8. Google (YouTube) | Uploading to YouTube | ☐ code built and unit-tested, not run live; needs the API enabled, a Web OAuth client and a connect. Uploads stay private until the YouTube audit |
 
 **Live as of 2026-09-25:** Facebook Page and Instagram both publishing, six real
 posts sent, scheduler and monitor running as Windows scheduled tasks.

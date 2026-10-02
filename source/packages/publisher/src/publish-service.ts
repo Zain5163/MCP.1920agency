@@ -2,6 +2,7 @@ import {
   PublishError,
   backoffMs,
   type Connection,
+  type ErrorCode,
   type Platform,
   type PlatformAdapter,
   type PostDraft,
@@ -29,11 +30,14 @@ export interface TargetOutcome {
   readonly platform: Platform
   readonly displayName: string
   readonly ok: boolean
+  /** Includes the adapter's `notice`, which every caller must show. */
   readonly result?: PublishResult
   readonly error?: {
     readonly failureClass: string
     readonly message: string
     readonly platformCode?: string
+    /** The catalogue entry the adapter named, when it could tell. Prefer it over the class. */
+    readonly code?: ErrorCode
     readonly retryable: boolean
     readonly retryAfterMs?: number
   }
@@ -187,10 +191,34 @@ function describeError(error: unknown): NonNullable<TargetOutcome['error']> {
       // support ticket nobody can trace back to the platform.
       message: error.platformMessage ?? error.message,
       ...(error.platformCode !== undefined ? { platformCode: error.platformCode } : {}),
+      ...(error.code !== undefined ? { code: error.code } : {}),
       retryable: error.isRetryable,
       ...(error.isRetryable ? { retryAfterMs } : {}),
     }
   }
+
+  /**
+   * The vault refusing a dead credential is a credential failure, not a
+   * rejection of the post. Reported as `permanent`, the worker filed the target
+   * as failed rather than needing reconnection, and the MCP server told the user
+   * the platform had refused the content — when the fix was to reconnect.
+   *
+   * Matched by name because this package does not depend on the vault. When the
+   * vault gives the refusal behind it — say, Google revoking the token — its
+   * code and wording are carried along, so the diagnosis can be specific.
+   */
+  if (error instanceof Error && error.name === 'NeedsReauthError') {
+    const cause = error.cause instanceof PublishError ? error.cause : undefined
+    const because = cause?.platformMessage ?? cause?.message
+    return {
+      failureClass: 'credential',
+      message: because !== undefined ? `${error.message} ${because}` : error.message,
+      ...(cause?.platformCode !== undefined ? { platformCode: cause.platformCode } : {}),
+      ...(cause?.code !== undefined ? { code: cause.code } : {}),
+      retryable: false,
+    }
+  }
+
   return {
     failureClass: 'permanent',
     message: error instanceof Error ? error.message : String(error),

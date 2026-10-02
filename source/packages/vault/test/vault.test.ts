@@ -220,6 +220,132 @@ describe('expiry and refresh', () => {
       return 1
     })
   })
+
+  test('a refresh that returns only a new access token keeps the refresh token', async () => {
+    // Google returns no new refresh token on refresh. Replacing the credential
+    // with the reply would leave nothing to refresh with an hour later.
+    const store = new FakeStore()
+    const vault = makeVault(store, now)
+    await vault.store('c', 't', {
+      accessToken: 'old',
+      refreshToken: 'r1',
+      expiresAt: past,
+      scopes: ['a'],
+      authorisationExpiresAt: null,
+    })
+
+    await vault.withCredential('c', 't', async () => 1, async () => ({ accessToken: 'new', expiresAt: future }))
+
+    await vault.withCredential('c', 't', async (cred) => {
+      assert.equal(cred.accessToken, 'new')
+      assert.equal(cred.refreshToken, 'r1')
+      assert.deepEqual(cred.scopes, ['a'])
+      assert.equal(cred.authorisationExpiresAt, null)
+      return 1
+    })
+  })
+
+  test('a transient refresh failure is passed on without marking the account dead', async () => {
+    // One network blip during an hourly refresh must not disable a channel.
+    const store = new FakeStore()
+    const vault = makeVault(store, now)
+    await vault.store('c', 't', { accessToken: 'old', refreshToken: 'r1', expiresAt: past })
+    const blip = Object.assign(new Error('Could not reach Google'), { failureClass: 'transient' })
+
+    await assert.rejects(
+      () => vault.withCredential('c', 't', async () => 1, async () => { throw blip }),
+      (error: unknown) => error === blip,
+    )
+    assert.deepEqual(store.reauthCalls, [])
+  })
+
+  test('a refused refresh keeps its cause, so the reason can be reported', async () => {
+    const store = new FakeStore()
+    const vault = makeVault(store, now)
+    await vault.store('c', 't', { accessToken: 'old', refreshToken: 'r1', expiresAt: past })
+    const refused = Object.assign(new Error('invalid_grant'), { failureClass: 'credential' })
+
+    await assert.rejects(
+      () => vault.withCredential('c', 't', async () => 1, async () => { throw refused }),
+      (error: unknown) => {
+        assert.ok(error instanceof NeedsReauthError)
+        assert.equal(error.cause, refused)
+        return true
+      },
+    )
+    assert.equal(store.reauthCalls.length, 1)
+  })
+
+  test('a failure to save after a successful refresh does not mark the account dead', async () => {
+    // The platform already said yes; a database hiccup is not a revoked token.
+    const store = new FakeStore()
+    const vault = makeVault(store, now)
+    await vault.store('c', 't', { accessToken: 'old', refreshToken: 'r1', expiresAt: past })
+    store.save = async () => {
+      throw new Error('database unavailable')
+    }
+
+    await assert.rejects(
+      () => vault.withCredential('c', 't', async () => 1, async () => ({ accessToken: 'new', expiresAt: future })),
+      /database unavailable/,
+    )
+    assert.deepEqual(store.reauthCalls, [])
+  })
+})
+
+describe('the expiry column records when the authorisation dies', () => {
+  const hour = new Date('2026-01-01T02:00:00Z')
+  const month = new Date('2026-02-01T00:00:00Z')
+
+  test('without an authorisation expiry it follows the token expiry, as before', async () => {
+    const store = new FakeStore()
+    await makeVault(store).store('c', 't', { accessToken: 'x', expiresAt: month })
+    assert.equal(store.rows.get('t:c')!.expiresAt?.toISOString(), month.toISOString())
+  })
+
+  test('an authorisation expiry is what the column records, not the hourly token', async () => {
+    const store = new FakeStore()
+    await makeVault(store).store('c', 't', { accessToken: 'x', expiresAt: hour, authorisationExpiresAt: month })
+    assert.equal(store.rows.get('t:c')!.expiresAt?.toISOString(), month.toISOString())
+  })
+
+  test('null means no known end, and is written as null rather than the token expiry', async () => {
+    // Otherwise the refresh runner marks a Google connection dead an hour in.
+    const store = new FakeStore()
+    await makeVault(store).store('c', 't', { accessToken: 'x', expiresAt: hour, authorisationExpiresAt: null })
+    assert.equal(store.rows.get('t:c')!.expiresAt, null)
+  })
+
+  test('the authorisation expiry survives the round trip, as a Date or as null', async () => {
+    const store = new FakeStore()
+    const vault = makeVault(store, () => new Date('2026-01-01T00:00:00Z'))
+    await vault.store('a', 't', { accessToken: 'x', expiresAt: hour, authorisationExpiresAt: month })
+    await vault.store('b', 't', { accessToken: 'y', expiresAt: hour, authorisationExpiresAt: null })
+
+    await vault.withCredential('a', 't', async (cred) => {
+      assert.ok(cred.authorisationExpiresAt instanceof Date)
+      assert.equal(cred.authorisationExpiresAt.toISOString(), month.toISOString())
+      return 1
+    })
+    await vault.withCredential('b', 't', async (cred) => {
+      assert.equal(cred.authorisationExpiresAt, null)
+      return 1
+    })
+  })
+
+  test('a refresh keeps the authorisation expiry in the column', async () => {
+    const store = new FakeStore()
+    const vault = makeVault(store, () => new Date('2026-01-01T03:00:00Z'))
+    await vault.store('c', 't', { accessToken: 'old', refreshToken: 'r', expiresAt: hour, authorisationExpiresAt: null })
+
+    await vault.withCredential(
+      'c',
+      't',
+      async () => 1,
+      async () => ({ accessToken: 'new', expiresAt: new Date('2026-01-01T04:00:00Z') }),
+    )
+    assert.equal(store.rows.get('t:c')!.expiresAt, null)
+  })
 })
 
 describe('no credential escape hatch', () => {

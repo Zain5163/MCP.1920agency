@@ -41,7 +41,44 @@ export interface DiscoveredAccount {
 export interface AuthorisedCredential {
   readonly accessToken: string
   readonly refreshToken?: string
+  /** When the access token stops working. */
   readonly expiresAt?: Date
+  /**
+   * The scopes the person actually granted, when the provider reports them.
+   *
+   * Google lets people untick individual permissions, so what was requested is
+   * not what was granted. Storing the requested list would make a connection
+   * look capable of something it is not. Absent means the provider does not
+   * say, and the requested scopes are the best record there is.
+   */
+  readonly grantedScopes?: readonly string[]
+  /**
+   * The provider's stable id for the person who authorised, when it has one
+   * (OpenID `sub`). Keys the stored authorisation, so reconnecting updates it
+   * rather than adding a duplicate. Absent means the first discovered account
+   * stands in, as it always has.
+   */
+  readonly externalUserId?: string
+  /** A human label for the authorisation, e.g. the email that signed in. */
+  readonly accountLabel?: string
+  /**
+   * When the authorisation itself ends, if that differs from `expiresAt`.
+   * `null` means no known end: Google's access token lasts an hour, but the
+   * refresh token behind it lives until it is revoked. Absent means
+   * `expiresAt` is the authorisation's end too, which is true for every
+   * provider that has no refresh token.
+   */
+  readonly authorisationExpiresAt?: Date | null
+}
+
+/** Options for building the authorise URL. */
+export interface AuthUrlOptions {
+  /**
+   * Which of the provider's products to ask for, by bundle name, e.g. the
+   * YouTube bundle of a Google connection. Providers with a single fixed set of
+   * scopes ignore this. Empty or absent means the provider's default.
+   */
+  readonly scopeBundles?: readonly string[]
 }
 
 export interface Provider {
@@ -66,8 +103,11 @@ export interface Provider {
    * from the start, authorisation never was, so the connect command only knew
    * how to run Meta's dialog. Putting both on the provider is what makes
    * `connect <provider>` generic instead of a switch on platform names.
+   *
+   * `options` is how a provider with several products asks for only the ones
+   * being connected. A provider is free to ignore it.
    */
-  authUrl(state: string): string
+  authUrl(state: string, options?: AuthUrlOptions): string
 
   /** Turns the code from the redirect into a usable credential. */
   exchangeCode(code: string): Promise<AuthorisedCredential>
@@ -88,6 +128,31 @@ export interface Provider {
    * a failure.
    */
   refresh?(currentToken: string): Promise<{ accessToken: string; expiresAt: Date }>
+
+  /**
+   * Renews a credential using its refresh token.
+   *
+   * Separate from `refresh` because that one is handed only the access token,
+   * which is all Threads and Instagram need, and a refresh-token provider such
+   * as Google cannot work with it. This one receives the whole stored
+   * credential and returns what changed; the vault merges the result, so a
+   * provider that issues no new refresh token keeps the old one.
+   *
+   * It has the shape of the vault's refresh function, so it can be passed
+   * straight to `withCredential` and renewal happens on read.
+   */
+  refreshCredential?(current: {
+    readonly accessToken: string
+    readonly refreshToken?: string
+    readonly expiresAt?: Date
+  }): Promise<{ readonly accessToken: string; readonly refreshToken?: string; readonly expiresAt: Date }>
+
+  /**
+   * What to tell someone whose authorisation reached no postable account, in
+   * this provider's own terms — for Google, that the account may have no
+   * channel. Without it the connect command can only say "nothing found".
+   */
+  readonly noAccountsHint?: string
 }
 
 const REGISTRY = new Map<string, Provider>()

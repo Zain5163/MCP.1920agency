@@ -40,6 +40,24 @@ describe('redaction — the property that matters most', () => {
     assert.match(redactText('failed with EAABwzLixnjYBO1ZByourtokenvalue123456'), /\[redacted:meta-token\]/)
   })
 
+  test('catches Google access tokens, refresh tokens and client secrets in free text', () => {
+    // Shapes from Google's own documentation; none of these is a real credential.
+    const access = 'ya29.a0AfB_byC1D2E3F4G5H6I7J8K9L0MnOpQrStUvWxYz-_0123456789'
+    const refresh = '1//xEoDL4iW3cxlI7yDbSRFYNG01kVKM2C-259HOF2aQbI'
+    const secret = 'GOCSPX-AbCdEfGhIjKlMnOpQrStUvWxYz12'
+    const out = redactText(`refresh failed: access=${access} refresh=${refresh} secret=${secret}`)
+
+    for (const leaked of [access, refresh, secret]) assert.ok(!out.includes(leaked), `leaked ${leaked}`)
+    assert.match(out, /\[redacted:google-access-token\]/)
+    assert.match(out, /\[redacted:google-refresh-token\]/)
+    assert.match(out, /\[redacted:google-client-secret\]/)
+  })
+
+  test('leaves URLs and short paths alone while catching Google tokens', () => {
+    const text = 'see https://www.googleapis.com/upload/youtube/v3/videos and file:1//a'
+    assert.equal(redactText(text), text)
+  })
+
   test('catches JWTs, which is what Supabase keys are', () => {
     const jwt = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dBjftJeZ4CVPmB92K27uhbUJU1p1r_wW1gFWFOEjXk'
     assert.ok(!redactText(`key=${jwt}`).includes(jwt))

@@ -5,7 +5,9 @@ import {
   allProviders,
   createState,
   flattenAccounts,
+  googleProviderConfigFromEnv,
   providerFor,
+  registerGoogleProvider,
   registerLinkedInProvider,
   registerInstagramProvider,
   registerMetaProvider,
@@ -152,6 +154,15 @@ function registerConfigured(): void {
       organizationAccess: true,
     })
   }
+
+  /**
+   * Google: one OAuth client (a "Web application" client in the owner's Cloud
+   * project), with the products to connect named after it on the command line —
+   * `pnpm connect:provider google youtube`. The redirect defaults to
+   * /google/callback on the same port as the others.
+   */
+  const google = googleProviderConfigFromEnv((key) => optional(key))
+  if (google !== undefined) registerGoogleProvider(google)
 }
 
 /**
@@ -161,10 +172,13 @@ function registerConfigured(): void {
  * are already declared — so reading them from there records what was actually
  * requested rather than a second copy that can drift out of step. Providers
  * separate them with either spaces or commas.
+ *
+ * Only a fallback: a provider that reports what was actually granted (Google
+ * does, and lets people untick permissions) is believed instead.
  */
-function requestedScopes(provider: Provider): string[] {
+function requestedScopes(provider: Provider, scopeBundles: readonly string[]): string[] {
   try {
-    const scope = new URL(provider.authUrl('probe')).searchParams.get('scope')
+    const scope = new URL(provider.authUrl('probe', { scopeBundles })).searchParams.get('scope')
     return scope === null ? [] : scope.split(/[\s,]+/).filter((s) => s !== '')
   } catch {
     return []
@@ -203,6 +217,14 @@ async function main(): Promise<void> {
   const provider = providerFor(requested)
   if (provider === undefined) usage(requested)
 
+  /**
+   * Anything after the provider's name says which of its products to connect:
+   * `pnpm connect:provider google youtube`. Passed through untouched — only the
+   * provider knows what the names mean, an unknown one is refused by it, and a
+   * provider with one fixed set of scopes ignores them.
+   */
+  const scopeBundles = process.argv.slice(3)
+
   const state = await health()
   if (!state.reachable) {
     console.error(`\n  Cannot reach the database: ${state.error ?? 'unknown error'}`)
@@ -211,7 +233,7 @@ async function main(): Promise<void> {
   }
 
   const csrfState = createState()
-  const authUrl = provider.authUrl(csrfState)
+  const authUrl = provider.authUrl(csrfState, { scopeBundles })
   const redirect = new URL(provider.redirectUri)
 
   // Start listening BEFORE opening the browser. A fast authorisation against a
@@ -241,17 +263,31 @@ async function main(): Promise<void> {
 
   if (accounts.length === 0) {
     // Not a crash, and worth distinguishing from a failure: the authorisation
-    // worked, it just does not reach anything postable.
+    // worked, it just does not reach anything postable. The provider knows the
+    // likely reason in its own terms, such as a Google account with no channel.
     console.error(`\n  ${provider.displayName} authorised, but it reaches no postable accounts.`)
-    console.error('  Check that this login administers the page or account you expected.')
+    console.error(`  ${provider.noAccountsHint ?? 'Check that this login administers the page or account you expected.'}`)
     console.error('  Nothing was stored.\n')
     await disconnect()
     process.exit(1)
   }
 
   const tenant = await ensureTenant()
-  const scopes = requestedScopes(provider)
+  // What was granted, when the provider says; people can untick permissions.
+  const scopes =
+    credential.grantedScopes !== undefined
+      ? [...credential.grantedScopes]
+      : requestedScopes(provider, scopeBundles)
   const kek = parseKey(required('VAULT_MASTER_KEY'), 'VAULT_MASTER_KEY')
+
+  /**
+   * When the authorisation itself ends. For most providers that is the
+   * token's own expiry. Google's token lasts an hour while the authorisation
+   * behind it has no fixed end (null), and recording the hour would have the
+   * refresh runner mark it dead an hour from now.
+   */
+  const authorisationEnds: Date | null | undefined =
+    credential.authorisationExpiresAt !== undefined ? credential.authorisationExpiresAt : credential.expiresAt
 
   /**
    * Store the authorisation itself, not only the per-account credentials.
@@ -262,12 +298,14 @@ async function main(): Promise<void> {
   const auth = await saveProviderAuth({
     tenantId: tenant.id,
     provider: provider.key,
-    externalUserId: discovered[0]!.externalId,
-    displayName: provider.displayName,
+    // The person who signed in, when the provider identifies them; otherwise
+    // the first account stands in, as before.
+    externalUserId: credential.externalUserId ?? discovered[0]!.externalId,
+    displayName: credential.accountLabel ?? provider.displayName,
     secretCiphertext: '',
     keyVersion: 1,
     scopes,
-    ...(credential.expiresAt !== undefined ? { expiresAt: credential.expiresAt } : {}),
+    ...(authorisationEnds !== undefined ? { expiresAt: authorisationEnds } : {}),
   })
 
   // Provider authorisations live in their own table, so they need their own
@@ -277,6 +315,9 @@ async function main(): Promise<void> {
     accessToken: credential.accessToken,
     ...(credential.refreshToken !== undefined ? { refreshToken: credential.refreshToken } : {}),
     ...(credential.expiresAt !== undefined ? { expiresAt: credential.expiresAt } : {}),
+    ...(credential.authorisationExpiresAt !== undefined
+      ? { authorisationExpiresAt: credential.authorisationExpiresAt }
+      : {}),
   })
 
   const vault = new TokenVault({ kek, keyVersion: 1, store: prismaCredentialStore() })
@@ -311,9 +352,23 @@ async function main(): Promise<void> {
       },
     })
 
+    /**
+     * The account's own copy of its credential.
+     *
+     * The refresh token is copied only when the account publishes with the
+     * very token it renews. A Google channel does, and without the copy its
+     * connection would be marked dead an hour after connecting. A Meta Page
+     * has a token of its own, which the user's refresh token could never renew,
+     * so it gets none — nothing changes for it.
+     */
+    const sameToken = account.accessToken === credential.accessToken
     await vault.store(connection.id, tenant.id, {
       accessToken: account.accessToken,
+      ...(sameToken && credential.refreshToken !== undefined ? { refreshToken: credential.refreshToken } : {}),
       ...(credential.expiresAt !== undefined ? { expiresAt: credential.expiresAt } : {}),
+      ...(credential.authorisationExpiresAt !== undefined
+        ? { authorisationExpiresAt: credential.authorisationExpiresAt }
+        : {}),
     })
     console.log(`    connected  ${account.platform.padEnd(14)} ${account.displayName}`)
   }
@@ -328,10 +383,13 @@ async function main(): Promise<void> {
   })
 
   console.log(`\n  Done. ${accounts.length} account(s) connected via ${provider.displayName}.`)
-  if (credential.expiresAt !== undefined) {
+  if (authorisationEnds instanceof Date) {
     // Some platforms issue credentials that simply die, and a silent expiry
     // weeks later is indistinguishable from a broken integration.
-    console.log(`  This authorisation expires ${credential.expiresAt.toISOString().slice(0, 10)}.`)
+    console.log(`  This authorisation expires ${authorisationEnds.toISOString().slice(0, 10)}.`)
+  } else if (authorisationEnds === null) {
+    // Not "never expires": the provider can still end it — see SETUP.md.
+    console.log('  Its access token renews itself; the authorisation has no fixed end date.')
   }
   console.log('')
   await disconnect()

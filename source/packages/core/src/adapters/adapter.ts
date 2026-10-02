@@ -16,6 +16,13 @@ import type {
  */
 export interface Capabilities {
   readonly maxTextLength: number
+  /**
+   * Present only on platforms that keep a title apart from the text, and the
+   * most characters it may have. A UI shows a title field when this is set, so
+   * a new titled platform needs a number here rather than a branch on its name.
+   * Absent means `PostDraft.title` is ignored for this platform.
+   */
+  readonly titleMaxLength?: number
   readonly mediaKinds: readonly MediaKind[]
   readonly maxMediaCount: number
   /** Minimum media required. Instagram cannot post text alone, so this is 1. */
@@ -31,6 +38,14 @@ export interface Capabilities {
   readonly aspectRatioMax?: number
   readonly maxImageBytes?: number
   readonly maxVideoBytes?: number
+  /** Largest document accepted, in bytes. Only meaningful where `mediaKinds` lists documents. */
+  readonly maxDocumentBytes?: number
+  /**
+   * Most documents one post may carry, where `mediaKinds` lists documents.
+   * Absent means only `maxMediaCount` applies. A LinkedIn document post is one
+   * document and its text, so LinkedIn declares 1.
+   */
+  readonly maxDocumentCount?: number
   /**
    * Instagram and TikTok fetch media from a public HTTPS URL rather than
    * accepting bytes. Drives whether a target may publish before its media has
@@ -39,7 +54,10 @@ export interface Capabilities {
   readonly requiresPublicMediaUrl: boolean
   /** Whether the platform itself can hold a future-dated post. */
   readonly supportsNativeScheduling: boolean
-  /** Mixing images and video in one post. Most platforms disallow it. */
+  /**
+   * Mixing kinds of media in one post: images with video, or a document with
+   * either. Most platforms disallow it.
+   */
   readonly allowsMixedMedia: boolean
   /** How the preview should render this platform. Absent means no preview yet. */
   readonly preview?: PreviewStyle

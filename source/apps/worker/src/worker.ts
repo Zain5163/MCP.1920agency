@@ -6,9 +6,11 @@ import {
   ThreadsAdapter,
   PinterestAdapter,
   LinkedInAdapter,
+  YouTubeAdapter,
+  youTubeOptionsFromEnv,
 } from '@social-publisher/adapters'
 import { optional, required } from '@social-publisher/config'
-import { backoffMs, type Connection, type MediaRef, type PostDraft } from '@social-publisher/core'
+import { backoffMs, mediaKindForMime, type Connection, type MediaRef, type PostDraft } from '@social-publisher/core'
 import {
   MAX_ATTEMPTS,
   WORKER_ID,
@@ -21,6 +23,7 @@ import {
   recordHeartbeat,
   reclaimStale,
   retryJob,
+  touchJob,
 } from '@social-publisher/db'
 import { PublishService } from '@social-publisher/publisher'
 import { TokenVault, parseKey } from '@social-publisher/vault'
@@ -43,6 +46,14 @@ const log = (message: string): void => {
   console.log(`[worker ${new Date().toISOString()}] ${message}`)
 }
 
+/**
+ * How often a running job's lock is refreshed. Far inside the 15 minutes after
+ * which reclaimStale calls a lock abandoned, so a long upload is never handed
+ * to a second worker — which, with no idempotency key on a video upload, would
+ * be a second copy of the video.
+ */
+const LOCK_HEARTBEAT_MS = 60_000
+
 function buildService(): PublishService {
   const apiVersion = optional('META_API_VERSION', 'v25.0')!
   const appSecret = required('META_APP_SECRET')
@@ -53,6 +64,8 @@ function buildService(): PublishService {
     new PinterestAdapter(),
     // LinkedIn uses its own API, its own token and its own version header.
     new LinkedInAdapter(),
+    // Google's token and settings; uploads stay private until the API audit passes.
+    new YouTubeAdapter(youTubeOptionsFromEnv((key) => optional(key))),
   ])
 }
 
@@ -136,7 +149,9 @@ async function processOne(service: PublishService, vault: TokenVault): Promise<b
 
   const media: MediaRef[] = target.post.media.map((link) => ({
     id: link.media.id,
-    kind: link.media.mime.startsWith('video/') ? 'video' : 'image',
+    // The media table holds a mime type and no kind: a PDF is a document (a
+    // LinkedIn carousel), video/* is video, anything else an image, as before.
+    kind: mediaKindForMime(link.media.mime),
     mime: link.media.mime,
     bytes: link.media.bytes,
     publicUrl: link.media.publicUrl,
@@ -154,23 +169,46 @@ async function processOne(service: PublishService, vault: TokenVault): Promise<b
 
   await db().target.update({ where: { id: target.id }, data: { state: 'publishing' } })
 
-  const report = await service.publish(
-    draft,
-    [
-      {
-        connection,
-        withCredential: async <T,>(fn: (token: string) => Promise<T>): Promise<T> =>
-          await vault.withCredential(connection.id, connection.tenantId, async (cred) =>
-            await fn(cred.accessToken),
-          ),
-      },
-    ],
-    { idempotencyKeyFor: () => target.idempotencyKey },
-  )
+  // Keep the lock fresh for as long as the publish runs. Unref'd, so a stuck
+  // timer can never keep the process alive on its own.
+  const heartbeat = setInterval(() => {
+    touchJob(job.jobId).catch((error: unknown) => {
+      log(`job ${job.jobId}: could not refresh its lock — ${error instanceof Error ? error.message : String(error)}`)
+    })
+  }, LOCK_HEARTBEAT_MS)
+  heartbeat.unref()
+
+  const adapter = service.adapterFor(connection.platform)
+  let report: Awaited<ReturnType<PublishService['publish']>>
+  try {
+    report = await service.publish(
+      draft,
+      [
+        {
+          connection,
+          withCredential: async <T,>(fn: (token: string) => Promise<T>): Promise<T> =>
+            await vault.withCredential(
+              connection.id,
+              connection.tenantId,
+              async (cred) => await fn(cred.accessToken),
+              // Renews an hour-long token on the way in. Undefined for every
+              // adapter whose tokens do not renew, which changes nothing for them.
+              adapter?.refreshCredential?.bind(adapter),
+            ),
+        },
+      ],
+      { idempotencyKeyFor: () => target.idempotencyKey },
+    )
+  } finally {
+    clearInterval(heartbeat)
+  }
 
   const outcome = report.succeeded[0] ?? report.failed[0]!
 
   if (outcome.ok) {
+    // A notice means it went through but not as "published" implies — a video
+    // uploaded private, for one. It is kept with the target and logged as such.
+    const notice = outcome.result!.notice
     await db().target.update({
       where: { id: target.id },
       data: {
@@ -178,11 +216,15 @@ async function processOne(service: PublishService, vault: TokenVault): Promise<b
         publishedAt: new Date(),
         platformPostId: outcome.result!.platformPostId,
         platformUrl: outcome.result!.url ?? null,
+        platformMessage: notice ?? null,
         attempts: { increment: 1 },
       },
     })
     await completeJob(job.jobId)
-    log(`job ${job.jobId}: PUBLISHED to ${connection.displayName} — ${outcome.result!.url ?? outcome.result!.platformPostId}`)
+    log(
+      `job ${job.jobId}: ${notice === undefined ? 'PUBLISHED' : 'UPLOADED'} to ${connection.displayName} — ` +
+        `${outcome.result!.url ?? outcome.result!.platformPostId}${notice === undefined ? '' : ` — ${notice}`}`,
+    )
     return true
   }
 

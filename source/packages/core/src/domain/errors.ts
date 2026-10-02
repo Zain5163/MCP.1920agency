@@ -1,3 +1,5 @@
+import type { ErrorCode } from './resolutions.ts'
+
 /**
  * Error classification. This is the reliability feature of the whole system.
  *
@@ -22,6 +24,16 @@ export class PublishError extends Error {
   readonly httpStatus: number | undefined
   /** Honour a platform's Retry-After rather than guessing. */
   readonly retryAfterSeconds: number | undefined
+  /**
+   * The catalogue entry that explains this failure, when the adapter knows it.
+   *
+   * The failure class alone is too coarse to explain anything: YouTube answers
+   * "out of quota", "permission not granted" and "API switched off" all with a
+   * 403, and a class-only mapping would tell the owner his token expired for
+   * every one of them. An adapter that can tell them apart says which here, and
+   * whoever shows the error uses this before falling back on the class.
+   */
+  readonly code: ErrorCode | undefined
 
   constructor(
     message: string,
@@ -31,6 +43,7 @@ export class PublishError extends Error {
       platformCode?: string
       httpStatus?: number
       retryAfterSeconds?: number
+      code?: ErrorCode
       cause?: unknown
     },
   ) {
@@ -41,6 +54,7 @@ export class PublishError extends Error {
     this.platformCode = options.platformCode
     this.httpStatus = options.httpStatus
     this.retryAfterSeconds = options.retryAfterSeconds
+    this.code = options.code
   }
 
   get isRetryable(): boolean {

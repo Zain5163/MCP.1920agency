@@ -1,14 +1,11 @@
-import { open, stat, unlink } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { randomUUID } from 'node:crypto'
-
 import {
   CAPABILITIES,
   PublishError,
   bodyForPlatform,
   classifyHttpStatus,
   classifyNetworkError,
+  countGraphemes,
+  titleForPlatform,
   validateAgainstCapabilities,
   type Capabilities,
   type MediaRef,
@@ -17,8 +14,11 @@ import {
   type PostDraft,
   type PublishContext,
   type PublishResult,
+  type ValidationIssue,
   type ValidationResult,
 } from '@social-publisher/core'
+
+import { openMedia, type MediaSource } from './media-source.ts'
 
 /**
  * LinkedIn adapter.
@@ -41,6 +41,13 @@ import {
  *    onward. A single unescaped `(` publishes a truncated post that reports
  *    complete success. That is the worst failure shape there is, so escaping
  *    happens here and is covered by tests.
+ *
+ * 4. **A document post (a PDF carousel) carries a title.** The document goes up
+ *    through its own Documents API in one piece, and the post names it with
+ *    `content.media.title`, which LinkedIn requires for a document. The title is
+ *    plain text, not little text, and is the draft's title or, failing that, the
+ *    first line of the text. Checked against Microsoft Learn on 2026-10-02
+ *    (research/2026-10-02-linkedin-documents.md); not yet posted for real.
  *
  * ⚠️ Posting as an organisation needs the Community Management API, which
  * LinkedIn approves sparingly. Personal profiles work with the self-serve
@@ -77,55 +84,63 @@ export function escapeLittleText(text: string): string {
 }
 
 /**
- * A file that can be read one byte range at a time.
- *
- * Exists so a large video is never held in memory in one piece: LinkedIn asks
- * for 4 MB parts, and each part is read from disk only when it is about to be
- * sent.
+ * The longest document title LinkedIn's own composer takes, as schedulers that
+ * post documents report it (SocialPilot's LinkedIn document guide). LinkedIn's
+ * API documentation gives no limit for an organic post, so a longer title is a
+ * warning rather than an error, and a title this adapter makes from the text is
+ * kept within it. UNVERIFIED against the API.
  */
-interface MediaSource {
-  readonly size: number
-  read(start: number, endInclusive: number): Promise<Uint8Array>
-  close(): Promise<void>
-}
+export const LINKEDIN_DOCUMENT_TITLE_SHOWN = 58
 
 /**
- * `owned` means this adapter created the file and must delete it. A caller's own
- * media is never deleted, which would be a spectacular thing to get wrong.
+ * The document types the Documents API takes: "PPT, PPTX, DOC, DOCX, and PDF"
+ * (Microsoft Learn, checked 2026-10-02).
  */
-async function fileSource(path: string, owned: boolean): Promise<MediaSource> {
-  const { size } = await stat(path)
-  const handle = await open(path, 'r')
-  let closed = false
+const DOCUMENT_TYPES: ReadonlySet<string> = new Set([
+  'application/pdf',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+])
 
-  return {
-    size,
-    async read(start, endInclusive) {
-      const length = endInclusive - start + 1
-      const buffer = Buffer.allocUnsafe(length)
-      const { bytesRead } = await handle.read(buffer, 0, length, start)
-      // A short read means the file changed under us mid-upload. Sending the
-      // padding would upload silent corruption, so it stops instead.
-      if (bytesRead !== length) {
-        throw new PublishError(
-          `Read ${bytesRead} bytes where ${length} were expected. The media file changed while it was being uploaded.`,
-          { failureClass: 'transient' },
-        )
-      }
-      return new Uint8Array(buffer)
-    },
-    async close() {
-      if (closed) return
-      closed = true
-      await handle.close().catch(() => {})
-      if (owned) await unlink(path).catch(() => {})
-    },
-  }
-}
+/** Every PDF starts with this, within its first kilobyte. */
+const PDF_SIGNATURE = '%PDF-'
+const PDF_SIGNATURE_WINDOW = 1024
 
 export interface LinkedInAdapterOptions {
   readonly fetch?: typeof globalThis.fetch
   readonly apiVersion?: string
+  /** How to wait while LinkedIn processes a document. Injected so tests do not sleep. */
+  readonly sleep?: (ms: number) => Promise<void>
+  /** Status reads before a document that is still processing is given up on. Default 20. */
+  readonly documentStatusChecks?: number
+  /** Pause between those reads, in ms. Default 3,000, so about a minute in all. */
+  readonly documentPollIntervalMs?: number
+  /**
+   * Pause before posting when the token cannot read the document's status, in
+   * ms. Default 15,000. A member token is write-only for these reads, so this is
+   * the path a personal profile takes.
+   */
+  readonly documentUnreadableWaitMs?: number
+}
+
+/**
+ * A document is initialised like an image — one URL back, not a list of parts —
+ * but answers with a `document` URN.
+ */
+interface DocumentUploadInit {
+  readonly value?: {
+    readonly uploadUrl?: string
+    readonly document?: string
+  }
+}
+
+/** Where a document's title came from, which validation reports. */
+interface DocumentTitle {
+  readonly text: string
+  readonly source: 'draft' | 'text' | 'file' | 'default'
+  readonly shortened: boolean
 }
 
 interface UploadInit {
@@ -158,14 +173,71 @@ export class LinkedInAdapter implements PlatformAdapter {
 
   readonly #fetch: typeof globalThis.fetch
   readonly #version: string
+  readonly #sleep: (ms: number) => Promise<void>
+  readonly #documentStatusChecks: number
+  readonly #documentPollIntervalMs: number
+  readonly #documentUnreadableWaitMs: number
 
   constructor(options: LinkedInAdapterOptions = {}) {
     this.#fetch = options.fetch ?? globalThis.fetch
     this.#version = options.apiVersion ?? LINKEDIN_DEFAULT_VERSION
+    this.#sleep = options.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)))
+    this.#documentStatusChecks = Math.max(1, options.documentStatusChecks ?? 20)
+    this.#documentPollIntervalMs = options.documentPollIntervalMs ?? 3_000
+    this.#documentUnreadableWaitMs = options.documentUnreadableWaitMs ?? 15_000
   }
 
+  /**
+   * The shared checks, plus a document post's own: a type LinkedIn takes, and
+   * where its title comes from. Text, image and video posts get exactly the
+   * shared checks, as before documents existed.
+   */
   validate(draft: PostDraft): ValidationResult {
-    return validateAgainstCapabilities(draft, this.platform, this.capabilities)
+    const shared = validateAgainstCapabilities(draft, this.platform, this.capabilities)
+    const document = draft.media.find((m) => m.kind === 'document')
+    if (document === undefined) return shared
+
+    const issues: ValidationIssue[] = [...shared.issues]
+    const add = (severity: ValidationIssue['severity'], code: string, message: string): void => {
+      issues.push({ severity, code, message, platform: this.platform })
+    }
+
+    for (const item of draft.media) {
+      if (item.kind === 'document' && !DOCUMENT_TYPES.has(normalisedMime(item.mime))) {
+        add(
+          'error',
+          'document_type_unsupported',
+          `LinkedIn takes a document as PDF, PPT, PPTX, DOC or DOCX, not ${item.mime === '' ? 'a file of unknown type' : item.mime}.`,
+        )
+      }
+    }
+
+    const title = this.#documentTitle(draft, document)
+    if (title.source === 'draft') {
+      const length = countGraphemes(title.text)
+      if (length > LINKEDIN_DOCUMENT_TITLE_SHOWN) {
+        add(
+          'warning',
+          'document_title_long',
+          `The document title is ${length} characters. LinkedIn's own composer allows ${LINKEDIN_DOCUMENT_TITLE_SHOWN} ` +
+            'and the API documents no limit, so a longer title may be shortened or refused. Shorten it to be safe.',
+        )
+      }
+    } else if (title.source === 'text') {
+      add(
+        'warning',
+        'document_title_from_text',
+        title.shortened
+          ? `No title was set, so the document is titled with the first line of the text, shortened to ${LINKEDIN_DOCUMENT_TITLE_SHOWN} characters: "${title.text}".`
+          : `No title was set, so the document is titled with the first line of the text: "${title.text}".`,
+      )
+    } else if (title.source === 'file') {
+      add('warning', 'document_title_from_file', `No title was set and there is no text, so the document is titled with its file name: "${title.text}".`)
+    } else {
+      add('warning', 'document_title_default', `No title was set and there is no text or file name to take one from, so the document is titled "${title.text}".`)
+    }
+
+    return { ok: !issues.some((i) => i.severity === 'error'), issues }
   }
 
   async publish(ctx: PublishContext, draft: PostDraft): Promise<PublishResult> {
@@ -190,6 +262,24 @@ export class LinkedInAdapter implements PlatformAdapter {
     }
 
     /**
+     * A document is the whole of its post's media: one document, nothing beside
+     * it. Validation has already said so; this restates it where the content is
+     * built, as the video rule below does.
+     */
+    const documents = draft.media.filter((m) => m.kind === 'document')
+    if (documents.length > 0 && documents.length !== draft.media.length) {
+      throw new PublishError(
+        'LinkedIn cannot combine a document with images or video in one post. Send the document on its own.',
+        { failureClass: 'permanent' },
+      )
+    }
+    if (documents.length > 1) {
+      throw new PublishError('LinkedIn takes one document per post, not several.', {
+        failureClass: 'permanent',
+      })
+    }
+
+    /**
      * A post is images or one video, never both.
      *
      * LinkedIn has no container that mixes them, and attempting it fails with an
@@ -210,9 +300,15 @@ export class LinkedInAdapter implements PlatformAdapter {
     }
 
     const uploaded: string[] = []
+    // Only a document post names its media. Settled before anything is sent.
+    const firstDocument = documents[0]
+    const documentTitle =
+      firstDocument !== undefined ? this.#documentTitle(draft, firstDocument).text : undefined
     const firstVideo = videos[0]
     if (firstVideo !== undefined) {
       uploaded.push(await this.#uploadVideo(ctx, author, firstVideo))
+    } else if (firstDocument !== undefined) {
+      uploaded.push(await this.#uploadDocument(ctx, author, firstDocument))
     } else {
       for (const image of draft.media) {
         uploaded.push(await this.#uploadImage(ctx, author, image))
@@ -234,7 +330,11 @@ export class LinkedInAdapter implements PlatformAdapter {
 
     const first = uploaded[0]
     if (uploaded.length === 1 && first !== undefined) {
-      body.content = { media: { id: first } }
+      // The Posts API marks the title required for a document, and it is the
+      // only media this adapter titles.
+      body.content = {
+        media: { id: first, ...(documentTitle !== undefined ? { title: documentTitle } : {}) },
+      }
     } else if (uploaded.length > 1) {
       body.content = { multiImage: { images: uploaded.map((id) => ({ id })) } }
     }
@@ -283,7 +383,8 @@ export class LinkedInAdapter implements PlatformAdapter {
       })
     }
 
-    const source = await this.#openMedia(media)
+    // From disk in ranges, downloading a URL to a temp file first (media-source.ts).
+    const source = await openMedia(media, this.#fetch)
     let put: Response
     try {
       // An image goes up in one piece; LinkedIn offers no parts for images.
@@ -336,7 +437,9 @@ export class LinkedInAdapter implements PlatformAdapter {
    * and a video upload is already slow enough that this is not where the time goes.
    */
   async #uploadVideo(ctx: PublishContext, owner: string, media: MediaRef): Promise<string> {
-    const source = await this.#openMedia(media)
+    // LinkedIn asks for 4 MB parts, and each one is read from disk only when it
+    // is about to be sent.
+    const source = await openMedia(media, this.#fetch)
     try {
       return await this.#uploadVideoFrom(ctx, owner, media, source)
     } finally {
@@ -430,76 +533,216 @@ export class LinkedInAdapter implements PlatformAdapter {
   }
 
   /**
-   * Opens media as a file on disk that can be read one range at a time.
+   * Uploads a document — a PDF carousel, or a PPT, PPTX, DOC or DOCX file — and
+   * waits for LinkedIn to process it, where the token can see that.
    *
-   * The first version of this returned the whole file as a single `Uint8Array`.
-   * Fine for a 1.6 MB image, and an out-of-memory crash for a 400 MB video —
-   * several concurrent uploads on a worker would each hold their entire file in
-   * one buffer. Since LinkedIn wants the video in 4 MB parts anyway, reading
-   * those parts straight from disk is both the fix and the natural shape.
+   * The Documents API, checked on Microsoft Learn 2026-10-02:
    *
-   * A URL is downloaded to a temporary file first rather than held in memory.
-   * That trades disk for RAM deliberately: disk is the resource we have.
+   *   1. `POST /rest/documents?action=initializeUpload` with the owner returns
+   *      an upload URL and the `urn:li:document:…` id.
+   *   2. One PUT of the whole file to that URL. Unlike video there are no parts,
+   *      no ETags and no finalize call: a document goes up in one piece, at most
+   *      100 MB, so it is read into memory once.
+   *   3. Processing, read back from `GET /rest/documents/{urn}` (#awaitDocument).
+   *
+   * The file is opened and checked first, so an empty, oversized or mislabelled
+   * file is refused before anything is registered with LinkedIn.
    */
-  async #openMedia(media: MediaRef): Promise<MediaSource> {
-    if (media.localPath !== undefined) {
-      try {
-        return await fileSource(media.localPath, false)
-      } catch (cause) {
-        throw new PublishError(`Could not read the media file at ${media.localPath}`, {
-          failureClass: 'permanent',
-          cause,
-        })
-      }
-    }
+  async #uploadDocument(ctx: PublishContext, owner: string, media: MediaRef): Promise<string> {
+    const source = await openMedia(media, this.#fetch, ctx.signal !== undefined ? { signal: ctx.signal } : {})
+    let urn: string
+    try {
+      await this.#checkDocument(media, source)
 
-    if (media.publicUrl !== undefined) {
-      const url = media.publicUrl
-      let response: Response
+      const init = await this.#send(
+        ctx,
+        'POST',
+        `${LINKEDIN_BASE}/rest/documents?action=initializeUpload`,
+        { initializeUploadRequest: { owner } },
+      )
+      const parsed = (await readJson(init)) as DocumentUploadInit | undefined
+      const target = parsed?.value?.uploadUrl
+      const document = parsed?.value?.document
+      if (typeof target !== 'string' || target === '' || typeof document !== 'string' || document === '') {
+        throw new PublishError(
+          'LinkedIn did not return an upload address for the document, so nothing was uploaded or posted.',
+          { failureClass: 'transient', httpStatus: init.status },
+        )
+      }
+      urn = document
+
+      const bytes = await source.read(0, source.size - 1)
+      let put: Response
       try {
-        response = await this.#fetch(url)
+        const request: RequestInit = {
+          method: 'PUT',
+          headers: {
+            Authorization: `Bearer ${ctx.credential.accessToken}`,
+            'content-type': media.mime,
+          },
+          body: bytes,
+        }
+        if (ctx.signal !== undefined) request.signal = ctx.signal
+        put = await this.#fetch(target, request)
       } catch (cause) {
-        throw new PublishError(`Could not download the media from ${url}`, {
+        throw new PublishError('Could not upload the document to LinkedIn. Nothing was posted.', {
           failureClass: classifyNetworkError(cause),
           cause,
         })
       }
-      if (!response.ok) {
-        throw new PublishError(`Media host returned HTTP ${response.status} for ${url}`, {
-          failureClass: classifyHttpStatus(response.status),
-          httpStatus: response.status,
+      await drain(put)
+      if (!put.ok) {
+        throw new PublishError(`LinkedIn rejected the document upload (HTTP ${put.status}). Nothing was posted.`, {
+          failureClass: classifyHttpStatus(put.status),
+          httpStatus: put.status,
         })
       }
+    } finally {
+      // Closes the handle and removes any temporary download, whatever happened.
+      await source.close()
+    }
 
-      const temp = join(tmpdir(), `adspilot-${randomUUID()}`)
-      try {
-        const handle = await open(temp, 'w')
-        try {
-          // Streamed rather than buffered, so a large download never exists in
-          // memory in one piece either.
-          if (response.body !== null) {
-            for await (const chunk of response.body as unknown as AsyncIterable<Uint8Array>) {
-              await handle.write(chunk)
-            }
-          }
-        } finally {
-          await handle.close()
-        }
-      } catch (cause) {
-        await unlink(temp).catch(() => {})
-        throw new PublishError(`Could not save the download from ${url}`, {
+    await this.#awaitDocument(ctx, urn)
+    return urn
+  }
+
+  /**
+   * What can be known about a document before LinkedIn sees it: that it has
+   * bytes, fits the limit by its real size rather than the declared one, and,
+   * when it says it is a PDF, starts like one.
+   */
+  async #checkDocument(media: MediaRef, source: MediaSource): Promise<void> {
+    if (source.size === 0) {
+      throw new PublishError('The document file is empty, so there is nothing to post.', {
+        failureClass: 'permanent',
+      })
+    }
+    const limit = this.capabilities.maxDocumentBytes
+    if (limit !== undefined && source.size > limit) {
+      throw new PublishError(
+        `The document is ${source.size} bytes, over LinkedIn's limit of ${limit} bytes (100 MB). Nothing was posted.`,
+        { failureClass: 'permanent' },
+      )
+    }
+    if (normalisedMime(media.mime) === 'application/pdf') {
+      const head = await source.read(0, Math.min(source.size, PDF_SIGNATURE_WINDOW) - 1)
+      if (!Buffer.from(head).toString('latin1').includes(PDF_SIGNATURE)) {
+        throw new PublishError(
+          'The file is labelled a PDF but does not start like one, so LinkedIn would refuse it. Export it again as a PDF. Nothing was posted.',
+          { failureClass: 'permanent' },
+        )
+      }
+    }
+  }
+
+  /**
+   * Waits until LinkedIn has processed an uploaded document, before the post
+   * points at it.
+   *
+   * Where the status can be read: AVAILABLE goes on; PROCESSING_FAILED stops
+   * with nothing posted; PROCESSING or WAITING_UPLOAD is read again, a bounded
+   * number of times, then given up as transient. Nothing is posted then, and the
+   * worker's retry uploads the document afresh, as the Instagram adapter does
+   * with a container that is slow to finish.
+   *
+   * A member token cannot read it. LinkedIn documents `w_member_social` as
+   * write-only for `GET /rest/images`, and Postiz, which posts documents through
+   * this API, reports the same for documents. So a status that cannot be read
+   * means one fixed pause, then the post. LinkedIn describes posts whose media is
+   * still processing as published once processing completes (the Posts API's
+   * PUBLISH_REQUESTED state), and the live video posts of 2026-09-26 were created
+   * straight after upload, so the pause only gives a fresh upload time to
+   * register. UNVERIFIED for documents until the first real one.
+   */
+  async #awaitDocument(ctx: PublishContext, urn: string): Promise<void> {
+    for (let check = 1; ; check += 1) {
+      const status = await this.#documentStatus(ctx, urn)
+      if (status === 'AVAILABLE') return
+      if (status === undefined) {
+        await this.#sleep(this.#documentUnreadableWaitMs)
+        return
+      }
+      if (status === 'PROCESSING_FAILED') {
+        throw new PublishError(
+          'LinkedIn could not process the document, so nothing was posted. LinkedIn takes PDF, PPT, PPTX, DOC or ' +
+            'DOCX files up to 100 MB and 300 pages; a password-protected or damaged file fails the same way.',
+          { failureClass: 'permanent', platformCode: status, code: 'MEDIA_PROCESSING_FAILED' },
+        )
+      }
+      if (check >= this.#documentStatusChecks) {
+        throw new PublishError(
+          `LinkedIn was still processing the document (${status}) after ${check} checks, so nothing was posted. ` +
+            'It is tried again later.',
+          { failureClass: 'transient', code: 'MEDIA_PROCESSING_TIMEOUT' },
+        )
+      }
+      await this.#sleep(this.#documentPollIntervalMs)
+    }
+  }
+
+  /**
+   * The document's processing status, or undefined when it cannot be read: no
+   * permission, no answer, or no status in the answer. Throws only when the
+   * publish was cancelled.
+   */
+  async #documentStatus(ctx: PublishContext, urn: string): Promise<string | undefined> {
+    let response: Response
+    try {
+      const init: RequestInit = {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${ctx.credential.accessToken}`,
+          'LinkedIn-Version': this.#version,
+          'X-Restli-Protocol-Version': '2.0.0',
+        },
+      }
+      if (ctx.signal !== undefined) init.signal = ctx.signal
+      // A URN in a path is encoded, as the Posts API asks for every URN in a URL.
+      response = await this.#fetch(`${LINKEDIN_BASE}/rest/documents/${encodeURIComponent(urn)}`, init)
+    } catch (cause) {
+      if (ctx.signal?.aborted === true) {
+        throw new PublishError('The publish was cancelled after the document was uploaded. Nothing was posted.', {
           failureClass: 'transient',
           cause,
         })
       }
+      return undefined
+    }
+    if (!response.ok) {
+      await drain(response)
+      return undefined
+    }
+    const body = (await readJson(response)) as { readonly status?: unknown } | undefined
+    return typeof body?.status === 'string' ? body.status : undefined
+  }
 
-      // Owned: this temp file is deleted when the source is closed.
-      return await fileSource(temp, true)
+  /**
+   * The title a document post goes out with: the draft's own (its LinkedIn
+   * override first), else the first non-blank line of the text, else the file's
+   * name, else "Document". One made here is kept within what LinkedIn's composer
+   * shows, shortened at a word if it has to be. The title is plain text, not
+   * little text, so it is not escaped.
+   */
+  #documentTitle(draft: PostDraft, document: MediaRef): DocumentTitle {
+    const explicit = titleForPlatform(draft, this.platform)
+    if (explicit !== undefined) return { text: explicit, source: 'draft', shortened: false }
+
+    const firstLine = bodyForPlatform(draft, this.platform)
+      .split('\n')
+      .map((line) => line.trim())
+      .find((line) => line !== '')
+    if (firstLine !== undefined) {
+      const fitted = fitToGraphemes(firstLine, LINKEDIN_DOCUMENT_TITLE_SHOWN)
+      return { text: fitted.text, source: 'text', shortened: fitted.shortened }
     }
 
-    throw new PublishError('The media has neither a local file nor a URL to upload from.', {
-      failureClass: 'permanent',
-    })
+    const name = fileTitle(document)
+    if (name !== undefined) {
+      const fitted = fitToGraphemes(name, LINKEDIN_DOCUMENT_TITLE_SHOWN)
+      return { text: fitted.text, source: 'file', shortened: fitted.shortened }
+    }
+
+    return { text: 'Document', source: 'default', shortened: false }
   }
 
   async #send(ctx: PublishContext, method: string, url: string, body: unknown): Promise<Response> {
@@ -528,15 +771,19 @@ export class LinkedInAdapter implements PlatformAdapter {
 
     if (!response.ok) {
       const text = await response.text()
-      let error: { message?: string; serviceErrorCode?: number } = {}
+      let error: { message?: string; serviceErrorCode?: number; code?: string } = {}
       try {
         error = text === '' ? {} : (JSON.parse(text) as typeof error)
       } catch {
         error = { message: text.slice(0, 200) }
       }
 
+      const media = mediaAssetProblem(error)
       throw new PublishError(`LinkedIn publish failed: ${error.message ?? 'unknown error'}`, {
-        failureClass: classifyHttpStatus(response.status),
+        // Media LinkedIn has not received yet is worth another go; media it
+        // could not process is not, and has its own explanation.
+        failureClass: media === 'waiting' ? 'transient' : media === 'failed' ? 'permanent' : classifyHttpStatus(response.status),
+        ...(media === 'failed' ? { code: 'MEDIA_PROCESSING_FAILED' as const } : {}),
         ...(error.message !== undefined ? { platformMessage: error.message } : {}),
         ...(error.serviceErrorCode !== undefined
           ? { platformCode: String(error.serviceErrorCode) }
@@ -546,5 +793,80 @@ export class LinkedInAdapter implements PlatformAdapter {
     }
 
     return response
+  }
+}
+
+/**
+ * LinkedIn's errors for a post that points at media it has not received yet, or
+ * could not process. Listed in the Videos API's error table
+ * (`MEDIA_ASSET_WAITING_UPLOAD`, "Media asset is waiting upload";
+ * `MEDIA_ASSET_PROCESSING_FAILED`, "Media asset failed processing") and assumed,
+ * not verified, to be what a document post gets too. Matched on the newer
+ * `code` field or the message, since LinkedIn returns either shape.
+ */
+function mediaAssetProblem(error: { readonly message?: string; readonly code?: string }): 'waiting' | 'failed' | undefined {
+  const text = `${error.code ?? ''} ${error.message ?? ''}`
+  if (/MEDIA_ASSET_WAITING_UPLOAD|waiting upload/i.test(text)) return 'waiting'
+  if (/MEDIA_ASSET_PROCESSING_FAILED|failed processing/i.test(text)) return 'failed'
+  return undefined
+}
+
+/** A media type without parameters or case, e.g. `application/pdf`. */
+function normalisedMime(mime: string): string {
+  return (mime.split(';')[0] ?? '').trim().toLowerCase()
+}
+
+/**
+ * A title from a local file's name, without its folder or extension. Only a
+ * local file: a hosted copy is named by its content hash, which makes a useless
+ * title.
+ */
+function fileTitle(media: MediaRef): string | undefined {
+  if (media.localPath === undefined) return undefined
+  // Either separator, so a Windows path is read the same on any machine.
+  const name = media.localPath.split(/[\\/]/).pop() ?? ''
+  const dot = name.lastIndexOf('.')
+  const stem = (dot > 0 ? name.slice(0, dot) : name).trim()
+  return stem === '' ? undefined : stem
+}
+
+/**
+ * Shortens text to at most `max` graphemes, at a word where that keeps most of
+ * it, ending with an ellipsis; never inside an emoji. The YouTube adapter
+ * shortens a title made from the text by the same rule.
+ */
+function fitToGraphemes(text: string, max: number): { text: string; shortened: boolean } {
+  const parts = graphemes(text)
+  if (parts.length <= max) return { text, shortened: false }
+  const head = parts.slice(0, max - 1).join('')
+  const space = head.lastIndexOf(' ')
+  const cut = space >= Math.floor(head.length * 0.6) ? head.slice(0, space) : head
+  return { text: `${cut.trimEnd()}…`, shortened: true }
+}
+
+function graphemes(text: string): string[] {
+  const Segmenter = (Intl as { Segmenter?: typeof Intl.Segmenter }).Segmenter
+  if (Segmenter === undefined) return [...text]
+  return [...new Segmenter('en', { granularity: 'grapheme' }).segment(text)].map((s) => s.segment)
+}
+
+/** The body as a JSON object, or undefined when it is empty, not JSON, or not an object. */
+async function readJson(response: Response): Promise<object | undefined> {
+  const text = await response.text().catch(() => '')
+  if (text === '') return undefined
+  try {
+    const parsed: unknown = JSON.parse(text)
+    return typeof parsed === 'object' && parsed !== null ? parsed : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/** Releases a reply's body so its connection can be reused. */
+async function drain(response: Response): Promise<void> {
+  try {
+    await response.body?.cancel()
+  } catch {
+    // Nothing to release.
   }
 }

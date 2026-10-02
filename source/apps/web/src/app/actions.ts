@@ -216,6 +216,8 @@ export async function createPost(_prev: unknown, formData: FormData): Promise<Ac
               publishedAt: new Date(),
               platformPostId: outcome.result!.platformPostId,
               platformUrl: outcome.result!.url ?? null,
+              // Kept with the target, so the dashboard shows it too.
+              platformMessage: outcome.result!.notice ?? null,
             }
           : {
               failureClass: outcome.error!.failureClass,
@@ -233,12 +235,26 @@ export async function createPost(_prev: unknown, formData: FormData): Promise<Ac
   })
   revalidatePath('/')
 
+  /**
+   * A notice means the platform took it but it is not what "published"
+   * implies — a video uploaded private until the API audit passes, for one.
+   * Those are shown with their notice and never counted as published.
+   */
   const details = [
-    ...report.succeeded.map((o) => `${o.displayName}: published`),
+    ...report.succeeded.map((o) => `${o.displayName}: ${o.result?.notice ?? 'published'}`),
     ...report.failed.map((o) => `${o.displayName}: ${o.error!.message}`),
   ]
+  const withNotice = report.succeeded.filter((o) => o.result?.notice !== undefined).length
+  const published = report.succeeded.length - withNotice
 
   return report.allSucceeded
-    ? { ok: true, message: `Published to ${report.succeeded.length} account(s).`, details }
+    ? {
+        ok: true,
+        message:
+          withNotice === 0
+            ? `Published to ${published} account(s).`
+            : `Sent to ${report.succeeded.length} account(s); ${withNotice} not published publicly — read the details.`,
+        details,
+      }
     : { ok: false, message: 'Some targets failed.', details }
 }

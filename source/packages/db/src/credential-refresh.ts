@@ -110,8 +110,15 @@ export async function markAuthExpired(providerAuthId: string, reason: string): P
   ])
 }
 
-/** Records a successful refresh, clearing any previous failure. */
-export async function recordRefreshed(providerAuthId: string, expiresAt: Date): Promise<void> {
+/**
+ * Records a successful refresh, clearing any previous failure.
+ *
+ * `expiresAt` is when the authorisation now ends. `null` is allowed for
+ * providers whose authorisation has no known end once its access token is
+ * renewed — Google's refresh token lives until it is revoked — so recording a
+ * refresh never writes an hour-long access-token expiry into this column.
+ */
+export async function recordRefreshed(providerAuthId: string, expiresAt: Date | null): Promise<void> {
   await db().providerAuth.update({
     where: { id: providerAuthId },
     data: { expiresAt, needsReauth: false, reauthReason: null },

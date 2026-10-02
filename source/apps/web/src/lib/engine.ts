@@ -6,8 +6,12 @@ import {
   ThreadsAdapter,
   PinterestAdapter,
   LinkedInAdapter,
+  YouTubeAdapter,
+  googleProviderConfigFromEnv,
   providerFor as lookupProvider,
+  registerGoogleProvider,
   registerMetaProvider,
+  youTubeOptionsFromEnv,
   type Provider,
 } from '@social-publisher/adapters'
 import { optional, required } from '@social-publisher/config'
@@ -44,8 +48,11 @@ export function publishService(): PublishService {
       new ThreadsAdapter(),
       // Pinterest uses its own API and its own token, so no Meta config either.
       new PinterestAdapter(),
-    // LinkedIn uses its own API, its own token and its own version header.
-    new LinkedInAdapter(),
+      // LinkedIn uses its own API, its own token and its own version header.
+      new LinkedInAdapter(),
+      // Google's token and settings. Uploads stay private, and are reported as
+      // private, until YOUTUBE_UPLOADS_AUDITED says the API audit has passed.
+      new YouTubeAdapter(youTubeOptionsFromEnv((key) => optional(key))),
     ])
   }
   return service
@@ -78,6 +85,10 @@ function ensureProviders(): void {
     redirectUri: optional('META_REDIRECT_URI', 'http://localhost:8787/callback')!,
     apiVersion: optional('META_API_VERSION', 'v25.0')!,
   })
+  // Optional: only when a Google client is configured. Without it a stored
+  // Google authorisation simply has no provider here, and says so.
+  const google = googleProviderConfigFromEnv((key) => optional(key))
+  if (google !== undefined) registerGoogleProvider(google)
   providersReady = true
 }
 
@@ -143,13 +154,23 @@ export async function listConnections(tenantId: string): Promise<Connection[]> {
   }))
 }
 
-/** Binds a connection to its credential without exposing the token to callers. */
+/**
+ * Binds a connection to its credential without exposing the token to callers.
+ *
+ * The adapter's refresh function goes along, so an hour-long token is renewed
+ * on the way in instead of the connection being marked dead. Undefined for
+ * every adapter whose tokens do not renew, which is exactly the old behaviour.
+ */
 export function targetFor(connection: Connection): TargetSpec {
+  const adapter = publishService().adapterFor(connection.platform)
   return {
     connection,
     withCredential: async (fn) =>
-      await tokenVault().withCredential(connection.id, connection.tenantId, async (cred) =>
-        await fn(cred.accessToken),
+      await tokenVault().withCredential(
+        connection.id,
+        connection.tenantId,
+        async (cred) => await fn(cred.accessToken),
+        adapter?.refreshCredential?.bind(adapter),
       ),
   }
 }

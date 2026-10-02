@@ -190,6 +190,85 @@ describe('publish', () => {
     assert.deepEqual(seen.sort(), ['idem-a', 'idem-b'])
   })
 
+  test("carries the adapter's notice through, so a private upload is never reported as published", async () => {
+    const svc = new PublishService([
+      fakeAdapter('facebook_page', async () => ({
+        platformPostId: 'v1',
+        notice: 'Uploaded as private: the project has not passed the audit.',
+      })),
+    ])
+    const report = await svc.publish(draft(), [target(connection())], keys)
+    assert.equal(report.succeeded[0]!.result!.notice, 'Uploaded as private: the project has not passed the audit.')
+  })
+
+  test('passes the precise catalogue code through when the adapter names one', async () => {
+    const svc = new PublishService([
+      fakeAdapter('facebook_page', async () => {
+        throw new PublishError('out of quota', { failureClass: 'transient', code: 'QUOTA_EXHAUSTED' })
+      }),
+    ])
+    const report = await svc.publish(draft(), [target(connection())], keys)
+    assert.equal(report.failed[0]!.error!.code, 'QUOTA_EXHAUSTED')
+  })
+
+  test('leaves the code out when the adapter did not name one', async () => {
+    const svc = new PublishService([
+      fakeAdapter('facebook_page', async () => {
+        throw new PublishError('nope', { failureClass: 'permanent' })
+      }),
+    ])
+    const report = await svc.publish(draft(), [target(connection())], keys)
+    assert.equal(report.failed[0]!.error!.code, undefined)
+  })
+
+  test('a credential the vault refused is a credential failure, not a rejected post', async () => {
+    // Reported as permanent, the worker filed it as failed and MCP said the
+    // platform refused the content, when the fix was to reconnect.
+    class NeedsReauthError extends Error {
+      constructor(message: string, options?: { cause?: unknown }) {
+        super(message, options)
+        this.name = 'NeedsReauthError'
+      }
+    }
+    const svc = new PublishService([fakeAdapter('facebook_page', async () => ({ platformPostId: '1' }))])
+    const dead: TargetSpec = {
+      connection: connection(),
+      withCredential: async () => {
+        throw new NeedsReauthError('Credential refresh failed. Reconnect the account.', {
+          cause: new PublishError('Google refused to renew', {
+            failureClass: 'credential',
+            platformMessage: 'Token has been expired or revoked.',
+            platformCode: 'invalid_grant',
+            code: 'GOOGLE_TOKEN_REVOKED',
+          }),
+        })
+      },
+    }
+
+    const report = await svc.publish(draft(), [dead], keys)
+    const error = report.failed[0]!.error!
+    assert.equal(error.failureClass, 'credential')
+    assert.equal(error.retryable, false)
+    assert.equal(error.code, 'GOOGLE_TOKEN_REVOKED')
+    assert.equal(error.platformCode, 'invalid_grant')
+    assert.match(error.message, /Reconnect the account\. Token has been expired or revoked\./)
+  })
+
+  test('a refused credential with no recorded cause is still a credential failure', async () => {
+    const svc = new PublishService([fakeAdapter('facebook_page', async () => ({ platformPostId: '1' }))])
+    const dead: TargetSpec = {
+      connection: connection(),
+      withCredential: async () => {
+        throw Object.assign(new Error('Credential expired and cannot be refreshed. Reconnect the account.'), {
+          name: 'NeedsReauthError',
+        })
+      },
+    }
+    const report = await svc.publish(draft(), [dead], keys)
+    assert.equal(report.failed[0]!.error!.failureClass, 'credential')
+    assert.equal(report.failed[0]!.error!.code, undefined)
+  })
+
   test('a non-PublishError is still reported, not swallowed', async () => {
     const svc = new PublishService([
       fakeAdapter('facebook_page', async () => {

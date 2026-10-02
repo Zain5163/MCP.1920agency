@@ -2,8 +2,16 @@ import { strict as assert } from 'node:assert'
 import { test, describe } from 'node:test'
 
 import { capabilitiesFor } from '../src/adapters/capabilities.ts'
-import { countGraphemes, validateAgainstCapabilities, bodyForPlatform } from '../src/domain/validate.ts'
-import type { MediaRef, PostDraft } from '../src/domain/types.ts'
+import { mediaKindForMime } from '../src/domain/media.ts'
+import {
+  countGraphemes,
+  validateAgainstCapabilities,
+  bodyForPlatform,
+  overridesForStorage,
+  syntheticMediaForPlatform,
+  titleForPlatform,
+} from '../src/domain/validate.ts'
+import { PLATFORMS, type MediaRef, type PostDraft } from '../src/domain/types.ts'
 
 const image = (over: Partial<MediaRef> = {}): MediaRef => ({
   id: 'm1',
@@ -322,5 +330,243 @@ describe('per-platform overrides end to end', () => {
     })
     assert.equal(bodyForPlatform(d, 'instagram'), 'instagram only')
     assert.equal(bodyForPlatform(d, 'facebook_page'), 'shared')
+  })
+})
+
+describe('titles', () => {
+  test('a titled platform declares how long its title may be', () => {
+    // The UI shows a title field from this number, never from a platform name.
+    assert.equal(capabilitiesFor('youtube').titleMaxLength, 100)
+    assert.equal(capabilitiesFor('facebook_page').titleMaxLength, undefined)
+  })
+
+  test('the platform override wins over the draft title', () => {
+    const d = draft({ title: 'Shared', overrides: { youtube: { title: 'Own' } } })
+    assert.equal(titleForPlatform(d, 'youtube'), 'Own')
+    assert.equal(titleForPlatform(d, 'pinterest'), 'Shared')
+  })
+
+  test('a blank title is no title, so a blank override cannot hide the real one', () => {
+    // Forms and AI callers send '' for an empty field.
+    assert.equal(titleForPlatform(draft({ title: '   ' }), 'youtube'), undefined)
+    const d = draft({ title: 'Real', overrides: { youtube: { title: '' } } })
+    assert.equal(titleForPlatform(d, 'youtube'), 'Real')
+  })
+
+  test('surrounding whitespace is dropped', () => {
+    assert.equal(titleForPlatform(draft({ title: '  Hello  ' }), 'youtube'), 'Hello')
+  })
+
+  test('rejects a title over the platform limit', () => {
+    const result = validateAgainstCapabilities(
+      draft({ title: 'a'.repeat(101), media: [video()] }),
+      'youtube',
+      capabilitiesFor('youtube'),
+    )
+    assert.ok(errorCodes(result).includes('title_too_long'))
+    assert.match(result.issues.find((i) => i.code === 'title_too_long')!.message, /1 over the 100 limit/)
+  })
+
+  test('accepts a title exactly at the limit', () => {
+    const result = validateAgainstCapabilities(
+      draft({ title: 'a'.repeat(100), media: [video()] }),
+      'youtube',
+      capabilitiesFor('youtube'),
+    )
+    assert.ok(!errorCodes(result).includes('title_too_long'))
+  })
+
+  test('counts a title in graphemes, like the body', () => {
+    const family = '\u{1F468}‍\u{1F469}‍\u{1F467}‍\u{1F466}'
+    const result = validateAgainstCapabilities(
+      draft({ title: family.repeat(100), media: [video()] }),
+      'youtube',
+      capabilitiesFor('youtube'),
+    )
+    assert.ok(!errorCodes(result).includes('title_too_long'))
+  })
+
+  test('a platform with no title field ignores a long title', () => {
+    const result = validateAgainstCapabilities(
+      draft({ title: 'a'.repeat(500) }),
+      'facebook_page',
+      capabilitiesFor('facebook_page'),
+    )
+    assert.equal(result.ok, true)
+  })
+
+  test('a missing title is not an error here; the adapter decides the fallback', () => {
+    const result = validateAgainstCapabilities(draft({ media: [video()] }), 'youtube', capabilitiesFor('youtube'))
+    assert.ok(!errorCodes(result).includes('title_too_long'))
+  })
+})
+
+describe('AI disclosure', () => {
+  test('defaults to an explicit false, never undefined', () => {
+    assert.equal(syntheticMediaForPlatform(draft(), 'youtube'), false)
+  })
+
+  test('the draft flag applies everywhere, and an override wins for its platform', () => {
+    const d = draft({ syntheticMedia: true, overrides: { instagram: { syntheticMedia: false } } })
+    assert.equal(syntheticMediaForPlatform(d, 'youtube'), true)
+    assert.equal(syntheticMediaForPlatform(d, 'instagram'), false)
+  })
+})
+
+describe('overrides stored with a scheduled post', () => {
+  test('a plain post stores nothing', () => {
+    assert.equal(overridesForStorage(draft(), ['youtube', 'facebook_page']), undefined)
+  })
+
+  test('the title and disclosure are copied into every target platform', () => {
+    // There is no title column, so this is how the worker gets them back.
+    const stored = overridesForStorage(draft({ title: 'T', syntheticMedia: true }), ['youtube', 'linkedin'])
+    assert.deepEqual(stored, {
+      youtube: { title: 'T', syntheticMedia: true },
+      linkedin: { title: 'T', syntheticMedia: true },
+    })
+  })
+
+  test("a platform's own override still wins, and other overrides are kept", () => {
+    const d = draft({
+      title: 'Shared',
+      overrides: { youtube: { title: 'Own', body: 'yt text' }, bluesky: { body: 'short' } },
+    })
+    const stored = overridesForStorage(d, ['youtube'])!
+    assert.deepEqual(stored.youtube, { title: 'Own', body: 'yt text' })
+    assert.deepEqual(stored.bluesky, { body: 'short' })
+  })
+
+  test('rebuilding a draft from what was stored resolves the same title and disclosure', () => {
+    // Exactly what the worker does: body, media and overrides, nothing else.
+    const original = draft({ title: 'Launch day', syntheticMedia: true })
+    const stored = overridesForStorage(original, ['youtube'])
+    const rebuilt: PostDraft = { body: original.body, media: [], ...(stored !== undefined ? { overrides: stored } : {}) }
+    assert.equal(titleForPlatform(rebuilt, 'youtube'), 'Launch day')
+    assert.equal(syntheticMediaForPlatform(rebuilt, 'youtube'), true)
+  })
+})
+
+describe('documents', () => {
+  const pdf = (over: Partial<MediaRef> = {}): MediaRef => ({
+    id: 'd1',
+    kind: 'document',
+    mime: 'application/pdf',
+    bytes: 1_672_687,
+    localPath: 'D:/assets/carousel.pdf',
+    ...over,
+  })
+
+  test('only LinkedIn takes documents', () => {
+    const taking = PLATFORMS.filter((p) => capabilitiesFor(p).mediaKinds.includes('document'))
+    assert.deepEqual(taking, ['linkedin'])
+  })
+
+  test('LinkedIn takes one document on its own', () => {
+    const result = validateAgainstCapabilities(draft({ media: [pdf()] }), 'linkedin', capabilitiesFor('linkedin'))
+    assert.equal(result.ok, true)
+    assert.deepEqual(errorCodes(result), [])
+  })
+
+  test('every other platform refuses a document', () => {
+    for (const platform of PLATFORMS.filter((p) => p !== 'linkedin')) {
+      const result = validateAgainstCapabilities(
+        draft({ media: [pdf({ publicUrl: 'https://cdn.example.com/d1.pdf' })] }),
+        platform,
+        capabilitiesFor(platform),
+      )
+      assert.equal(result.ok, false, `${platform} should refuse a document`)
+      assert.ok(errorCodes(result).includes('unsupported_media_kind'), `${platform}: ${errorCodes(result).join(', ')}`)
+      assert.ok(!errorCodes(result).includes('too_many_documents'), `${platform}: the document rules are LinkedIn's only`)
+    }
+  })
+
+  test('two documents in one post are refused', () => {
+    const result = validateAgainstCapabilities(
+      draft({ media: [pdf({ id: 'a' }), pdf({ id: 'b' })] }),
+      'linkedin',
+      capabilitiesFor('linkedin'),
+    )
+    assert.ok(errorCodes(result).includes('too_many_documents'))
+    assert.match(result.issues.find((i) => i.code === 'too_many_documents')!.message, /carries one/)
+  })
+
+  test('a document with an image or a video is refused as mixed media', () => {
+    for (const other of [image({ localPath: 'a.jpg' }), video({ localPath: 'a.mp4' })]) {
+      const result = validateAgainstCapabilities(draft({ media: [pdf(), other] }), 'linkedin', capabilitiesFor('linkedin'))
+      assert.ok(errorCodes(result).includes('mixed_media'), `with ${other.kind}`)
+      assert.ok(!errorCodes(result).includes('unsupported_media_kind'))
+      assert.match(result.issues.find((i) => i.code === 'mixed_media')!.message, /document is posted on its own/)
+    }
+  })
+
+  test('images with video keep the message they always had', () => {
+    const result = validateAgainstCapabilities(draft({ media: [image(), video()] }), 'bluesky', capabilitiesFor('bluesky'))
+    assert.equal(result.issues.find((i) => i.code === 'mixed_media')!.message, 'Images and video cannot be combined in one post here.')
+  })
+
+  test('a document over 100 MB is refused, and one exactly at it is not', () => {
+    const over = validateAgainstCapabilities(
+      draft({ media: [pdf({ bytes: 100_000_001 })] }),
+      'linkedin',
+      capabilitiesFor('linkedin'),
+    )
+    assert.ok(errorCodes(over).includes('document_too_large'))
+    assert.match(over.issues.find((i) => i.code === 'document_too_large')!.message, /over the 100 MB limit/)
+
+    const at = validateAgainstCapabilities(draft({ media: [pdf({ bytes: 100_000_000 })] }), 'linkedin', capabilitiesFor('linkedin'))
+    assert.ok(!errorCodes(at).includes('document_too_large'))
+  })
+
+  test('a document needs a file or a URL to upload from', () => {
+    const result = validateAgainstCapabilities(
+      draft({ media: [pdf({ localPath: undefined })] }),
+      'linkedin',
+      capabilitiesFor('linkedin'),
+    )
+    assert.ok(errorCodes(result).includes('media_source_missing'))
+  })
+
+  test('a document title is held to LinkedIn\'s 200, like any title', () => {
+    const result = validateAgainstCapabilities(
+      draft({ title: 'a'.repeat(201), media: [pdf()] }),
+      'linkedin',
+      capabilitiesFor('linkedin'),
+    )
+    assert.ok(errorCodes(result).includes('title_too_long'))
+  })
+})
+
+describe('mediaKindForMime', () => {
+  test('a PDF is a document', () => {
+    assert.equal(mediaKindForMime('application/pdf'), 'document')
+  })
+
+  test('case and parameters do not change the answer', () => {
+    assert.equal(mediaKindForMime('Application/PDF; charset=binary'), 'document')
+    assert.equal(mediaKindForMime(' VIDEO/MP4 '), 'video')
+  })
+
+  test('the Word and PowerPoint formats are documents too', () => {
+    for (const mime of [
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-powerpoint',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    ]) {
+      assert.equal(mediaKindForMime(mime), 'document', mime)
+    }
+  })
+
+  test('video is video and images are images, as the worker always mapped them', () => {
+    assert.equal(mediaKindForMime('video/mp4'), 'video')
+    assert.equal(mediaKindForMime('video/quicktime'), 'video')
+    assert.equal(mediaKindForMime('image/png'), 'image')
+    assert.equal(mediaKindForMime('image/jpeg'), 'image')
+  })
+
+  test('anything unrecognised stays an image, the old fallback', () => {
+    assert.equal(mediaKindForMime('application/octet-stream'), 'image')
+    assert.equal(mediaKindForMime(''), 'image')
   })
 })

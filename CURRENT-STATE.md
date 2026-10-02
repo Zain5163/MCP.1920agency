@@ -22,9 +22,11 @@ Working name: **AdsPilot**. It is being renamed because the name is taken (see
 | Facebook Page | ✅ token restored 2026-10-02 | 4 real posts earlier. Reconnected with all permissions; 35 Pages connected. Posting not re-proven yet: switch the Meta app back to Live first |
 | Instagram | ✅ token restored 2026-10-02 | 2 real posts earlier; 21 accounts connected |
 | LinkedIn personal profile | ✅ | Text, image and video posts, all proven 2026-09-26 |
+| LinkedIn document posts (PDF carousels) | 🟡 2026-10-02 | Built and unit-tested only, checked against LinkedIn's docs (`research/2026-10-02-linkedin-documents.md`). `post --document <pdf> --title "..."`; the approval script now schedules the week-1 carousels with it. No document has been posted for real; a scheduled one also needs the media bucket to accept PDFs (unchecked) |
 | LinkedIn company page | ⏸ | Waiting on LinkedIn's approval |
 | Threads, Pinterest | 🟡 | Code built; no credentials yet. Pinterest Trial access shows pins only to the owner |
-| Google Business Profile, YouTube, TikTok, X | not built | See `FUTURE-PLANS.md` |
+| YouTube (Google connection) | 🟡 2026-10-02 | Built and unit-tested only: Google sign-in, resumable upload, title and AI disclosure. Never connected or uploaded for real; needs the owner's Google Cloud steps (`SETUP.md` §8). Uploads stay private, and are reported as private, until the YouTube API audit passes |
+| Google Business Profile, TikTok, X | not built | See `FUTURE-PLANS.md` |
 
 Around the posting:
 

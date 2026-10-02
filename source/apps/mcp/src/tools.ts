@@ -7,6 +7,7 @@ import {
   decide,
   formatApprovalRequest,
   formatResolution,
+  overridesForStorage,
   resolutionFor,
   type Connection,
   type ErrorCode,
@@ -54,9 +55,15 @@ function diagnose(error: unknown): ToolResult {
   return fail('UNKNOWN', message)
 }
 
-function codeForFailure(failureClass: string): ErrorCode {
-  if (failureClass === 'credential') return 'TOKEN_EXPIRED'
-  if (failureClass === 'transient') return 'RATE_LIMITED'
+/**
+ * The resolution to show for a failed target: the adapter's own diagnosis
+ * first, the failure class only as a fallback. The class alone cannot tell a
+ * spent quota from a revoked token. Kept in step with server.ts.
+ */
+function codeForFailure(error: { failureClass: string; code?: ErrorCode | undefined }): ErrorCode {
+  if (error.code !== undefined) return error.code
+  if (error.failureClass === 'credential') return 'TOKEN_EXPIRED'
+  if (error.failureClass === 'transient') return 'RATE_LIMITED'
   return 'PLATFORM_REJECTED'
 }
 
@@ -79,7 +86,23 @@ async function connectionsFor(scope: TenantScope): Promise<Connection[]> {
 }
 
 const draftShape = {
-  body: z.string().describe('The post text or caption.'),
+  body: z.string().describe('The post text or caption. On YouTube this is the video description.'),
+  title: z
+    .string()
+    .optional()
+    .describe(
+      'Title, for platforms that keep one separately (YouTube: at most 100 characters, no < or >). ' +
+        'Without it YouTube uses the first line of body.',
+    ),
+  syntheticMedia: z
+    .boolean()
+    .optional()
+    .describe(
+      'Set true when the media is realistic AI-generated or altered content: a real person shown saying or ' +
+        'doing something they did not, altered footage of a real event or place, or a realistic scene that ' +
+        'never happened. YouTube requires this disclosure. Not needed for AI help with the script, captions, ' +
+        'thumbnail or ideas.',
+    ),
   platforms: z
     .array(z.enum(PLATFORMS))
     .optional()
@@ -235,16 +258,22 @@ export function registerTools(server: McpServer, identity: TokenIdentity, logger
             body: draft.body,
             accounts: chosen.map((c) => c.id).sort(),
             media: draft.media.map((m) => m.publicUrl ?? m.id),
+            // Both change what goes out — a title is public, the disclosure is a
+            // statement to the platform — so changing either voids an approval.
+            ...(draft.title !== undefined ? { title: draft.title } : {}),
+            ...(draft.syntheticMedia !== undefined ? { syntheticMedia: draft.syntheticMedia } : {}),
           },
           ...(args.confirm !== undefined ? { confirmation: args.confirm } : {}),
           describe: () =>
             [
               `Publishing to ${chosen.length} account(s):`,
               ...chosen.map((c) => `  ${c.platform.padEnd(15)} ${c.displayName}`),
+              ...(draft.title !== undefined ? ['', `Title: ${draft.title}`] : []),
               '',
               'Text:',
               ...draft.body.split('\n').map((line) => `  ${line}`),
               ...(draft.media.length > 0 ? ['', `Attachments: ${draft.media.length}`] : []),
+              ...(draft.syntheticMedia === true ? ['', 'Declared as realistic AI-generated or altered media.'] : []),
             ].join('\n'),
         })
 
@@ -256,7 +285,13 @@ export function registerTools(server: McpServer, identity: TokenIdentity, logger
           return text(formatApprovalRequest(gate))
         }
 
-        const post = await scope.createPost({ body: draft.body, createdBy: `mcp:${identity.userId}` })
+        // The title and disclosure travel in the overrides (there is no column
+        // for them), so retrying a failed target later keeps both.
+        const post = await scope.createPost({
+          body: draft.body,
+          createdBy: `mcp:${identity.userId}`,
+          overrides: overridesForStorage(draft, platforms),
+        })
 
         const report = await publishService().publish(draft, chosen.map(targetFor), {
           idempotencyKeyFor: (connectionId) => `${post.id}:${connectionId}`,
@@ -275,6 +310,8 @@ export function registerTools(server: McpServer, identity: TokenIdentity, logger
                     publishedAt: new Date(),
                     platformPostId: outcome.result!.platformPostId,
                     platformUrl: outcome.result!.url ?? null,
+                    // Kept with the target, so list_posts shows it as well.
+                    platformMessage: outcome.result!.notice ?? null,
                   }
                 : {
                     failureClass: outcome.error!.failureClass,
@@ -293,11 +330,17 @@ export function registerTools(server: McpServer, identity: TokenIdentity, logger
 
         const lines: string[] = []
         for (const ok of report.succeeded) {
-          lines.push(`PUBLISHED  ${ok.displayName}  ${ok.result!.url ?? ok.result!.platformPostId}`)
+          // A notice means it went through but is not what "published" implies —
+          // a video uploaded private, for one. It is never reported as PUBLISHED.
+          const notice = ok.result!.notice
+          lines.push(
+            `${notice === undefined ? 'PUBLISHED' : 'UPLOADED '}  ${ok.displayName}  ${ok.result!.url ?? ok.result!.platformPostId}`,
+          )
+          if (notice !== undefined) lines.push(`           NOTE: ${notice}`)
         }
         for (const bad of report.failed) {
           lines.push(`FAILED     ${bad.displayName}`)
-          lines.push(formatResolution(resolutionFor(codeForFailure(bad.error!.failureClass)), bad.error!.message))
+          lines.push(formatResolution(resolutionFor(codeForFailure(bad.error!)), bad.error!.message))
         }
         return text(lines.join('\n'))
       }),
@@ -332,7 +375,16 @@ export function registerTools(server: McpServer, identity: TokenIdentity, logger
         if (chosen.length === 0) return fail('NO_CONNECTION')
         await scope.requireConnections(chosen.map((c) => c.id))
 
-        const post = await scope.createPost({ body: draft.body, createdBy: `mcp:${identity.userId}` })
+        /**
+         * The worker rebuilds the draft from this row alone, and the posts table
+         * has no title or disclosure column. Without the overrides a scheduled
+         * video would go out under its first line, undisclosed.
+         */
+        const post = await scope.createPost({
+          body: draft.body,
+          createdBy: `mcp:${identity.userId}`,
+          overrides: overridesForStorage(draft, platforms),
+        })
 
         for (const connection of chosen) {
           const target = await db().target.create({
@@ -407,6 +459,8 @@ async function buildDraft(
   scope: TenantScope,
   args: {
     body: string
+    title?: string | undefined
+    syntheticMedia?: boolean | undefined
     platforms?: Platform[] | undefined
     accounts?: string[] | undefined
     media?:
@@ -430,7 +484,13 @@ async function buildDraft(
     ...(m.durationSeconds !== undefined ? { durationSeconds: m.durationSeconds } : {}),
   }))
 
-  const draft: PostDraft = { body: args.body, media }
+  const title = args.title?.trim()
+  const draft: PostDraft = {
+    body: args.body,
+    media,
+    ...(title !== undefined && title !== '' ? { title } : {}),
+    ...(args.syntheticMedia !== undefined ? { syntheticMedia: args.syntheticMedia } : {}),
+  }
   // Which accounts, decided once for validate, publish and schedule alike.
   const selection = selectTargets(connections, { platforms: args.platforms, accounts: args.accounts })
   const platforms = selection.ok ? [...selection.platforms] : (args.platforms ?? [])

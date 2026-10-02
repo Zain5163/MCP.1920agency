@@ -15,8 +15,24 @@ import { open, seal, VaultError, type SealContext } from './envelope.ts'
 export interface StoredCredential {
   readonly accessToken: string
   readonly refreshToken?: string
+  /** When this access token stops working. Drives refresh-on-read. */
   readonly expiresAt?: Date
   readonly scopes?: readonly string[]
+  /**
+   * When the AUTHORISATION ends, as distinct from the access token.
+   *
+   * For most providers they are the same moment: a Threads or LinkedIn token is
+   * the authorisation, and it dies at 60 days. Google splits them. Its access
+   * token lasts an hour and is renewed with a refresh token that lives until it
+   * is revoked. Writing the hour into the expiry column would make the refresh
+   * runner declare the whole authorisation dead an hour after connecting, and
+   * the monitor raise a critical alert on every run.
+   *
+   * So when this is present it is what the column records: a date, or `null`
+   * for "no known end". Absent means the column follows `expiresAt`, exactly as
+   * before this field existed.
+   */
+  readonly authorisationExpiresAt?: Date | null
 }
 
 export interface CredentialRecord {
@@ -50,8 +66,12 @@ export interface VaultOptions {
 
 export class NeedsReauthError extends Error {
   readonly connectionId: string
-  constructor(connectionId: string, message: string) {
-    super(message)
+  /**
+   * `cause` carries the refresh failure, when there was one, so whoever reports
+   * this can say "Google revoked the token" rather than only "reconnect".
+   */
+  constructor(connectionId: string, message: string, options?: { cause?: unknown }) {
+    super(message, options?.cause !== undefined ? { cause: options.cause } : undefined)
     this.name = 'NeedsReauthError'
     this.connectionId = connectionId
   }
@@ -86,7 +106,11 @@ export class TokenVault {
       tenantId,
       secretCiphertext: ciphertext,
       keyVersion: this.#keyVersion,
-      expiresAt: credential.expiresAt ?? null,
+      // The column means "when this authorisation dies". See authorisationExpiresAt.
+      expiresAt:
+        credential.authorisationExpiresAt !== undefined
+          ? credential.authorisationExpiresAt
+          : (credential.expiresAt ?? null),
     })
   }
 
@@ -94,9 +118,16 @@ export class TokenVault {
    * Hands a live credential to `fn`, refreshing first if it is at or near expiry.
    *
    * The credential is not returned and must not be captured by the callback. If a
-   * refresh is needed and either impossible or unsuccessful, the connection is
+   * refresh is needed and either impossible or refused, the connection is
    * marked `needs_reauth` and NeedsReauthError is thrown — the user has to
    * reconnect, and retrying will not help.
+   *
+   * A refresh that fails *transiently* — the error carries `failureClass:
+   * 'transient'`, as a PublishError does — is re-thrown as it is and marks
+   * nothing. With an hourly token, one network blip during a refresh would
+   * otherwise disable a working channel until someone reconnected it. The class
+   * is read by duck typing because the vault deliberately depends on nothing,
+   * core included.
    */
   async withCredential<T>(
     connectionId: string,
@@ -127,16 +158,30 @@ export class TokenVault {
           'Credential expired and cannot be refreshed. Reconnect the account.',
         )
       }
+      let refreshed: StoredCredential
       try {
-        credential = await refresh(credential)
-        await this.store(connectionId, tenantId, credential)
+        refreshed = await refresh(credential)
       } catch (cause) {
+        if (isTransient(cause)) throw cause
         await this.#store.markNeedsReauth(connectionId, tenantId, 'refresh failed')
         throw new NeedsReauthError(
           connectionId,
           'Credential refresh failed. Reconnect the account.',
+          { cause },
         )
       }
+      /**
+       * Merged, not replaced. A refresher returns what changed — usually a new
+       * access token and expiry — and replacing the whole credential with that
+       * would drop the refresh token it was renewed with, so the next refresh,
+       * an hour later, would have nothing to work with.
+       *
+       * Stored outside the try on purpose: the platform has already said yes,
+       * so a database hiccup while saving is not a reason to mark a working
+       * account dead.
+       */
+      credential = { ...credential, ...refreshed }
+      await this.store(connectionId, tenantId, credential)
     }
 
     return await fn(credential)
@@ -148,9 +193,29 @@ export class TokenVault {
   }
 }
 
-/** JSON.parse gives back an ISO string, not a Date. */
+/** JSON.parse gives back an ISO string, not a Date. A stored null stays null. */
 function reviveDates(credential: StoredCredential): StoredCredential {
-  const raw = credential as StoredCredential & { expiresAt?: string | Date }
-  if (raw.expiresAt === undefined) return credential
-  return { ...credential, expiresAt: new Date(raw.expiresAt) }
+  const raw = credential as StoredCredential & {
+    expiresAt?: string | Date
+    authorisationExpiresAt?: string | Date | null
+  }
+  return {
+    ...credential,
+    ...(raw.expiresAt !== undefined ? { expiresAt: new Date(raw.expiresAt) } : {}),
+    ...(raw.authorisationExpiresAt !== undefined
+      ? {
+          authorisationExpiresAt:
+            raw.authorisationExpiresAt === null ? null : new Date(raw.authorisationExpiresAt),
+        }
+      : {}),
+  }
+}
+
+/** Whether a refresh failure says it is worth trying again later. */
+function isTransient(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    (error as { failureClass?: unknown }).failureClass === 'transient'
+  )
 }

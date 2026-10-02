@@ -24,7 +24,17 @@ export type Platform = (typeof PLATFORMS)[number]
 /** Where the API credentials for a connection came from. Drives the BYO-keys model. */
 export type CredentialSource = 'platform_app' | 'tenant_byo'
 
-export type MediaKind = 'image' | 'video'
+/**
+ * What an attachment is.
+ *
+ * `document` is a multi-page file, such as a PDF, that a platform shows as pages
+ * the reader swipes through: a LinkedIn document post, which is how PDF
+ * carousels go out there. Only a platform whose capabilities list it accepts
+ * one; every other platform refuses it at validation. The database keeps no
+ * kind, only a mime type, so a stored file's kind comes from
+ * `mediaKindForMime` (domain/media.ts).
+ */
+export type MediaKind = 'image' | 'video' | 'document'
 
 export interface MediaRef {
   readonly id: string
@@ -53,11 +63,35 @@ export interface MediaRef {
  */
 export interface PostDraft {
   readonly body: string
+  /**
+   * A title, for platforms that keep one separately from the text, such as a
+   * YouTube video. Generic so others with a title (a Pinterest pin, a LinkedIn
+   * document) can take it up too. A platform uses it only when its capabilities
+   * declare `titleMaxLength`, which is also what tells a UI to show a title
+   * field — data, never a platform name. The rest ignore it.
+   */
+  readonly title?: string
+  /**
+   * Declares that the media is realistic AI-generated or altered content: a real
+   * person shown saying or doing something they did not, altered footage of a
+   * real event or place, or a realistic scene that never happened.
+   *
+   * Generic because YouTube, Meta and TikTok all ask for this disclosure, and
+   * omitting it on content that needs it can get a post labelled or removed.
+   * Unset means "not declared", which every adapter sends as `false`.
+   */
+  readonly syntheticMedia?: boolean
   readonly media: readonly MediaRef[]
   /** Optional per-platform overrides, e.g. a shorter body for X. */
-  readonly overrides?: Partial<Record<Platform, Partial<Pick<PostDraft, 'body'>>>>
+  readonly overrides?: Partial<Record<Platform, PlatformOverride>>
   readonly scheduledFor?: Date
 }
+
+/**
+ * What one platform may override. Each field falls back to the draft's own
+ * value when absent.
+ */
+export type PlatformOverride = Partial<Pick<PostDraft, 'body' | 'title' | 'syntheticMedia'>>
 
 /** A connected social account. Never carries a secret — see packages/vault. */
 export interface Connection {
@@ -109,6 +143,17 @@ export interface PublishResult {
   readonly platformPostId: string
   readonly url?: string
   readonly raw?: unknown
+  /**
+   * Set when the platform accepted the post but the outcome is not what
+   * "published" would make a reader assume — for example a video uploaded as
+   * private because the API project has not passed YouTube's audit.
+   *
+   * Every surface that reports a result must show this text and must not
+   * describe that target as plainly published. A success the customer cannot
+   * see is the silent failure this project designs against; the adapter is the
+   * only place that knows it happened, so it says so here.
+   */
+  readonly notice?: string
 }
 
 export type TargetState =
