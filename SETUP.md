@@ -152,7 +152,7 @@ platform here whose connections go stale on their own if nothing refreshes them.
 | Step | Blocks | Status |
 |---|---|---|
 | 1. Business Verification | Serving anyone but yourself | ✅ 2026-09-21 (1920 Agency) |
-| 2. Meta App | Facebook + Instagram | ✅ app `SMMM-Agent`, connected and publishing |
+| 2. Meta App | Facebook + Instagram | ✅ app `Mysmadspilot` (renamed from Mysmadspilot 2026-10-02; same App ID), connected and publishing |
 | 3. Supabase | All persistence | ✅ migrated, keep-alive running |
 | 4. Media storage | Instagram, Threads | ✅ Supabase Storage, public bucket `media` |
 | 5. Env file | Running anything | ✅ at `%USERPROFILE%\.social-publisher\.env` |

@@ -94,7 +94,7 @@ here and leaves the old process serving.
 |---|---|
 | Database | Supabase Postgres. Migrations in `source/packages/db/prisma/migrations` |
 | Media | Supabase Storage, public bucket `media` |
-| Meta app | `SMMM-Agent`, linked to the verified **1920 Agency** business portfolio |
+| Meta app | `Mysmadspilot` (renamed from Mysmadspilot 2026-10-02; same App ID), linked to the verified **1920 Agency** business portfolio |
 | Scheduled tasks | `AdsPilot-Worker` every 5 min · `Social-Publisher-Keepalive` Sundays 09:00 |
 
 The keep-alive exists because Supabase pauses free projects after 7 days of
