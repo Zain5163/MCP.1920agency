@@ -14,8 +14,9 @@ server** (so any AI client can drive it), a **web dashboard**, and a **CLI**.
 The product bet, in the owner's words: *give one MCP server to a person or company
 and they no longer need to go anywhere else — or hire a whole team.*
 
-Working and verified live: **Facebook Pages and Instagram**. Six posts published,
-one of them by the scheduler with nobody present.
+Working and verified live (2026-10-02): posting to **Facebook, Instagram and
+LinkedIn**, and **Meta ads** end to end (a real campaign ran at PKR 500/day).
+The full list is `CURRENT-STATE.md`; everything planned is `FUTURE-PLANS.md`.
 
 ---
 
@@ -24,6 +25,8 @@ one of them by the scheduler with nobody present.
 | File | What it answers |
 |---|---|
 | **START-HERE.md** (this) | Where everything is |
+| **CURRENT-STATE.md** | Everything built today, and what is proven live |
+| **FUTURE-PLANS.md** | Everything planned and not built, in order |
 | **PROJECT-CONTEXT.md** | Purpose, decisions, risks, current state |
 | **PROJECT-LOG.md** | What was built and verified, in order, with dates |
 | **ROADMAP.md** | What to build next, ranked by dependency |
@@ -35,7 +38,7 @@ one of them by the scheduler with nobody present.
 | **RULES.md** | Standing rules for how this project is built |
 | **research/** | What was checked, when, against what source |
 | **reference/ad-skills/** | Third-party ad playbooks, licensed and pinned. Source material only |
-| **source/apps/mcp/playbooks/** | Our own Meta, Google and TikTok playbooks, served to AI clients |
+| **source/apps/mcp/playbooks/** | Our own playbooks for 11 ad platforms, served to AI clients |
 | **architecture/** | How the system is put together |
 
 ---
@@ -118,21 +121,7 @@ manual resume from the dashboard.
 
 ---
 
-## Current state, honestly
+## Current state
 
-**Working:** Facebook and Instagram publishing, media upload, scheduling with
-retry and backoff, encrypted credentials, error catalogue, telemetry with
-redaction, tenant isolation, owner/admin roles, real login, hosted MCP with
-per-user tokens, token management, cancel scheduled posts.
-
-**Known gaps** (also in `NEXT-STEPS.md`):
-
-- Nothing alerts if the scheduler stops. A silent worker looks like an empty queue.
-- Every platform limit in `capabilities.ts` is `verified: false` — from knowledge,
-  not checked against live documentation.
-- Postgres RLS is designed but not written as migrations.
-- The database password was exposed in a chat transcript on 2026-09-24 and
-  **still needs rotating**.
-- `APP_PASSWORD` remains in the env file and is no longer used.
-
-**Not built:** everything in tiers 2–6 of `ROADMAP.md`.
+See **`CURRENT-STATE.md`** (built and proven) and **`FUTURE-PLANS.md`** (planned).
+Blocked items and who unblocks them: `WAITING-LIST.md`.

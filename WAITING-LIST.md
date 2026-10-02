@@ -110,7 +110,7 @@ Check with `get_campaign_status` whether Meta approved them.
 
 ---
 
-## 8. AI image generation: built, needs two values from the owner
+## 8. AI image generation: key and $2/day cap set 2026-10-01; needs credit (see #13)
 
 Decided: **OpenRouter, paid per image** (decisions/0007). Built and unit-tested
 as `generate_ad_images`. Needs, in the env file:
