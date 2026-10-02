@@ -1509,6 +1509,45 @@ verdicts, and nothing was changed.
 
 641 tests, 13 workspaces typecheck clean.
 
+## 2026-10-02 — Facebook Page management, and both Meta connections found dead
+
+**Found while building:** the first read of the Page's comments failed with
+Meta error 190. Meta's own `debug_token` showed the stored Facebook **and**
+Instagram tokens as **invalid**, carrying only `read_insights, ads_management,
+ads_read, public_profile`. The Page permissions posting needs had been
+withdrawn. **Posting to Facebook and Instagram has been broken for an unknown
+time**, while every check, `list_accounts` included, said "ready", because only
+expiry dates were checked.
+
+Most likely cause: the same Meta app (SMMM-Agent) was approved again later with
+only the ads permissions ticked, which replaces the earlier grant. Not proven.
+
+**Fixed: the monitor now asks Meta.** Each run checks every Facebook and
+Instagram token with `debug_token`; a dead one is marked needs-reauth (so the
+dashboard, `list_accounts` and the worker see it) and alerts with the fix. Run
+live: both connections caught, CRITICAL, marked needs-reauth.
+
+**Built: Page management** (`page-tools.ts`, `facebook-engagement.ts`):
+
+| Tool | Approval |
+|---|---|
+| `list_page_comments`: who said what, whether the Page replied, spam hints | none, reads |
+| `reply_to_comment` | yes, public under the business's name |
+| `hide_comment` / unhide | none: reversible, the author still sees it |
+| `delete_comment` | yes, permanent |
+| `list_page_reviews` | none, reads |
+| `list_page_messages`: who is waiting, and whether the 24-hour rule allows a reply | none, reads |
+| `reply_to_message` | yes; refused outside Meta's 24-hour window before Meta is called |
+| `get_page_insights`: one metric at a time, retired ones listed not fatal | none, reads |
+
+The Facebook connection now also asks for `pages_read_user_content`,
+`pages_manage_engagement`, `pages_messaging`, `read_insights`.
+
+**Not yet proven live:** none of the Page tools can run until the owner
+reconnects Facebook. Tested against Meta's documented shapes only.
+
+651 tests, 13 workspaces typecheck clean.
+
 ## Verified live, not just tested
 
 | What | How it was proven |

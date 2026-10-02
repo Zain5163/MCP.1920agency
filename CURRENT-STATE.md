@@ -19,8 +19,8 @@ Working name: **AdsPilot**. It is being renamed because the name is taken (see
 
 | Platform | State | Notes |
 |---|---|---|
-| Facebook Page | ✅ | Text, images, video; 4 real posts on 1920 Agency |
-| Instagram | ✅ | 2 real posts |
+| Facebook Page | ⏸ **Broken since an unknown date, found 2026-10-02** | Worked (4 real posts). Meta withdrew the Page permissions; needs the owner to reconnect (WAITING-LIST #17) |
+| Instagram | ⏸ **Broken, same cause** | Worked (2 real posts). Fixed by the same reconnect |
 | LinkedIn personal profile | ✅ | Text, image and video posts, all proven 2026-09-26 |
 | LinkedIn company page | ⏸ | Waiting on LinkedIn's approval |
 | Threads, Pinterest | 🟡 | Code built; no credentials yet. Pinterest Trial access shows pins only to the owner |
@@ -37,6 +37,8 @@ Around the posting:
 | Carousels, per-platform text, preview, retry a failed target (dashboard) | ✅ |
 | Several accounts from one login (e.g. five Facebook Pages) | ✅ |
 | Daily token refresh and expiry warnings | ✅ |
+| Monitor asks Meta whether each Facebook/Instagram token still works (2026-10-02) | ✅ Caught both dead connections on its first run |
+| Facebook Page management: comments, replies, hide, delete, reviews, Messenger, insights | 🟡 Built and tested; runs once Facebook is reconnected |
 
 ## 2. Meta ads
 
@@ -85,7 +87,7 @@ Around the posting:
 | Error catalogue: every error says why and how to fix it | ✅ |
 | Audit log of every action | ✅ |
 | Database lockdown (RLS on all tables) | ✅ |
-| Tests | ✅ 641 passing, 13 workspaces typecheck clean |
+| Tests | ✅ 651 passing, 13 workspaces typecheck clean |
 
 ## 6. Automations running on this PC
 
@@ -113,7 +115,6 @@ They run only while this PC is on.
 
 - Every Facebook/Instagram limit is checked; other platforms' limits are from
   documentation, not tested live.
-- Facebook Pages: posting only. No comments, inbox or insights yet.
 - Ads tools work only on the owner's own account (single-tenant by design until
   per-customer ad accounts exist).
 - Everything runs only while this PC is on.

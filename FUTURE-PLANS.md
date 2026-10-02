@@ -19,7 +19,7 @@ Agency's own accounts.
 
 | # | What | Why now | Detail |
 |---|---|---|---|
-| 1 | **Facebook Page management**: read and reply to comments and reviews, hide spam, Messenger replies, insights | Owner's Page works without Meta review | ROADMAP 5b.7 |
+| — | ~~**Facebook Page management**~~ built 2026-10-02 (CURRENT-STATE); was: read and reply to comments and reviews, hide spam, Messenger replies, insights | Owner's Page works without Meta review | ROADMAP 5b.7 |
 | 2 | **Google Business Profile posting** | Owner's priority #1; waiting on Google's access form (up to 14 days) | `architecture/google-suite-plan.md` |
 | 3 | **YouTube posting** | Uploads stay private until Google's audit passes | same |
 | 4 | **Search Console and Google Analytics** reads | | same |

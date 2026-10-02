@@ -1,5 +1,7 @@
-import { optional } from '@social-publisher/config'
-import { disconnect, recordHeartbeat, runHealthChecks, type HealthCheck } from '@social-publisher/db'
+import { META_REQUIRED_SCOPES, inspectMetaToken } from '@social-publisher/adapters'
+import { optional, required } from '@social-publisher/config'
+import { db, disconnect, prismaCredentialStore, recordHeartbeat, runHealthChecks, type HealthCheck } from '@social-publisher/db'
+import { TokenVault, parseKey } from '@social-publisher/vault'
 import { createLogger } from '@social-publisher/telemetry'
 
 /**
@@ -27,8 +29,67 @@ const ICON: Record<HealthCheck['severity'], string> = {
   critical: '  CRITICAL',
 }
 
+/**
+ * Asks Meta whether each Facebook and Instagram token still works.
+ *
+ * Added 2026-10-02. Both Meta connections had been dead for an unknown time —
+ * Meta had withdrawn their Page permissions — while every check reported them
+ * "ready", because only expiry dates were looked at. A dead connection is now
+ * marked needs-reauth, so the dashboard, `list_accounts` and the worker all see
+ * it, and the alert says how to fix it.
+ */
+async function metaTokenChecks(): Promise<HealthCheck[]> {
+  const appId = optional('META_APP_ID')
+  const appSecret = optional('META_APP_SECRET')
+  if (appId === undefined || appSecret === undefined) return []
+  const store = prismaCredentialStore()
+  const vault = new TokenVault({ kek: parseKey(required('VAULT_MASTER_KEY'), 'VAULT_MASTER_KEY'), keyVersion: 1, store })
+  const rows = await db().connection.findMany({
+    where: { platform: { in: Object.keys(META_REQUIRED_SCOPES) as never }, needsReauth: false },
+  })
+  const checks: HealthCheck[] = []
+  for (const row of rows) {
+    try {
+      const health = await vault.withCredential(row.id, row.tenantId, async (cred) =>
+        await inspectMetaToken({
+          token: cred.accessToken,
+          appId,
+          appSecret,
+          required: META_REQUIRED_SCOPES[row.platform] ?? [],
+          apiVersion: optional('META_API_VERSION', 'v25.0')!,
+        }),
+      )
+      if (health.valid) continue
+      const reason = health.missing.length > 0 ? `permissions withdrawn: ${health.missing.join(', ')}` : (health.reason ?? 'Meta reports the token invalid')
+      await store.markNeedsReauth(row.id, row.tenantId, reason)
+      checks.push({
+        name: 'meta_token',
+        severity: 'critical',
+        summary: `"${row.displayName}" cannot post: ${reason}.`,
+        action: 'Reconnect Facebook in the dashboard (Accounts → Reconnect) and keep every permission ticked.',
+        detail: { connectionId: row.id, platform: row.platform },
+      })
+    } catch (error) {
+      checks.push({
+        name: 'meta_token',
+        severity: 'warning',
+        summary: `Could not check "${row.displayName}": ${error instanceof Error ? error.message : String(error)}`,
+        action: 'Usually a network blip; the next run checks again.',
+      })
+    }
+  }
+  return checks
+}
+
 async function main(): Promise<void> {
-  const report = await runHealthChecks()
+  const base = await runHealthChecks()
+  const tokenChecks = await metaTokenChecks()
+  const order = { ok: 0, warning: 1, critical: 2 } as const
+  const report = {
+    ...base,
+    checks: [...base.checks, ...tokenChecks],
+    worst: [base.worst, ...tokenChecks.map((c) => c.severity)].reduce((a, b) => (order[b] > order[a] ? b : a)),
+  }
 
   console.log(`\n  AdsPilot health — ${report.checkedAt.toISOString()}\n`)
 

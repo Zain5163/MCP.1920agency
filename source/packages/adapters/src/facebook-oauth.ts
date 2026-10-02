@@ -35,6 +35,12 @@ export const FACEBOOK_SCOPES = [
   'business_management',
   'instagram_basic',
   'instagram_content_publish',
+  // Page management (2026-10-02): read comments and reviews, reply to and hide
+  // comments, answer Messenger, read insights.
+  'pages_read_user_content',
+  'pages_manage_engagement',
+  'pages_messaging',
+  'read_insights',
 ] as const
 
 export interface OAuthConfig {

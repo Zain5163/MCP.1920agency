@@ -197,6 +197,29 @@ From `audit_ad_account`, 2026-10-02, read-only:
   conversation than "VES- 5" (PKR 54). Give a target cost per conversation for a
   real verdict.
 
+## 17. Reconnect Facebook — posting and Instagram are broken until then 🔴
+
+Found 2026-10-02: Meta withdrew the Page and Instagram permissions from the
+stored login (details in PROJECT-LOG). **Nothing posts to Facebook or Instagram
+until this is done**, and the new Page tools cannot run.
+
+**Waiting on the owner, in this order:**
+
+1. **Add the permissions to the Meta app first**, or Meta's login window refuses
+   the whole login: developers.facebook.com → SMMM-Agent → Use cases → the Pages
+   use case → add `pages_read_user_content`, `pages_manage_engagement`,
+   `read_insights`; for Messenger, the Messenger use case → `pages_messaging`.
+2. **Reconnect:** `start-dashboard.cmd` → Accounts → Reconnect Facebook (or
+   `pnpm connect` in `source/apps/cli`).
+3. In Meta's window, **choose the 1920 Agency Page and keep every permission
+   ticked.**
+4. **Never re-approve SMMM-Agent later with fewer permissions** (for example,
+   only ads): that replaces this grant and breaks posting again. The ads token
+   is a separate system-user token and needs no login here.
+
+Then the next monitor run confirms both connections, and the Page tools are
+checked live.
+
 ---
 
 ## How to use this file
