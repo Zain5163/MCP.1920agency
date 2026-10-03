@@ -368,10 +368,41 @@ export function formatPublishReport(report: PublishReport, options: { readonly a
   }
   for (const bad of report.failed) {
     lines.push(`FAILED     ${bad.displayName}  ${bad.error!.message}`)
-    lines.push(formatResolution(resolutionFor(codeForFailure(bad.error!)), bad.error!.platformCode))
+    lines.push(publishNowResolution(bad.error!))
     // The dashboard will not retry it, so say how it can be sent.
     if (!options.attachmentsStored) lines.push(`           NOTE: ${ATTACHMENTS_NOT_STORED_MESSAGE}`)
   }
+  return lines.join('\n')
+}
+
+/**
+ * A failed target's diagnosis, as it is true for a post published now.
+ *
+ * The catalogue speaks for the worker, which retries a transient failure on
+ * its own: "This will be retried automatically", and for some codes a first
+ * step of "No action needed — it will retry automatically". Nothing retries a
+ * post published now, so for one of those both were false, and an AI caller
+ * repeats them to the user, who then waits for a retry that never comes. They
+ * are replaced by when to publish it again.
+ *
+ * The retry sentence is the last line of every formatted resolution, so that
+ * line is the one replaced.
+ */
+export function publishNowResolution(
+  error: { readonly failureClass: string; readonly code?: ErrorCode | undefined; readonly platformCode?: string | undefined; readonly retryAfterMs?: number | undefined },
+  now: Date = new Date(),
+): string {
+  const resolution = resolutionFor(codeForFailure(error))
+  if (!resolution.retryable) return formatResolution(resolution, error.platformCode)
+
+  const kept = resolution.fix.filter((step) => !/automatic/i.test(step))
+  const fix = kept.length > 0 ? kept : ['Publish it again once the wait has passed']
+  const lines = formatResolution({ ...resolution, fix }, error.platformCode).split('\n')
+  const when =
+    error.retryAfterMs !== undefined ? `after ${new Date(now.getTime() + error.retryAfterMs).toISOString()}` : 'once the wait has passed'
+  lines[lines.length - 1] =
+    `Nothing retries a post that was published now: call publish_post again ${when}, ` +
+    'without confirm, to get a new approval.'
   return lines.join('\n')
 }
 

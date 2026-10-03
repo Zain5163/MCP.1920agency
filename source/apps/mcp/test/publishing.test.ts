@@ -2,7 +2,16 @@ import { strict as assert } from 'node:assert'
 import { describe, test } from 'node:test'
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
-import { PublishError, capabilitiesFor, type Platform, type PlatformAdapter, type PublishResult } from '@social-publisher/core'
+import {
+  PublishError,
+  allCodes,
+  capabilitiesFor,
+  formatResolution,
+  resolutionFor,
+  type Platform,
+  type PlatformAdapter,
+  type PublishResult,
+} from '@social-publisher/core'
 import { ATTACHMENTS_NOT_STORED_CODE, ATTACHMENTS_NOT_STORED_MESSAGE, NOTICE_CODE } from '@social-publisher/db'
 import { PublishService } from '@social-publisher/publisher'
 import { Logger } from '@social-publisher/telemetry'
@@ -10,6 +19,7 @@ import { Logger } from '@social-publisher/telemetry'
 import {
   approvalSummary,
   formatPostList,
+  publishNowResolution,
   publishPost,
   type MediaRow,
   type PostRows,
@@ -399,5 +409,47 @@ describe('a failed post whose attachments were not stored is never retried witho
     })
     assert.equal(rows.targets[0]!.state, 'published')
     assert.equal(rows.targets[0]!.errorCode, null)
+  })
+})
+
+describe('a publish-now failure never promises an automatic retry (finding #9)', () => {
+  test("the reviewers' case: a spent YouTube quota says when to publish again, not that it will be retried", async () => {
+    const quota = async (): Promise<PublishResult> => {
+      throw new PublishError('The YouTube upload quota for today is used up.', {
+        failureClass: 'transient',
+        code: 'QUOTA_EXHAUSTED',
+        platformCode: 'quotaExceeded',
+        retryAfterSeconds: 77_087,
+      })
+    }
+    const { deps, scope } = harness([adapter('youtube', quota)])
+    const args = { body: 'Launch video', platforms: ['youtube' as Platform], media: [{ kind: 'video' as const, localPath: 'D:/clip.mp4', mime: 'video/mp4' }] }
+    const approval = reply(await publishPost(scope as never, args, { deps, actor: 'mcp' }))
+    const before = Date.now()
+    const done = reply(await publishPost(scope as never, { ...args, confirm: tokenIn(approval) }, { deps, actor: 'mcp' }))
+
+    assert.match(done, /^FAILED     PSX Ascend/)
+    assert.match(done, /\[QUOTA_EXHAUSTED\]/)
+    assert.doesNotMatch(done, /automatic/i)
+    const when = /call publish_post again after (\S+), without confirm/.exec(done)
+    assert.ok(when !== null, done)
+    const wait = Date.parse(when[1]!) - before
+    assert.ok(wait > 77_000_000 && wait < 77_200_000, `the quota's own wait, not a guess: ${wait}`)
+  })
+
+  test('no retryable catalogue entry is shown with an automatic retry', () => {
+    for (const code of allCodes()) {
+      const resolution = resolutionFor(code)
+      if (!resolution.retryable) continue
+      const text = publishNowResolution({ failureClass: 'transient', code, retryAfterMs: 30_000 })
+      assert.doesNotMatch(text, /automatic/i, code)
+      assert.match(text, /Nothing retries a post that was published now/, code)
+      assert.match(text, /How to fix:\n {2}1\. /, `${code} still has a step to follow`)
+    }
+  })
+
+  test('a failure that is not retryable reads exactly as the catalogue has it', () => {
+    const error = { failureClass: 'permanent', code: 'PLATFORM_REJECTED' as const, platformCode: '100' }
+    assert.equal(publishNowResolution(error), formatResolution(resolutionFor('PLATFORM_REJECTED'), '100'))
   })
 })
