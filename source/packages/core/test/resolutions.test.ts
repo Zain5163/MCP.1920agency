@@ -79,9 +79,19 @@ describe('classification steers agent behaviour', () => {
       'YOUTUBE_NO_CHANNEL',
       'YOUTUBE_WRONG_CHANNEL',
       'YOUTUBE_CHANNEL_UPLOAD_LIMIT',
+      'YOUTUBE_UPLOAD_UNCONFIRMED',
     ] as const) {
       assert.ok(codes.includes(expected), `missing catalogue entry: ${expected}`)
     }
+  })
+
+  test('an upload whose reply was lost is never retried, and says to look in YouTube Studio first', () => {
+    // The video may already exist; a retry is the one thing sure to duplicate it.
+    const r = resolutionFor('YOUTUBE_UPLOAD_UNCONFIRMED')
+    assert.equal(r.retryable, false)
+    assert.equal(r.needsHuman, true)
+    assert.match(r.fix[0]!, /YouTube Studio/)
+    assert.doesNotMatch(formatResolution(r), /retried automatically/)
   })
 
   test('only a person can fix a missing permission, a switched-off API or a dead Google token', () => {

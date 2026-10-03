@@ -51,6 +51,7 @@ export type ErrorCode =
   | 'YOUTUBE_NO_CHANNEL'
   | 'YOUTUBE_WRONG_CHANNEL'
   | 'YOUTUBE_CHANNEL_UPLOAD_LIMIT'
+  | 'YOUTUBE_UPLOAD_UNCONFIRMED'
   // internal
   | 'UNKNOWN'
 
@@ -356,6 +357,22 @@ const CATALOGUE: Readonly<Record<ErrorCode, Omit<Resolution, 'code'>>> = {
     ],
     retryable: true,
     needsHuman: false,
+  },
+  /**
+   * Not retryable, and a person must look, because the one thing a retry is
+   * sure to do here is upload the video again: YouTube makes the video the
+   * moment it holds the last byte and has no way to recognise a repeat.
+   */
+  YOUTUBE_UPLOAD_UNCONFIRMED: {
+    what: 'The whole video was sent to YouTube, but whether YouTube created it is not known.',
+    why: 'YouTube creates the video the moment it receives the last byte, and the reply that would have confirmed it never arrived: the connection dropped, YouTube answered with a server error, or the upload was cancelled, and asking the upload session afterwards did not settle it. YouTube cannot recognise a repeated upload, so publishing again without checking could put the video on the channel twice.',
+    fix: [
+      'Open YouTube Studio (https://studio.youtube.com) and look for the video under Content; a new upload can take a few minutes to appear',
+      'If it is there, do not publish it again: change its title, privacy or other details in YouTube Studio if needed',
+      'If it is still missing after about 15 minutes, publish it again',
+    ],
+    retryable: false,
+    needsHuman: true,
   },
 
   UNKNOWN: {

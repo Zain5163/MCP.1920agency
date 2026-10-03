@@ -360,8 +360,9 @@ describe('the resumable upload', () => {
     assert.deepEqual(sleeps, [7_000])
   })
 
-  test('gives up after repeated interruptions, as a transient error the worker retries', async () => {
-    const file = await videoFile(SMALL_CHUNK)
+  test('gives up after repeated interruptions before the last chunk, as a transient error the worker retries', async () => {
+    // Two chunks, so the failing one is not the last: no video can exist yet.
+    const file = await videoFile(2 * SMALL_CHUNK)
     const { yt, calls } = make([MINE, STARTED, { status: 503 }], { chunkBytes: SMALL_CHUNK, maxResumeAttempts: 2 })
 
     await assert.rejects(
@@ -376,8 +377,8 @@ describe('the resumable upload', () => {
     assert.equal(calls.filter((c) => c.method === 'PUT').length, 3)
   })
 
-  test('an expired session is transient, so the job retries with a fresh upload', async () => {
-    const file = await videoFile(SMALL_CHUNK)
+  test('an expired session before the last chunk is transient, so the job retries with a fresh upload', async () => {
+    const file = await videoFile(2 * SMALL_CHUNK)
     const { yt, calls } = make([MINE, STARTED, { status: 404 }], { chunkBytes: SMALL_CHUNK })
     await assert.rejects(
       () => yt.publish(ctx(), draft({ media: [vid(file)] })),
@@ -387,7 +388,7 @@ describe('the resumable upload', () => {
   })
 
   test('a token that runs out mid-upload is transient: the next attempt renews it', async () => {
-    const file = await videoFile(SMALL_CHUNK)
+    const file = await videoFile(2 * SMALL_CHUNK)
     const { yt } = make([MINE, STARTED, { status: 401 }], { chunkBytes: SMALL_CHUNK })
     await assert.rejects(
       () => yt.publish(ctx(), draft({ media: [vid(file)] })),
@@ -419,7 +420,243 @@ describe('the resumable upload', () => {
     const { yt } = make([MINE, STARTED, { status: 201, body: {} }])
     await assert.rejects(
       () => yt.publish(ctx(), draft({ media: [vid(file)] })),
-      (error: unknown) => error instanceof PublishError && error.failureClass === 'permanent',
+      (error: unknown) =>
+        error instanceof PublishError &&
+        error.failureClass === 'permanent' &&
+        error.code === 'YOUTUBE_UPLOAD_UNCONFIRMED',
+    )
+  })
+})
+
+/**
+ * A YouTube that keeps state across attempts, for the duplicate tests.
+ *
+ * It follows the documented protocol: the video exists the moment a session
+ * holds every byte, whatever then happens to the reply, and a status check on
+ * a finished session repeats the 201. `lastReply` decides what the request that
+ * completes each upload gets back; `statusFailures` how many status checks
+ * fail after that, and how.
+ */
+function fakeChannel(plan: {
+  lastReply: 'ok' | 'lost' | 'slow-down'
+  statusFailures?: number
+  statusFailure?: Reply | Error
+}) {
+  const videos: string[] = []
+  const sessions = new Map<string, { held: number; video?: string }>()
+  let statusFailuresLeft = plan.statusFailures ?? 0
+  let statusChecks = 0
+  let completions = 0
+  const dropped = () => new TypeError('fetch failed', { cause: Object.assign(new Error('read ECONNRESET'), { code: 'ECONNRESET' }) })
+  const made = (id: string) =>
+    new Response(JSON.stringify({ id, status: { privacyStatus: 'private', uploadStatus: 'uploaded' } }), { status: 201 })
+
+  const fetchImpl = (async (url: string | URL | Request, init?: RequestInit) => {
+    const address = String(url)
+    const method = init?.method ?? 'GET'
+    const headers = (init?.headers as Record<string, string> | undefined) ?? {}
+    if (address.includes('/youtube/v3/channels')) return new Response(JSON.stringify(MINE.body))
+    if (method === 'GET') return new Response(JSON.stringify(READ_BACK().body))
+    if (method === 'POST') {
+      const session = `${SESSION.replace('SESSION1', '')}S${sessions.size + 1}`
+      sessions.set(session, { held: 0 })
+      return new Response(null, { status: 200, headers: { location: session } })
+    }
+
+    const session = sessions.get(address)!
+    const range = headers['Content-Range'] ?? ''
+    if (range.startsWith('bytes */')) {
+      statusChecks += 1
+      if (statusFailuresLeft > 0) {
+        statusFailuresLeft -= 1
+        const failure = plan.statusFailure ?? dropped()
+        if (failure instanceof Error) throw failure
+        return new Response(failure.body === undefined ? null : JSON.stringify(failure.body), {
+          status: failure.status ?? 200,
+          headers: failure.headers ?? {},
+        })
+      }
+      if (session.video !== undefined) return made(session.video)
+      return new Response(null, { status: 308, headers: session.held > 0 ? { range: `bytes=0-${session.held - 1}` } : {} })
+    }
+
+    const [, , last, total] = /bytes (\d+)-(\d+)\/(\d+)/.exec(range)!.map(Number) as [number, number, number, number]
+    session.held = last + 1
+    if (session.held < total) return new Response(null, { status: 308, headers: { range: `bytes=0-${last}` } })
+    // Every byte is here: the video now exists on the channel, reply or not.
+    const id = `VID${videos.length + 1}`
+    videos.push(id)
+    session.video = id
+    completions += 1
+    if (completions === 1 && plan.lastReply === 'lost') throw dropped()
+    if (completions === 1 && plan.lastReply === 'slow-down') {
+      return new Response(null, { status: 503, headers: { 'retry-after': '120' } })
+    }
+    return made(id)
+  }) as unknown as typeof globalThis.fetch
+
+  return { fetchImpl, videos, statusChecks: () => statusChecks, sessionsOpened: () => sessions.size }
+}
+
+/** Publishes the way the worker does: again while the failure is retryable, at most six times. */
+async function publishLikeTheWorker(yt: YouTubeAdapter, post: PostDraft): Promise<{ outcomes: string[]; errors: unknown[] }> {
+  const outcomes: string[] = []
+  const errors: unknown[] = []
+  for (let attempt = 1; attempt <= 6; attempt += 1) {
+    try {
+      outcomes.push(`published ${(await yt.publish(ctx(), post)).platformPostId}`)
+      break
+    } catch (error) {
+      errors.push(error)
+      const retryable = error instanceof PublishError && error.isRetryable
+      outcomes.push(retryable ? 'retryable' : 'final')
+      if (!retryable) break
+    }
+  }
+  return { outcomes, errors }
+}
+
+const unconfirmedUpload = (error: unknown): boolean => {
+  assert.ok(error instanceof PublishError)
+  assert.equal(error.code, 'YOUTUBE_UPLOAD_UNCONFIRMED')
+  assert.equal(error.failureClass, 'permanent', 'never retryable: a retry would be a second copy')
+  assert.match(error.message, /YouTube Studio/)
+  assert.doesNotMatch(error.message, /Nothing was published/, 'the video may well exist')
+  return true
+}
+
+describe('once the last byte has gone out', () => {
+  test('a lost reply is recovered by asking the session, and the video is uploaded once', async () => {
+    const file = await videoFile(10_000)
+    const channel = fakeChannel({ lastReply: 'lost' })
+    const yt = new YouTubeAdapter({ fetch: channel.fetchImpl, sleep: async () => {} })
+
+    const { outcomes } = await publishLikeTheWorker(yt, draft({ media: [vid(file)] }))
+    assert.deepEqual(outcomes, ['published VID1'])
+    assert.deepEqual(channel.videos, ['VID1'])
+  })
+
+  test('a lost reply with the session unreachable after it is unconfirmed, so nothing uploads it twice', async () => {
+    // The reviewers' case: one chunk, which is also the last. Before the fix
+    // this said "Nothing was published" as a transient error, the retry
+    // uploaded the video again, and the channel held VID1 and VID2.
+    const file = await videoFile(10_000)
+    const channel = fakeChannel({ lastReply: 'lost', statusFailures: 5 })
+    const yt = new YouTubeAdapter({ fetch: channel.fetchImpl, sleep: async () => {} })
+
+    const { outcomes, errors } = await publishLikeTheWorker(yt, draft({ media: [vid(file)] }))
+    assert.deepEqual(outcomes, ['final'])
+    assert.ok(unconfirmedUpload(errors[0]))
+    assert.deepEqual(channel.videos, ['VID1'])
+    assert.equal(channel.sessionsOpened(), 1)
+  })
+
+  test('the same holds for the last of several chunks', async () => {
+    const file = await videoFile(600_000)
+    const channel = fakeChannel({ lastReply: 'lost', statusFailures: 5 })
+    const yt = new YouTubeAdapter({ fetch: channel.fetchImpl, sleep: async () => {}, chunkBytes: SMALL_CHUNK })
+
+    const { outcomes, errors } = await publishLikeTheWorker(yt, draft({ media: [vid(file)] }))
+    assert.deepEqual(outcomes, ['final'])
+    assert.ok(unconfirmedUpload(errors[0]))
+    assert.doesNotMatch((errors[0] as Error).message, /stopped at byte/)
+    assert.deepEqual(channel.videos, ['VID1'])
+  })
+
+  test('a status check refused after the last chunk is unconfirmed too, whatever the refusal', async () => {
+    const refusals: Array<Reply | Error> = [{ status: 404 }, { status: 401 }, googleFailure(400, 'badRequest')]
+    for (const statusFailure of refusals) {
+      const file = await videoFile(10_000)
+      const channel = fakeChannel({ lastReply: 'lost', statusFailures: 1, statusFailure })
+      const yt = new YouTubeAdapter({ fetch: channel.fetchImpl, sleep: async () => {} })
+
+      const { outcomes, errors } = await publishLikeTheWorker(yt, draft({ media: [vid(file)] }))
+      assert.deepEqual(outcomes, ['final'], JSON.stringify(statusFailure))
+      assert.ok(unconfirmedUpload(errors[0]))
+      assert.deepEqual(channel.videos, ['VID1'])
+    }
+  })
+
+  test('a long Retry-After on the last chunk is not given up on blind: the session is asked once first', async () => {
+    const file = await videoFile(10_000)
+    const channel = fakeChannel({ lastReply: 'slow-down' })
+    const sleeps: number[] = []
+    const yt = new YouTubeAdapter({ fetch: channel.fetchImpl, sleep: async (ms) => void sleeps.push(ms) })
+
+    const { outcomes } = await publishLikeTheWorker(yt, draft({ media: [vid(file)] }))
+    assert.deepEqual(outcomes, ['published VID1'])
+    assert.equal(channel.statusChecks(), 1)
+    assert.deepEqual(sleeps, [60_000], 'waits the longest inline wait, never the full two minutes')
+    assert.deepEqual(channel.videos, ['VID1'])
+  })
+
+  test('when that one status check is told to wait as well, the upload is unconfirmed, not "tried again later"', async () => {
+    const file = await videoFile(10_000)
+    const channel = fakeChannel({
+      lastReply: 'slow-down',
+      statusFailures: 1,
+      statusFailure: { status: 503, headers: { 'retry-after': '120' } },
+    })
+    const yt = new YouTubeAdapter({ fetch: channel.fetchImpl, sleep: async () => {} })
+
+    const { outcomes, errors } = await publishLikeTheWorker(yt, draft({ media: [vid(file)] }))
+    assert.deepEqual(outcomes, ['final'])
+    assert.ok(unconfirmedUpload(errors[0]))
+    assert.equal(channel.statusChecks(), 1, 'asked once, not repeatedly against the wait')
+    assert.deepEqual(channel.videos, ['VID1'])
+  })
+
+  test('a long Retry-After before the last chunk still hands the wait to the worker', async () => {
+    const file = await videoFile(2 * SMALL_CHUNK)
+    const { yt, calls } = make([MINE, STARTED, { status: 503, headers: { 'retry-after': '120' } }], {
+      chunkBytes: SMALL_CHUNK,
+    })
+    await assert.rejects(
+      () => yt.publish(ctx(), draft({ media: [vid(file)] })),
+      (error: unknown) => {
+        assert.ok(error instanceof PublishError)
+        assert.equal(error.failureClass, 'transient', 'no video can exist before the last byte')
+        assert.equal(error.retryAfterSeconds, 120)
+        return true
+      },
+    )
+    assert.equal(calls.filter((c) => c.method === 'PUT').length, 1, 'no status check is needed to know that')
+  })
+
+  test('a cancel while the last chunk is in flight is unconfirmed; a cancel before it is not', async () => {
+    const cancelOn = (chunkIndex: number) => {
+      const controller = new AbortController()
+      let puts = 0
+      const step = (call: Call): Reply => {
+        puts += 1
+        if (puts === chunkIndex) {
+          controller.abort()
+          throw new DOMException('This operation was aborted', 'AbortError')
+        }
+        return ackChunk(call)
+      }
+      return { controller, step }
+    }
+
+    const file = await videoFile(2 * SMALL_CHUNK)
+
+    const late = cancelOn(2)
+    const { yt: lateYt } = make([MINE, STARTED, late.step], { chunkBytes: SMALL_CHUNK })
+    await assert.rejects(
+      () => lateYt.publish({ ...ctx(), signal: late.controller.signal }, draft({ media: [vid(file)] })),
+      unconfirmedUpload,
+    )
+
+    const early = cancelOn(1)
+    const { yt: earlyYt } = make([MINE, STARTED, early.step], { chunkBytes: SMALL_CHUNK })
+    await assert.rejects(
+      () => earlyYt.publish({ ...ctx(), signal: early.controller.signal }, draft({ media: [vid(file)] })),
+      (error: unknown) => {
+        assert.ok(error instanceof PublishError)
+        assert.match(error.message, /cancelled before it finished\. Nothing was published/)
+        assert.notEqual(error.code, 'YOUTUBE_UPLOAD_UNCONFIRMED')
+        return true
+      },
     )
   })
 })
@@ -782,6 +1019,8 @@ describe('settings from the environment', () => {
 describe('limits on the upload loop', () => {
   test('a session that keeps giving back ground is stopped, not chased forever', async () => {
     // Each chunk is acknowledged, then a status check reports less than before.
+    // The last chunk is among those sent, and its final reply was a 503, so
+    // the stop is reported as unconfirmed rather than "nothing was published".
     const size = 2 * SMALL_CHUNK
     const file = await videoFile(size)
     let flip = false
@@ -799,11 +1038,35 @@ describe('limits on the upload loop', () => {
       ],
       { chunkBytes: SMALL_CHUNK },
     )
+    await assert.rejects(() => yt.publish(ctx(), draft({ media: [vid(file)] })), unconfirmedUpload)
+    assert.ok(calls.length < 40, `stopped after ${calls.length} calls`)
+  })
+
+  test('a session that gives back ground before the last chunk ever goes out stops as transient', async () => {
+    // The first chunk is acknowledged, the second always fails, and the
+    // session then says it holds nothing. The third, last, chunk is never
+    // sent, so no video can exist and a retry is safe.
+    const size = 3 * SMALL_CHUNK
+    const file = await videoFile(size)
+    const { yt, calls } = make(
+      [
+        MINE,
+        STARTED,
+        (call: Call) => {
+          const range = header(call, 'content-range') ?? ''
+          if (range.startsWith('bytes */')) return { status: 308 }
+          return range.startsWith('bytes 0-') ? ackChunk(call) : { status: 503 }
+        },
+      ],
+      { chunkBytes: SMALL_CHUNK },
+    )
     await assert.rejects(
       () => yt.publish(ctx(), draft({ media: [vid(file)] })),
-      (error: unknown) => error instanceof PublishError && error.failureClass === 'transient',
+      (error: unknown) =>
+        error instanceof PublishError && error.failureClass === 'transient' && /Nothing was published/.test(error.message),
     )
     assert.ok(calls.length < 40, `stopped after ${calls.length} calls`)
+    assert.ok(!calls.some((c) => header(c, 'content-range')?.startsWith(`bytes ${2 * SMALL_CHUNK}-`) === true))
   })
 
   test('warns that a video over 15 minutes needs a verified channel', () => {

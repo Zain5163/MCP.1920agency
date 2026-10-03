@@ -54,7 +54,9 @@ import { openMedia, type MediaSource } from './media-source.ts'
  *    a second copy of the video. What prevents that is outside this file: the
  *    worker records the video id the moment it exists and never re-runs a job
  *    that has one, and it keeps the job's lock fresh while a long upload runs.
- *    Inside this file, nothing may throw once the video exists.
+ *    Inside this file, nothing may throw once the video exists, and once the
+ *    last byte has gone out without an answer, no failure may be retryable or
+ *    claim that nothing was published: the reply may be all that was lost.
  *
  * 5. **One token reaches one channel**, and the API has no channel parameter.
  *    So before anything is uploaded the token is asked which channel it
@@ -157,13 +159,28 @@ interface VideoResource {
   readonly status?: { readonly privacyStatus?: string; readonly uploadStatus?: string }
 }
 
-/** What the upload session said in reply to one request. */
+/**
+ * What the upload session said in reply to one request.
+ *
+ * Refusals are replies rather than throws so that the upload loop, which alone
+ * knows whether the file's last byte has gone out, decides what each one
+ * means: the same 404 is "start again" before the last byte and "the video may
+ * exist" after it.
+ */
 type UploadReply =
   | { readonly kind: 'done'; readonly video: VideoResource }
   /** 308: the session holds this many bytes. */
   | { readonly kind: 'incomplete'; readonly received: number }
   /** No reply at all, or a 5xx Google says can be resumed after. */
   | { readonly kind: 'interrupted'; readonly httpStatus?: number; readonly retryAfterMs?: number }
+  /** 401: the session refused the access token. */
+  | { readonly kind: 'unauthorised' }
+  /** 404: the session no longer exists. */
+  | { readonly kind: 'gone' }
+  /** The caller's signal stopped the request, so whether it arrived is unknown. */
+  | { readonly kind: 'cancelled'; readonly cause: unknown }
+  /** Any other refusal, classified from Google's reply. */
+  | { readonly kind: 'refused'; readonly error: PublishError }
 
 export class YouTubeAdapter implements PlatformAdapter {
   readonly platform: Platform = 'youtube'
@@ -509,6 +526,14 @@ export class YouTubeAdapter implements PlatformAdapter {
    * chunk may have arrived in full, in part, or not at all. Interruptions in a
    * row are bounded; progress resets the count, so a long upload on a shaky
    * line survives many blips but a dead one gives up.
+   *
+   * Giving up means two different things, depending on whether the last byte
+   * has gone out. Before it, no video can exist, so the error says nothing was
+   * published and is safe to retry. After it, YouTube may already have made
+   * the video and only lost the reply, so every way out of here except the
+   * video itself is a permanent YOUTUBE_UPLOAD_UNCONFIRMED: a retry, by the
+   * worker or by an owner taking "nothing was published" at its word, would
+   * put the video on the channel twice.
    */
   async #sendFile(
     ctx: PublishContext,
@@ -519,6 +544,17 @@ export class YouTubeAdapter implements PlatformAdapter {
     let offset = 0
     let failures = 0
     let mustAsk = false
+    /**
+     * Set the moment a request carrying the file's last byte goes out, and
+     * cleared only by a 308 showing the session still lacks bytes, the one
+     * reply that proves the video was not made. Any other answer, even a
+     * refusal, is not treated as proof: being wrong costs a second copy of the
+     * video, while caution costs one look at YouTube Studio.
+     */
+    let finalSent = false
+    // Asking the session once more is worth a long Retry-After only when the
+    // answer could be "the video exists", and only once.
+    let pauseChecked = false
     // A ceiling on requests overall, whatever the replies say. Progress resets
     // the failure count, so a session that kept giving back ground could
     // otherwise keep this going forever.
@@ -527,6 +563,7 @@ export class YouTubeAdapter implements PlatformAdapter {
     for (;;) {
       budget -= 1
       if (budget < 0) {
+        if (finalSent) throw unconfirmed('the upload session kept answering without saying whether it holds the whole file')
         throw new PublishError(
           `The YouTube upload made no lasting progress and was stopped at byte ${offset} of ${source.size}. ` +
             'Nothing was published; the next attempt starts it again.',
@@ -534,28 +571,63 @@ export class YouTubeAdapter implements PlatformAdapter {
         )
       }
       const asking = mustAsk || offset >= source.size
+      if (!asking && offset + this.#chunkBytes >= source.size) finalSent = true
       const reply = asking
         ? await this.#askStatus(ctx, session, source.size)
         : await this.#putChunk(ctx, session, source, offset, contentType)
       mustAsk = false
 
-      if (reply.kind === 'done') return reply.video
-
-      if (reply.kind === 'incomplete') {
-        const moved = reply.received > offset
-        offset = reply.received
-        if (moved) {
-          failures = 0
-          continue
+      switch (reply.kind) {
+        case 'done':
+          return reply.video
+        case 'cancelled':
+          if (finalSent) throw unconfirmed('the upload was cancelled before YouTube answered', reply.cause)
+          throw new PublishError('The upload was cancelled before it finished. Nothing was published.', {
+            failureClass: 'transient',
+            cause: reply.cause,
+          })
+        case 'gone':
+          if (finalSent) throw unconfirmed('the upload session no longer exists (HTTP 404), so it cannot say whether it finished')
+          throw new PublishError(
+            'The YouTube upload session expired before the video finished. Nothing was published; the next attempt starts a fresh upload.',
+            { failureClass: 'transient', httpStatus: 404 },
+          )
+        case 'unauthorised':
+          if (finalSent) throw unconfirmed('YouTube stopped accepting the access token, so the upload session could not be asked whether it finished')
+          // An hour-long token can run out in the middle of a long upload. The
+          // next attempt renews it, and its channel check catches a token that
+          // was revoked rather than expired.
+          throw new PublishError(
+            'YouTube stopped accepting the access token partway through the upload, most likely because it expired. ' +
+              'Nothing was published; the next attempt renews the token and uploads again.',
+            { failureClass: 'transient', httpStatus: 401 },
+          )
+        case 'refused':
+          if (finalSent) {
+            throw unconfirmed(`YouTube answered with an error instead: ${reply.error.platformMessage ?? reply.error.message}`, reply.error)
+          }
+          throw reply.error
+        case 'incomplete': {
+          // The only reply that proves the video does not exist yet.
+          if (reply.received < source.size) finalSent = false
+          const moved = reply.received > offset
+          offset = reply.received
+          if (moved) {
+            failures = 0
+            continue
+          }
+          // A status check may report no progress: it is saying where to resume.
+          if (asking && offset < source.size) continue
+          break
         }
-        // A status check may report no progress: it is saying where to resume.
-        if (asking && offset < source.size) continue
-      } else {
-        mustAsk = true
+        case 'interrupted':
+          mustAsk = true
+          break
       }
 
       failures += 1
       if (failures > this.#maxResumeAttempts) {
+        if (finalSent) throw unconfirmed(`the connection failed ${failures} times in a row, so the upload session could not be asked whether it finished`)
         const network = reply.kind === 'interrupted' && reply.httpStatus === undefined
         throw new PublishError(
           `The YouTube upload was interrupted ${failures} times in a row and stopped at byte ${offset} of ${source.size}. ` +
@@ -570,9 +642,20 @@ export class YouTubeAdapter implements PlatformAdapter {
 
       const asked = reply.kind === 'interrupted' ? reply.retryAfterMs : undefined
       if (asked !== undefined && asked > LONGEST_INLINE_WAIT_MS) {
+        if (finalSent && !pauseChecked) {
+          // The video may exist already, and giving up now could only say
+          // "unconfirmed". One status check after the longest wait allowed
+          // here usually settles it, which saves the owner the check by hand.
+          pauseChecked = true
+          mustAsk = true
+          await this.#sleep(LONGEST_INLINE_WAIT_MS)
+          continue
+        }
+        const seconds = Math.ceil(asked / 1000)
+        if (finalSent) throw unconfirmed(`YouTube asked for a ${seconds}-second pause before answering, and one more status check did not settle it`)
         throw new PublishError('YouTube asked for a long pause in the middle of the upload. Nothing was published; it is tried again later.', {
           failureClass: 'transient',
-          retryAfterSeconds: Math.ceil(asked / 1000),
+          retryAfterSeconds: seconds,
         })
       }
       await this.#sleep(asked ?? backoffMs(failures, { baseMs: this.#retryBaseMs, maxMs: 32_000 }))
@@ -618,12 +701,7 @@ export class YouTubeAdapter implements PlatformAdapter {
       if (ctx.signal !== undefined) init.signal = ctx.signal
       response = await this.#fetch(session, init)
     } catch (cause) {
-      if (ctx.signal?.aborted === true) {
-        throw new PublishError('The upload was cancelled before it finished. Nothing was published.', {
-          failureClass: 'transient',
-          cause,
-        })
-      }
+      if (ctx.signal?.aborted === true) return { kind: 'cancelled', cause }
       return { kind: 'interrupted' }
     }
     return await this.#interpret(response)
@@ -639,7 +717,7 @@ export class YouTubeAdapter implements PlatformAdapter {
         // so this is permanent and says what to check.
         throw new PublishError(
           "YouTube reported the upload complete but returned no video id. Check the channel's uploads before posting it again, or it may appear twice.",
-          { failureClass: 'permanent', httpStatus: status },
+          { failureClass: 'permanent', httpStatus: status, code: 'YOUTUBE_UPLOAD_UNCONFIRMED' },
         )
       }
       return { kind: 'done', video: video as VideoResource }
@@ -653,22 +731,12 @@ export class YouTubeAdapter implements PlatformAdapter {
 
     if (status === 404) {
       await drain(response)
-      throw new PublishError(
-        'The YouTube upload session expired before the video finished. Nothing was published; the next attempt starts a fresh upload.',
-        { failureClass: 'transient', httpStatus: status },
-      )
+      return { kind: 'gone' }
     }
 
     if (status === 401) {
-      // An hour-long token can run out in the middle of a long upload. The next
-      // attempt renews it, and its channel check catches a token that was
-      // revoked rather than expired.
       await drain(response)
-      throw new PublishError(
-        'YouTube stopped accepting the access token partway through the upload, most likely because it expired. ' +
-          'Nothing was published; the next attempt renews the token and uploads again.',
-        { failureClass: 'transient', httpStatus: status },
-      )
+      return { kind: 'unauthorised' }
     }
 
     if (RESUMABLE_STATUSES.has(status)) {
@@ -681,10 +749,13 @@ export class YouTubeAdapter implements PlatformAdapter {
       }
     }
 
-    throw googleError(((await readJson(response)) ?? {}) as GoogleErrorBody, status, {
-      what: 'Uploading the video to YouTube',
-      retryAfter: response.headers.get('retry-after'),
-    })
+    return {
+      kind: 'refused',
+      error: googleError(((await readJson(response)) ?? {}) as GoogleErrorBody, status, {
+        what: 'Uploading the video to YouTube',
+        retryAfter: response.headers.get('retry-after'),
+      }),
+    }
   }
 
   /**
@@ -827,6 +898,24 @@ function privacyNotice(outcome: {
     return `Uploaded as unlisted, as configured: only people with the link can see it.${unconfirmed}`
   }
   return outcome.confirmed ? undefined : `Uploaded as public.${unconfirmed}`
+}
+
+/**
+ * The error for an upload whose last byte went out but whose outcome is not
+ * known.
+ *
+ * Permanent on purpose. YouTube makes the video the moment it holds the last
+ * byte and accepts no idempotency key, so any retry, by the worker or by the
+ * owner, would be a second copy, public once the project is audited. Looking
+ * in YouTube Studio is the only safe next step, and the message says so
+ * instead of "nothing was published", which may be false.
+ */
+function unconfirmed(why: string, cause?: unknown): PublishError {
+  return new PublishError(
+    `The whole video was sent to YouTube, but YouTube's reply was lost: ${why}. ` +
+      'It may already be on the channel, so check YouTube Studio before publishing it again.',
+    { failureClass: 'permanent', code: 'YOUTUBE_UPLOAD_UNCONFIRMED', ...(cause !== undefined ? { cause } : {}) },
+  )
 }
 
 /** Bytes the session holds, from a 308's `Range: bytes=0-N`. No header means none yet. */
