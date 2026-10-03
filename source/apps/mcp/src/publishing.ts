@@ -22,6 +22,7 @@ import {
 } from '@social-publisher/db'
 import type { PublishReport, PublishService, TargetOutcome, TargetSpec } from '@social-publisher/publisher'
 
+import { APPROVALS, alreadyUsedText, repeatLine, type ApprovalLedger, type EarlierSends } from './approvals.ts'
 import { loadConnections } from './context.ts'
 
 /**
@@ -122,6 +123,10 @@ export interface PostingContext {
   readonly actor: string
   /** Told when an approval is requested instead of a publish, for the hosted server's log. */
   readonly onApprovalRequested?: (accounts: number) => Promise<void>
+  /** The MCP request's abort signal: it fires when the client gives up on the call. */
+  readonly signal?: AbortSignal | undefined
+  /** Which approvals were used; this process's own unless a test brings one. */
+  readonly approvals?: ApprovalLedger
 }
 
 export async function buildDraft(scope: TenantScope, args: DraftArgs) {
@@ -223,9 +228,15 @@ export function approvalPayload(draft: PostDraft, chosen: readonly Connection[])
  * and a LinkedIn text post drop the title and only YouTube is sent the
  * declaration: an owner approved a post believing Meta had been told.
  */
-export function approvalSummary(draft: PostDraft, chosen: readonly Connection[]): string {
+export function approvalSummary(
+  draft: PostDraft,
+  chosen: readonly Connection[],
+  earlier?: EarlierSends | undefined,
+): string {
   const fields = fieldsSentLines(draft, chosen.map((c) => c.platform))
   return [
+    // Content already sent in this process says so first: see approvals.ts.
+    ...(earlier !== undefined ? [repeatLine(earlier), ''] : []),
     `Publishing to ${chosen.length} account(s):`,
     ...chosen.map((c) => `  ${c.platform.padEnd(15)} ${c.displayName}`),
     ...(fields.titles.length > 0 ? ['', ...fields.titles] : []),
@@ -288,6 +299,15 @@ export async function publishPost(scope: TenantScope, args: PublishArgs, ctx: Po
   // publishing the valid subset.
   await scope.requireConnections(chosen.map((c) => c.id))
 
+  // From here to the claim below there is no await, so a repeat of this call
+  // that is already on its way in finds the approval spent (approvals.ts).
+  const approvals = ctx.approvals ?? APPROVALS
+  if (args.confirm !== undefined) {
+    const earlier = approvals.useOf(args.confirm)
+    if (earlier !== undefined) return text(alreadyUsedText(earlier))
+  }
+  const approval = approvals.approvalFor('publish_post', approvalPayload(draft, chosen))
+
   /**
    * The approval gate.
    *
@@ -300,40 +320,65 @@ export async function publishPost(scope: TenantScope, args: PublishArgs, ctx: Po
    */
   const gate = decide({
     action: 'publish_post',
-    payload: approvalPayload(draft, chosen),
+    payload: approval.payload,
     ...(args.confirm !== undefined ? { confirmation: args.confirm } : {}),
-    describe: () => approvalSummary(draft, chosen),
+    describe: () => approvalSummary(draft, chosen, approval.earlier),
   })
   if (!gate.allowed) {
     await ctx.onApprovalRequested?.(chosen.length)
     return text(formatApprovalRequest(gate))
   }
+  // A caller that has already given up is not published for. Its approval is
+  // left unused, since nothing was acted on.
+  if (ctx.signal?.aborted === true) return text('Cancelled before anything was sent. Nothing was published.')
+
+  const use = args.confirm !== undefined ? approvals.claim(args.confirm, approval) : undefined
 
   // The title and disclosure travel in the overrides (there is no column for
   // them), so retrying a failed target later keeps both.
-  const post = await scope.createPost({
-    body: draft.body,
-    createdBy: ctx.actor,
-    overrides: overridesForStorage(draft, platforms),
-  })
-  // And the attachments, so a Retry rebuilds the post with them. A local file
-  // cannot be stored: a target that fails is then marked never to be retried.
-  const attachmentsStored = await storeHostedMedia(ctx.deps.rows, scope.tenantId, post.id, draft.media)
-
-  const report = await service.publish(draft, chosen.map(ctx.deps.targetFor), {
-    idempotencyKeyFor: (connectionId) => `${post.id}:${connectionId}`,
-  })
-
-  for (const outcome of [...report.succeeded, ...report.failed]) {
-    await ctx.deps.rows.createTarget(targetRow(scope.tenantId, post.id, outcome, { attachmentsStored }))
+  let post: { id: string }
+  try {
+    post = await scope.createPost({
+      body: draft.body,
+      createdBy: ctx.actor,
+      overrides: overridesForStorage(draft, platforms),
+    })
+  } catch (error) {
+    // Nothing was sent, so the approval may be used once the cause is fixed.
+    use?.release()
+    throw error
   }
-  await scope.record(ctx.actor, 'post.published', {
-    postId: post.id,
-    succeeded: report.succeeded.length,
-    failed: report.failed.length,
-  })
+  use?.attach(post.id)
 
-  return text(formatPublishReport(report, { attachmentsStored }))
+  try {
+    // And the attachments, so a Retry rebuilds the post with them. A local file
+    // cannot be stored: a target that fails is then marked never to be retried.
+    const attachmentsStored = await storeHostedMedia(ctx.deps.rows, scope.tenantId, post.id, draft.media)
+
+    /**
+     * The request's own signal goes to the adapters. A client that gives up
+     * sends a cancellation; before, the upload carried on regardless and the
+     * client, told nothing, called again. An upload cancelled before its last
+     * byte publishes nothing, and the target is recorded as failed.
+     */
+    const report = await service.publish(draft, chosen.map(ctx.deps.targetFor), {
+      idempotencyKeyFor: (connectionId) => `${post.id}:${connectionId}`,
+      ...(ctx.signal !== undefined ? { signal: ctx.signal } : {}),
+    })
+
+    for (const outcome of [...report.succeeded, ...report.failed]) {
+      await ctx.deps.rows.createTarget(targetRow(scope.tenantId, post.id, outcome, { attachmentsStored }))
+    }
+    await scope.record(ctx.actor, 'post.published', {
+      postId: post.id,
+      succeeded: report.succeeded.length,
+      failed: report.failed.length,
+    })
+
+    return text(formatPublishReport(report, { attachmentsStored }))
+  } finally {
+    use?.finish()
+  }
 }
 
 /** The target row for one finished publish. */

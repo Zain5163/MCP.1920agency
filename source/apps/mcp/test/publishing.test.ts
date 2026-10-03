@@ -1,6 +1,8 @@
 import { strict as assert } from 'node:assert'
 import { describe, test } from 'node:test'
 
+import { Client } from '@modelcontextprotocol/sdk/client/index.js'
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import {
   PublishError,
@@ -16,6 +18,7 @@ import { ATTACHMENTS_NOT_STORED_CODE, ATTACHMENTS_NOT_STORED_MESSAGE, NOTICE_COD
 import { PublishService } from '@social-publisher/publisher'
 import { Logger } from '@social-publisher/telemetry'
 
+import { ApprovalLedger } from '../src/approvals.ts'
 import {
   approvalSummary,
   formatPostList,
@@ -451,5 +454,162 @@ describe('a publish-now failure never promises an automatic retry (finding #9)',
   test('a failure that is not retryable reads exactly as the catalogue has it', () => {
     const error = { failureClass: 'permanent', code: 'PLATFORM_REJECTED' as const, platformCode: '100' }
     assert.equal(publishNowResolution(error), formatResolution(resolutionFor('PLATFORM_REJECTED'), '100'))
+  })
+})
+
+describe('an approval publishes once, and a client that gives up stops the upload (finding #12)', () => {
+  const textOf = (result: unknown): string => (result as { content: Array<{ text: string }> }).content[0]!.text
+
+  async function until(condition: () => boolean): Promise<void> {
+    for (let i = 0; i < 200 && !condition(); i += 1) await new Promise((r) => setTimeout(r, 10))
+    assert.ok(condition(), 'timed out waiting')
+  }
+
+  /** An upload that takes a while, and stops with "nothing was published" when its signal fires. */
+  function slowUpload(ms: number) {
+    const calls = { started: 0, finished: 0, signals: [] as Array<AbortSignal | undefined> }
+    const youtube = adapter('youtube', async (ctx) => {
+      calls.started += 1
+      calls.signals.push(ctx.signal)
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(resolve, ms)
+        ctx.signal?.addEventListener('abort', () => {
+          clearTimeout(timer)
+          reject(new PublishError('The upload was cancelled before it finished. Nothing was published.', { failureClass: 'transient' }))
+        })
+      })
+      calls.finished += 1
+      return published(`VID-${calls.finished}`)
+    })
+    return { youtube, calls }
+  }
+
+  const video = (body: string) => ({
+    body,
+    platforms: ['youtube' as Platform],
+    media: [{ kind: 'video' as const, publicUrl: 'https://cdn.example.com/big.mp4', mime: 'video/mp4' }],
+  })
+
+  test("the reviewers' case: the client times out, the upload stops, and its retry with the same approval publishes nothing", async () => {
+    const { youtube, calls } = slowUpload(2_000)
+    const { deps, rows, scope } = harness([youtube])
+    const server = new McpServer({ name: 't', version: '0' })
+    const logger = new Logger([{ name: 'memory', write: async () => {} }])
+    registerTools(server, { tokenId: 'tok', tenantId: TENANT, userId: 'user-7', scope: scope as never }, logger, deps)
+    const [serverSide, clientSide] = InMemoryTransport.createLinkedPair()
+    await server.connect(serverSide)
+    const client = new Client({ name: 'c', version: '0' })
+    await client.connect(clientSide)
+
+    try {
+      const args = video('A long video, timed out once')
+      const token = tokenIn(textOf(await client.callTool({ name: 'publish_post', arguments: args })))
+
+      // The client gives up and sends a cancellation, as Claude Code does on Esc or an idle limit.
+      await assert.rejects(
+        client.callTool({ name: 'publish_post', arguments: { ...args, confirm: token } }, undefined, { timeout: 150 }),
+        /timed out/i,
+      )
+      await until(() => rows.targets.length === 1)
+      assert.equal(calls.signals[0]?.aborted, true, 'the cancellation reached the upload')
+      assert.equal(calls.finished, 0, 'the upload stopped: nothing was published')
+      assert.equal(rows.targets[0]!.state, 'failed')
+
+      // The model calls again with the same arguments and token.
+      const retry = textOf(await client.callTool({ name: 'publish_post', arguments: { ...args, confirm: token } }))
+      assert.match(retry, /This approval was already used, for post post-1\. An approval publishes once\./)
+      assert.equal(calls.started, 1, 'no second upload')
+    } finally {
+      await client.close()
+      await server.close()
+    }
+  })
+
+  test('a repeat after the publish finished says where it went and sends nothing', async () => {
+    const { youtube, calls } = slowUpload(0)
+    const { deps, scope } = harness([youtube])
+    const ctx = { deps, actor: 'mcp', approvals: new ApprovalLedger() }
+    const args = video('Repeat after success')
+    const token = tokenIn(reply(await publishPost(scope as never, args, ctx)))
+
+    assert.match(reply(await publishPost(scope as never, { ...args, confirm: token }, ctx)), /^PUBLISHED  PSX Ascend/)
+    const again = reply(await publishPost(scope as never, { ...args, confirm: token }, ctx))
+    assert.match(again, /already used, for post post-1/)
+    assert.match(again, /check list_posts|Check list_posts/)
+    assert.equal(calls.started, 1)
+    assert.equal(scope.created.length, 1, 'no second post row either')
+  })
+
+  test('two identical calls at once publish once', async () => {
+    const { youtube, calls } = slowUpload(50)
+    const { deps, scope } = harness([youtube])
+    const ctx = { deps, actor: 'mcp', approvals: new ApprovalLedger() }
+    const args = video('Double click')
+    const token = tokenIn(reply(await publishPost(scope as never, args, ctx)))
+
+    const answers = (await Promise.all([
+      publishPost(scope as never, { ...args, confirm: token }, ctx),
+      publishPost(scope as never, { ...args, confirm: token }, ctx),
+    ])).map(reply)
+
+    assert.equal(calls.started, 1)
+    assert.equal(answers.filter((a) => a.startsWith('PUBLISHED')).length, 1)
+    // The second arrives before the first has its post row, so it is told only that.
+    assert.equal(answers.filter((a) => /^This approval is being used right now/.test(a)).length, 1, answers.join('\n---\n'))
+  })
+
+  test('the same content can be sent again, with a new approval that says it is a repeat', async () => {
+    const { youtube, calls } = slowUpload(0)
+    const { deps, scope } = harness([youtube])
+    const ctx = { deps, actor: 'mcp', approvals: new ApprovalLedger() }
+    const args = video('Send it twice on purpose')
+    const first = tokenIn(reply(await publishPost(scope as never, args, ctx)))
+    await publishPost(scope as never, { ...args, confirm: first }, ctx)
+
+    const second = reply(await publishPost(scope as never, args, ctx))
+    assert.match(second, /ALREADY SENT once in this session, last as post post-1: approving sends it again\./)
+    assert.notEqual(tokenIn(second), first, 'a different approval, not the spent one')
+
+    assert.match(reply(await publishPost(scope as never, { ...args, confirm: tokenIn(second) }, ctx)), /^PUBLISHED/)
+    assert.equal(calls.started, 2)
+  })
+
+  test('an approval whose post could not even be stored is given back', async () => {
+    const { youtube, calls } = slowUpload(0)
+    const { deps, scope } = harness([youtube])
+    const ctx = { deps, actor: 'mcp', approvals: new ApprovalLedger() }
+    const args = video('Database down once')
+    const token = tokenIn(reply(await publishPost(scope as never, args, ctx)))
+
+    const createPost = scope.createPost.bind(scope)
+    let failOnce = true
+    scope.createPost = async (data) => {
+      if (failOnce) {
+        failOnce = false
+        throw new Error("Can't reach database server")
+      }
+      return await createPost(data)
+    }
+    await assert.rejects(publishPost(scope as never, { ...args, confirm: token }, ctx), /reach database/)
+    assert.equal(calls.started, 0)
+
+    assert.match(reply(await publishPost(scope as never, { ...args, confirm: token }, ctx)), /^PUBLISHED/, 'nothing was sent, so it still works')
+  })
+
+  test('a caller that has already given up is not published for, and keeps its approval', async () => {
+    const { youtube, calls } = slowUpload(0)
+    const { deps, scope } = harness([youtube])
+    const ctx = { deps, actor: 'mcp', approvals: new ApprovalLedger() }
+    const args = video('Cancelled while waiting')
+    const token = tokenIn(reply(await publishPost(scope as never, args, ctx)))
+
+    const gaveUp = AbortSignal.abort()
+    assert.match(
+      reply(await publishPost(scope as never, { ...args, confirm: token }, { ...ctx, signal: gaveUp })),
+      /Cancelled before anything was sent/,
+    )
+    assert.equal(calls.started, 0)
+    assert.equal(scope.created.length, 0)
+    assert.match(reply(await publishPost(scope as never, { ...args, confirm: token }, ctx)), /^PUBLISHED/)
   })
 })

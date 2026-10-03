@@ -215,7 +215,11 @@ server.tool(
   'publish_post',
   'Publish a post immediately to connected social accounts. This is PUBLIC and cannot be undone. Call it once WITHOUT a confirm token to get a summary, show that to the user, and only call again with the token once they have approved.',
   publishShape,
-  async (args) => await guard(async (scope) => await publishPost(scope, args, { deps, actor: 'mcp' })),
+  // The request's signal fires when the client gives up on the call (its
+  // timeout, Esc, an idle limit), so a long upload stops instead of finishing
+  // unseen and being sent again.
+  async (args, extra) =>
+    await guard(async (scope) => await publishPost(scope, args, { deps, actor: 'mcp', signal: extra.signal })),
 )
 
 server.tool(

@@ -195,11 +195,13 @@ export function registerTools(
     'publish_post',
     'Publish immediately to this account\'s social platforms. This is PUBLIC and cannot be undone — confirm the exact wording with the user before calling it.',
     publishShape,
-    async (args) =>
+    async (args, extra) =>
       await guard('publish_post', async () =>
         await publishPost(scope, args, {
           deps,
           actor: `mcp:${identity.userId}`,
+          // Fires when the client gives up on the call, so a long upload stops.
+          signal: extra.signal,
           onApprovalRequested: async (accounts) => {
             await logger.info('mcp.publish_post.awaiting_approval', 'approval requested', {
               tenantId: scope.tenantId,
