@@ -13,6 +13,8 @@ import { PublishService, type TargetSpec } from '@social-publisher/publisher'
 import { TokenVault, parseKey } from '@social-publisher/vault'
 import type { Connection } from '@social-publisher/core'
 
+import { credentialFor } from './credential.ts'
+
 /**
  * Wiring shared by every MCP tool.
  *
@@ -102,19 +104,21 @@ export async function loadConnections(scope: TenantScope): Promise<Connection[]>
  * Binds a connection to its vault-held credential without ever exposing the token.
  *
  * The adapter's refresh function goes along, so an hour-long token is renewed
- * on the way in instead of the connection being marked dead. For every adapter
- * whose tokens do not renew it is undefined, which is exactly the old behaviour.
+ * on the way in instead of the connection being marked dead, and again
+ * mid-upload when the adapter asks (see credential.ts). For every adapter whose
+ * tokens do not renew it is undefined, which is exactly the old behaviour.
+ *
+ * Logged to stderr: on the stdio transport, stdout is the protocol itself.
  */
 export function targetFor(connection: Connection): TargetSpec {
   const adapter = publishService().adapterFor(connection.platform)
   return {
     connection,
-    withCredential: async (fn) =>
-      await tokenVault().withCredential(
-        connection.id,
-        connection.tenantId,
-        async (cred) => await fn(cred.accessToken),
-        adapter?.refreshCredential?.bind(adapter),
-      ),
+    withCredential: credentialFor(
+      tokenVault(),
+      connection,
+      adapter?.refreshCredential?.bind(adapter),
+      (message) => console.error(`[adspilot] ${message}`),
+    ),
   }
 }

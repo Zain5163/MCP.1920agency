@@ -27,6 +27,8 @@ import { MediaStore } from '@social-publisher/media'
 import { PublishService } from '@social-publisher/publisher'
 import { TokenVault, parseKey } from '@social-publisher/vault'
 
+import { credentialFor } from './credential.ts'
+
 /**
  * `post` — publish from the command line.
  *
@@ -381,15 +383,15 @@ async function main(): Promise<void> {
       const adapter = service.adapterFor(connection.platform)
       return {
         connection,
-        withCredential: async <T,>(fn: (token: string) => Promise<T>): Promise<T> =>
-          await vault.withCredential(
-            connection.id,
-            connection.tenantId,
-            async (cred) => await fn(cred.accessToken),
-            // Renews an hour-long token on the way in. Undefined for every
-            // adapter whose tokens do not renew, which changes nothing for them.
-            adapter?.refreshCredential?.bind(adapter),
-          ),
+        // Renews an hour-long token on the way in, and again mid-upload when
+        // the adapter asks. Undefined for every adapter whose tokens do not
+        // renew, which changes nothing for them.
+        withCredential: credentialFor(
+          vault,
+          connection,
+          adapter?.refreshCredential?.bind(adapter),
+          (message) => console.error(`\n  Note: ${message}.`),
+        ),
       }
     }),
     { idempotencyKeyFor: (connectionId) => `${post.id}:${connectionId}` },

@@ -26,6 +26,8 @@ import { MediaStore } from '@social-publisher/media'
 import { PublishService, type TargetSpec } from '@social-publisher/publisher'
 import { TokenVault, parseKey } from '@social-publisher/vault'
 
+import { credentialFor } from './credential'
+
 /**
  * Server-side wiring for the web app.
  *
@@ -158,19 +160,19 @@ export async function listConnections(tenantId: string): Promise<Connection[]> {
  * Binds a connection to its credential without exposing the token to callers.
  *
  * The adapter's refresh function goes along, so an hour-long token is renewed
- * on the way in instead of the connection being marked dead. Undefined for
- * every adapter whose tokens do not renew, which is exactly the old behaviour.
+ * on the way in instead of the connection being marked dead, and again
+ * mid-upload when the adapter asks (see credential.ts). Undefined for every
+ * adapter whose tokens do not renew, which is exactly the old behaviour.
  */
 export function targetFor(connection: Connection): TargetSpec {
   const adapter = publishService().adapterFor(connection.platform)
   return {
     connection,
-    withCredential: async (fn) =>
-      await tokenVault().withCredential(
-        connection.id,
-        connection.tenantId,
-        async (cred) => await fn(cred.accessToken),
-        adapter?.refreshCredential?.bind(adapter),
-      ),
+    withCredential: credentialFor(
+      tokenVault(),
+      connection,
+      adapter?.refreshCredential?.bind(adapter),
+      (message) => console.error(`[publish] ${message}`),
+    ),
   }
 }

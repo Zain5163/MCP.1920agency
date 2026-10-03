@@ -10,7 +10,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "set-password": "node --experimental-strip-types src/set-db-password.ts",
     "post": "node --experimental-strip-types src/post.ts",
-    "create-user": "node --experimental-strip-types src/create-user.ts"
+    "create-user": "node --experimental-strip-types src/create-user.ts",
+    "test": "node --test --experimental-strip-types test/*.test.ts"
   },
   "dependencies": {
     "@social-publisher/adapters": "workspace:*",

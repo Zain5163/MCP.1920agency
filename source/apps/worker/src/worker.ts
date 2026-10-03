@@ -28,6 +28,8 @@ import {
 import { PublishService } from '@social-publisher/publisher'
 import { TokenVault, parseKey } from '@social-publisher/vault'
 
+import { credentialFor } from './credential.ts'
+
 /**
  * The scheduler worker.
  *
@@ -186,15 +188,15 @@ async function processOne(service: PublishService, vault: TokenVault): Promise<b
       [
         {
           connection,
-          withCredential: async <T,>(fn: (token: string) => Promise<T>): Promise<T> =>
-            await vault.withCredential(
-              connection.id,
-              connection.tenantId,
-              async (cred) => await fn(cred.accessToken),
-              // Renews an hour-long token on the way in. Undefined for every
-              // adapter whose tokens do not renew, which changes nothing for them.
-              adapter?.refreshCredential?.bind(adapter),
-            ),
+          // Renews an hour-long token on the way in, and again mid-upload when
+          // the adapter asks. Undefined for every adapter whose tokens do not
+          // renew, which changes nothing for them.
+          withCredential: credentialFor(
+            vault,
+            connection,
+            adapter?.refreshCredential?.bind(adapter),
+            (message) => log(`job ${job.jobId}: ${message}`),
+          ),
         },
       ],
       { idempotencyKeyFor: () => target.idempotencyKey },

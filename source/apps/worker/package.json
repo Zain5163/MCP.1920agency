@@ -8,7 +8,8 @@
     "once": "node --experimental-strip-types src/worker.ts --once",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "monitor": "node --experimental-strip-types src/monitor-cli.ts",
-    "refresh": "node --experimental-strip-types src/refresh-cli.ts"
+    "refresh": "node --experimental-strip-types src/refresh-cli.ts",
+    "test": "node --test --experimental-strip-types test/*.test.ts"
   },
   "dependencies": {
     "@social-publisher/adapters": "workspace:*",
