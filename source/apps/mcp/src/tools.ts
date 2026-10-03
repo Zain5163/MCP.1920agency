@@ -11,6 +11,7 @@ import {
   buildDraft,
   formatPostList,
   publishPost,
+  storeHostedMedia,
   validationProblems,
   type PostingDeps,
 } from './publishing.ts'
@@ -243,6 +244,10 @@ export function registerTools(
           createdBy: `mcp:${identity.userId}`,
           overrides: overridesForStorage(draft, platforms),
         })
+        // Its attachments too, or the worker finds none at the slot: every
+        // hosted media schedule failed there, YouTube's included. Every
+        // attachment here has a public URL, the only kind this schema takes.
+        await storeHostedMedia(deps.rows, scope.tenantId, post.id, draft.media)
 
         for (const connection of chosen) {
           const target = await deps.rows.createTarget({

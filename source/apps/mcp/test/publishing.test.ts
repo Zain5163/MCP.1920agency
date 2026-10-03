@@ -11,6 +11,7 @@ import {
   approvalSummary,
   formatPostList,
   publishPost,
+  type MediaRow,
   type PostRows,
   type PostingDeps,
   type TargetRow,
@@ -78,6 +79,10 @@ class FakeRows implements PostRows {
   }
   async createJob(row: { tenantId: string; targetId: string; runAfter: Date }) {
     this.jobs.push(row)
+  }
+  readonly media: MediaRow[] = []
+  async attachMedia(row: MediaRow) {
+    this.media.push(row)
   }
 }
 
@@ -260,5 +265,64 @@ describe('a target that went out with a notice is recorded and listed as uploade
       },
     ])
     assert.match(listed, /^    published  PSX Page/m)
+  })
+})
+
+describe('hosted schedule_post stores the attachments the worker will need (finding #11)', () => {
+  function hostedTools(adapters: PlatformAdapter[]) {
+    const h = harness(adapters)
+    const server = new McpServer({ name: 't', version: '0' })
+    const logger = new Logger([{ name: 'memory', write: async () => {} }])
+    registerTools(server, { tokenId: 'tok', tenantId: TENANT, userId: 'user-7', scope: h.scope as never }, logger, h.deps)
+    const tools = (server as unknown as { _registeredTools: Record<string, { handler: Function }> })._registeredTools
+    return { ...h, call: async (name: string, args: Record<string, unknown>) => reply(await tools[name]!.handler(args, {})) }
+  }
+
+  test("the reviewers' case: a scheduled YouTube video keeps its video", async () => {
+    const { call, rows, scope } = hostedTools([adapter('youtube', async () => published('never'))])
+    const at = new Date(Date.now() + 3_600_000).toISOString()
+    const answer = await call('schedule_post', {
+      body: ['My clip title', 'A description of the clip.'].join('\n'),
+      platforms: ['youtube'],
+      media: [{ kind: 'video', publicUrl: 'https://cdn.example.com/clip.mp4', mime: 'video/mp4' }],
+      at,
+    })
+
+    assert.match(answer, /^Scheduled for /)
+    assert.deepEqual(rows.media, [
+      {
+        tenantId: TENANT,
+        postId: scope.created[0]!.id,
+        position: 0,
+        r2Key: '',
+        publicUrl: 'https://cdn.example.com/clip.mp4',
+        mime: 'video/mp4',
+        bytes: 0,
+      },
+    ])
+    assert.equal(rows.targets[0]!.state, 'scheduled')
+    assert.equal(rows.jobs.length, 1)
+  })
+
+  test('attachments keep their order, and a post without any stores none', async () => {
+    const { call, rows } = hostedTools([adapter('instagram', async () => published('never'))])
+    const at = new Date(Date.now() + 3_600_000).toISOString()
+    await call('schedule_post', {
+      body: 'Carousel',
+      platforms: ['instagram'],
+      media: [
+        { kind: 'image', publicUrl: 'https://cdn.example.com/1.jpg', mime: 'image/jpeg' },
+        { kind: 'image', publicUrl: 'https://cdn.example.com/2.jpg', mime: 'image/jpeg' },
+      ],
+      at,
+    })
+    assert.deepEqual(rows.media.map((m) => [m.position, m.publicUrl]), [
+      [0, 'https://cdn.example.com/1.jpg'],
+      [1, 'https://cdn.example.com/2.jpg'],
+    ])
+
+    const text = hostedTools([adapter('facebook_page', async () => published('never'))])
+    await text.call('schedule_post', { body: 'Just words', platforms: ['facebook_page'], at })
+    assert.deepEqual(text.rows.media, [])
   })
 })

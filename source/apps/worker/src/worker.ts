@@ -10,7 +10,7 @@ import {
   youTubeOptionsFromEnv,
 } from '@social-publisher/adapters'
 import { optional, required } from '@social-publisher/config'
-import { backoffMs, mediaKindForMime, type Connection, type MediaRef, type PostDraft } from '@social-publisher/core'
+import { backoffMs, type Connection } from '@social-publisher/core'
 import {
   MAX_ATTEMPTS,
   WORKER_ID,
@@ -30,6 +30,7 @@ import { PublishService } from '@social-publisher/publisher'
 import { TokenVault, parseKey } from '@social-publisher/vault'
 
 import { credentialFor } from './credential.ts'
+import { draftFromStored } from './draft.ts'
 
 /**
  * The scheduler worker.
@@ -150,25 +151,7 @@ async function processOne(service: PublishService, vault: TokenVault): Promise<b
     ...(target.connection.expiresAt !== null ? { expiresAt: target.connection.expiresAt } : {}),
   }
 
-  const media: MediaRef[] = target.post.media.map((link) => ({
-    id: link.media.id,
-    // The media table holds a mime type and no kind: a PDF is a document (a
-    // LinkedIn carousel), video/* is video, anything else an image, as before.
-    kind: mediaKindForMime(link.media.mime),
-    mime: link.media.mime,
-    bytes: link.media.bytes,
-    publicUrl: link.media.publicUrl,
-    ...(link.media.width !== null ? { width: link.media.width } : {}),
-    ...(link.media.height !== null ? { height: link.media.height } : {}),
-    ...(link.media.durationSeconds !== null ? { durationSeconds: link.media.durationSeconds } : {}),
-  }))
-
-  const overrides = target.post.overrides as NonNullable<PostDraft['overrides']> | null
-  const draft: PostDraft = {
-    body: target.post.body,
-    media,
-    ...(overrides !== null ? { overrides } : {}),
-  }
+  const draft = draftFromStored(target.post)
 
   await db().target.update({ where: { id: target.id }, data: { state: 'publishing' } })
 

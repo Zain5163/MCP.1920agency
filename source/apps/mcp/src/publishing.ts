@@ -78,6 +78,20 @@ export interface PostingDeps {
 export interface PostRows {
   createTarget(row: TargetRow): Promise<{ id: string }>
   createJob(row: { tenantId: string; targetId: string; runAfter: Date }): Promise<void>
+  /** A media_assets row and the post_media link that places it in the post. */
+  attachMedia(row: MediaRow): Promise<void>
+}
+
+export interface MediaRow {
+  readonly tenantId: string
+  readonly postId: string
+  readonly position: number
+  /** Empty for a file the caller hosts: there is no bucket object, and nothing reads the key. */
+  readonly r2Key: string
+  readonly publicUrl: string
+  readonly mime: string
+  readonly bytes: number
+  readonly durationSeconds?: number
 }
 
 export interface TargetRow {
@@ -128,6 +142,45 @@ export async function buildDraft(scope: TenantScope, args: DraftArgs) {
   const platforms = selection.ok ? [...selection.platforms] : (args.platforms ?? [])
 
   return { draft, platforms, connections, selection }
+}
+
+/**
+ * Stores the post's attachments that have a public URL, so whatever rebuilds
+ * the post later finds them: the worker at a scheduled slot, or a Retry.
+ *
+ * The worker rebuilds a draft from the database alone. A schedule that stored
+ * no media rows reached its slot with no attachments: a YouTube video failed
+ * there for want of one, and a platform that allows a bare post would have
+ * published the text alone. The URL is the caller's, so there is no bucket
+ * key (`r2Key` is a required column that nothing reads, hence empty).
+ *
+ * Resolves to whether every attachment was stored. One that exists only as a
+ * local file (stdio) cannot be: no other process can read this machine's disk.
+ */
+export async function storeHostedMedia(
+  rows: PostRows,
+  tenantId: string,
+  postId: string,
+  media: readonly MediaRef[],
+): Promise<boolean> {
+  let all = true
+  for (const [position, item] of media.entries()) {
+    if (item.publicUrl === undefined) {
+      all = false
+      continue
+    }
+    await rows.attachMedia({
+      tenantId,
+      postId,
+      position,
+      r2Key: '',
+      publicUrl: item.publicUrl,
+      mime: item.mime,
+      bytes: item.bytes,
+      ...(item.durationSeconds !== undefined ? { durationSeconds: item.durationSeconds } : {}),
+    })
+  }
+  return all
 }
 
 /** The validation errors, one line per platform and issue. */

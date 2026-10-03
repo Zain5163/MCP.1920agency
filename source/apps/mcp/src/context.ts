@@ -140,4 +140,8 @@ const prismaRows: PostRows = {
   async createJob(row) {
     await db().job.create({ data: row })
   },
+  async attachMedia({ postId, position, ...asset }) {
+    const created = await db().mediaAsset.create({ data: asset, select: { id: true } })
+    await db().postMedia.create({ data: { postId, mediaId: created.id, position } })
+  },
 }
