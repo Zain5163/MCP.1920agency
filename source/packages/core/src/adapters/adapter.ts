@@ -23,6 +23,30 @@ export interface Capabilities {
    * Absent means `PostDraft.title` is ignored for this platform.
    */
   readonly titleMaxLength?: number
+  /**
+   * The kinds of post that carry the title, where only some do; a post carries
+   * it when it has media of one of these kinds. Absent means every post on a
+   * titled platform carries it.
+   *
+   * LinkedIn titles a document post and nothing else. Without this, a title
+   * on its text, image or video post was shown in approval summaries and held
+   * to a length limit although it is never sent. `titleIsSent` reads it, so
+   * summaries and validation follow the rule the adapter applies.
+   */
+  readonly titleMediaKinds?: readonly MediaKind[]
+  /**
+   * Whether publishing here tells the platform that the media is realistic
+   * AI-generated or altered (`PostDraft.syntheticMedia`). True only where the
+   * adapter really sends that declaration through the API; absent means it
+   * sends nothing, whatever the platform's own app offers.
+   *
+   * Approval summaries once said "Declared as realistic AI-generated or
+   * altered media" for every target, while only YouTube was told. A post
+   * declared for a platform without this gets the `synthetic_media_not_sent`
+   * warning, and `fieldsSentTo` lists where the declaration goes and where it
+   * does not, so the owner can label it in the app instead.
+   */
+  readonly sendsSyntheticMediaDisclosure?: boolean
   readonly mediaKinds: readonly MediaKind[]
   readonly maxMediaCount: number
   /** Minimum media required. Instagram cannot post text alone, so this is 1. */

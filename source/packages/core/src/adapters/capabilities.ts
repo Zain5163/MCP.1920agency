@@ -179,6 +179,9 @@ export const CAPABILITIES: Readonly<Record<Platform, CapabilityRecord>> = {
     // grapheme count cannot express, so the adapter checks the byte length too.
     maxTextLength: 5_000,
     titleMaxLength: 100,
+    // Every upload states containsSyntheticMedia, true or false. The only
+    // adapter here that sends the AI declaration at all.
+    sendsSyntheticMediaDisclosure: true,
     mediaKinds: ['video'],
     maxMediaCount: 1,
     minMediaCount: 1,
@@ -242,11 +245,12 @@ export const CAPABILITIES: Readonly<Record<Platform, CapabilityRecord>> = {
   linkedin: {
     maxTextLength: 3_000,
     // The title of a DOCUMENT post, shown above its pages; no other LinkedIn post
-    // here sends one. 200 is LinkedIn's stated maximum for a document ad's
-    // headline (LinkedIn Help a493903). No limit is documented for an organic
-    // post, and LinkedIn's own composer is reported to stop at 58, so the adapter
-    // warns past 58 and keeps a title it makes from the text within it.
+    // here sends one (titleMediaKinds). 200 is LinkedIn's stated maximum for a
+    // document ad's headline (LinkedIn Help a493903). No limit is documented for
+    // an organic post, and LinkedIn's own composer is reported to stop at 58, so
+    // the adapter warns past 58 and keeps a title it makes from the text within it.
     titleMaxLength: 200,
+    titleMediaKinds: ['document'],
     mediaKinds: ['image', 'video', 'document'],
     maxMediaCount: 20,
     minMediaCount: 0,

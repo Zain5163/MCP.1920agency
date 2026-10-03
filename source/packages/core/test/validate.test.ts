@@ -7,9 +7,11 @@ import {
   countGraphemes,
   validateAgainstCapabilities,
   bodyForPlatform,
+  fieldsSentTo,
   overridesForStorage,
   syntheticMediaForPlatform,
   titleForPlatform,
+  titleIsSent,
 } from '../src/domain/validate.ts'
 import { PLATFORMS, type MediaRef, type PostDraft } from '../src/domain/types.ts'
 
@@ -399,6 +401,30 @@ describe('titles', () => {
     const result = validateAgainstCapabilities(draft({ media: [video()] }), 'youtube', capabilitiesFor('youtube'))
     assert.ok(!errorCodes(result).includes('title_too_long'))
   })
+
+  test('LinkedIn sends a title only with a document; every YouTube video has one; Facebook never', () => {
+    const pdf: MediaRef = { id: 'd', kind: 'document', mime: 'application/pdf', bytes: 9, localPath: 'c.pdf' }
+    const linkedin = capabilitiesFor('linkedin')
+    assert.equal(titleIsSent(draft({ title: 'T', media: [pdf] }), linkedin), true)
+    for (const media of [[], [image()], [video()]]) {
+      assert.equal(titleIsSent(draft({ title: 'T', media }), linkedin), false, `${media[0]?.kind ?? 'text'} post`)
+    }
+    assert.equal(titleIsSent(draft({ title: 'T', media: [video()] }), capabilitiesFor('youtube')), true)
+    assert.equal(titleIsSent(draft({ title: 'T', media: [image()] }), capabilitiesFor('facebook_page')), false)
+  })
+
+  test('a title that is never sent is never too long', () => {
+    // A LinkedIn text, image or video post drops the title, so its length
+    // cannot be a reason to refuse the post, as it was before documents existed.
+    for (const media of [[], [image({ localPath: 'a.jpg' })], [video({ localPath: 'a.mp4' })]]) {
+      const result = validateAgainstCapabilities(
+        draft({ title: 'a'.repeat(201), media }),
+        'linkedin',
+        capabilitiesFor('linkedin'),
+      )
+      assert.ok(!errorCodes(result).includes('title_too_long'), `${media[0]?.kind ?? 'text'} post`)
+    }
+  })
 })
 
 describe('AI disclosure', () => {
@@ -410,6 +436,121 @@ describe('AI disclosure', () => {
     const d = draft({ syntheticMedia: true, overrides: { instagram: { syntheticMedia: false } } })
     assert.equal(syntheticMediaForPlatform(d, 'youtube'), true)
     assert.equal(syntheticMediaForPlatform(d, 'instagram'), false)
+  })
+
+  test('only YouTube sends the declaration, so only its capability says so', () => {
+    const telling = PLATFORMS.filter((p) => capabilitiesFor(p).sendsSyntheticMediaDisclosure === true)
+    assert.deepEqual(telling, ['youtube'])
+  })
+
+  test('declared for a platform that is not told: a warning there, never an error', () => {
+    for (const platform of ['facebook_page', 'instagram', 'linkedin'] as const) {
+      const result = validateAgainstCapabilities(
+        draft({ syntheticMedia: true, media: [image({ width: 1080, height: 1080 })] }),
+        platform,
+        capabilitiesFor(platform),
+      )
+      const issue = result.issues.find((i) => i.code === 'synthetic_media_not_sent')
+      assert.ok(issue !== undefined, `${platform} should warn`)
+      assert.equal(issue.severity, 'warning')
+      assert.equal(issue.platform, platform)
+      assert.match(issue.message, /does not send that declaration/)
+      assert.match(issue.message, /Label it in the platform's app/)
+      assert.equal(result.ok, true, `${platform}: the post itself is still valid`)
+    }
+  })
+
+  test('YouTube, which is told, gets no such warning', () => {
+    const result = validateAgainstCapabilities(
+      draft({ syntheticMedia: true, media: [video()] }),
+      'youtube',
+      capabilitiesFor('youtube'),
+    )
+    assert.ok(!result.issues.some((i) => i.code === 'synthetic_media_not_sent'))
+  })
+
+  test('nothing to warn about when nothing is declared, or an override withdraws it', () => {
+    const caps = capabilitiesFor('instagram')
+    const media = [image({ width: 1080, height: 1080 })]
+    for (const d of [
+      draft({ media }),
+      draft({ media, syntheticMedia: false }),
+      draft({ media, syntheticMedia: true, overrides: { instagram: { syntheticMedia: false } } }),
+    ]) {
+      assert.ok(!validateAgainstCapabilities(d, 'instagram', caps).issues.some((i) => i.code === 'synthetic_media_not_sent'))
+    }
+  })
+})
+
+describe('what each platform is sent', () => {
+  const pdf: MediaRef = { id: 'd', kind: 'document', mime: 'application/pdf', bytes: 9, localPath: 'c.pdf' }
+
+  test('a cross-post says where the declaration goes and where it does not', () => {
+    const sent = fieldsSentTo(draft({ title: 'Launch', syntheticMedia: true, media: [video()] }), [
+      'youtube',
+      'facebook_page',
+      'linkedin',
+    ])
+    assert.deepEqual(sent.titles, [{ platform: 'youtube', title: 'Launch' }])
+    assert.deepEqual(sent.disclosedTo, ['youtube'])
+    assert.deepEqual(sent.notDisclosedTo, ['facebook_page', 'linkedin'])
+  })
+
+  test('an Instagram-only post shows no title and is declared nowhere', () => {
+    // The approval summary for exactly this post said "Title: Launch" and
+    // "Declared as realistic AI-generated or altered media.".
+    const sent = fieldsSentTo(draft({ title: 'Launch', syntheticMedia: true, media: [image()] }), ['instagram'])
+    assert.deepEqual(sent, { titles: [], disclosedTo: [], notDisclosedTo: ['instagram'] })
+  })
+
+  test('a LinkedIn document carries its title; a LinkedIn text post does not', () => {
+    assert.deepEqual(fieldsSentTo(draft({ title: 'Carousel', media: [pdf] }), ['linkedin']).titles, [
+      { platform: 'linkedin', title: 'Carousel' },
+    ])
+    assert.deepEqual(fieldsSentTo(draft({ title: 'Carousel' }), ['linkedin']).titles, [])
+  })
+
+  test('each platform once, however many of its accounts are targeted', () => {
+    const sent = fieldsSentTo(draft({ title: 'T', syntheticMedia: true, media: [video()] }), [
+      'youtube',
+      'instagram',
+      'youtube',
+      'instagram',
+    ])
+    assert.deepEqual(sent.titles, [{ platform: 'youtube', title: 'T' }])
+    assert.deepEqual(sent.disclosedTo, ['youtube'])
+    assert.deepEqual(sent.notDisclosedTo, ['instagram'])
+  })
+
+  test("a platform's own title and declaration are the ones reported", () => {
+    const d = draft({
+      title: 'Shared',
+      syntheticMedia: true,
+      media: [video()],
+      overrides: { youtube: { title: 'Own' }, facebook_page: { syntheticMedia: false } },
+    })
+    const sent = fieldsSentTo(d, ['youtube', 'facebook_page', 'linkedin'])
+    assert.deepEqual(sent.titles, [{ platform: 'youtube', title: 'Own' }])
+    assert.deepEqual(sent.notDisclosedTo, ['linkedin'])
+  })
+
+  test('nothing set, nothing listed; a blank title is no title', () => {
+    assert.deepEqual(fieldsSentTo(draft({ media: [video()] }), ['youtube', 'instagram']), {
+      titles: [],
+      disclosedTo: [],
+      notDisclosedTo: [],
+    })
+    assert.deepEqual(fieldsSentTo(draft({ title: '  ', media: [video()] }), ['youtube']).titles, [])
+  })
+
+  test('it reads capabilities, never platform names: a caller may supply its own', () => {
+    const telling = (platform: (typeof PLATFORMS)[number]) => ({
+      ...capabilitiesFor(platform),
+      sendsSyntheticMediaDisclosure: true,
+    })
+    const sent = fieldsSentTo(draft({ syntheticMedia: true, media: [image()] }), ['instagram'], telling)
+    assert.deepEqual(sent.disclosedTo, ['instagram'])
+    assert.deepEqual(sent.notDisclosedTo, [])
   })
 })
 

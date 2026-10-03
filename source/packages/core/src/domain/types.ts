@@ -68,7 +68,9 @@ export interface PostDraft {
    * YouTube video. Generic so others with a title (a Pinterest pin, a LinkedIn
    * document) can take it up too. A platform uses it only when its capabilities
    * declare `titleMaxLength`, which is also what tells a UI to show a title
-   * field — data, never a platform name. The rest ignore it.
+   * field — data, never a platform name — and, where they list
+   * `titleMediaKinds`, only on those kinds of post (a LinkedIn document, not a
+   * LinkedIn text post). The rest ignore it; `fieldsSentTo` says which send it.
    */
   readonly title?: string
   /**
@@ -78,7 +80,13 @@ export interface PostDraft {
    *
    * Generic because YouTube, Meta and TikTok all ask for this disclosure, and
    * omitting it on content that needs it can get a post labelled or removed.
-   * Unset means "not declared", which every adapter sends as `false`.
+   * But only a platform whose capabilities declare
+   * `sendsSyntheticMediaDisclosure` is actually told: today that is YouTube,
+   * which is sent an explicit `true` or `false` on every upload, unset meaning
+   * `false`. Every other adapter (Facebook, Instagram, LinkedIn, Threads,
+   * Pinterest) sends nothing, so a post declared for those gets the
+   * `synthetic_media_not_sent` warning, and a summary must say where it was not
+   * declared (`fieldsSentTo`).
    */
   readonly syntheticMedia?: boolean
   readonly media: readonly MediaRef[]

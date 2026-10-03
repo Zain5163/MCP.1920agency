@@ -1,4 +1,5 @@
 import type { Capabilities, ValidationIssue, ValidationResult } from '../adapters/adapter.ts'
+import { capabilitiesFor } from '../adapters/capabilities.ts'
 import type { Platform, PlatformOverride, PostDraft } from './types.ts'
 
 /**
@@ -48,6 +49,72 @@ export function titleForPlatform(draft: PostDraft, platform: Platform): string |
  */
 export function syntheticMediaForPlatform(draft: PostDraft, platform: Platform): boolean {
   return draft.overrides?.[platform]?.syntheticMedia ?? draft.syntheticMedia ?? false
+}
+
+/**
+ * Whether this platform sends a title with this post.
+ *
+ * Only a titled platform does (`titleMaxLength`), and where its capabilities
+ * name the kinds of post that carry one (`titleMediaKinds`), only a post with
+ * media of such a kind: a YouTube video always has its title, a LinkedIn post
+ * only when it is a document. Validation and summaries both read this, so
+ * neither checks nor shows a title that never goes out.
+ */
+export function titleIsSent(draft: PostDraft, caps: Capabilities): boolean {
+  if (caps.titleMaxLength === undefined) return false
+  const kinds = caps.titleMediaKinds
+  return kinds === undefined || draft.media.some((m) => kinds.includes(m.kind))
+}
+
+/** Where a draft's title and AI-media declaration actually go. See `fieldsSentTo`. */
+export interface FieldsSent {
+  /**
+   * Each platform that sends a title with this post, and the title it sends.
+   * A platform that has no title field, does not title this kind of post, or
+   * has no title set is left out.
+   */
+  readonly titles: ReadonlyArray<{ readonly platform: Platform; readonly title: string }>
+  /** Platforms the post is declared for as realistic AI-generated or altered media, and which are told. */
+  readonly disclosedTo: readonly Platform[]
+  /**
+   * Platforms the post is declared for which are NOT told: publishing there
+   * sends no such declaration, so it has to be labelled in the platform's app.
+   */
+  readonly notDisclosedTo: readonly Platform[]
+}
+
+/**
+ * What a post's title and AI-media declaration actually reach, among the
+ * platforms it is about to go to.
+ *
+ * An approval summary is a statement about what will go out. Summaries showed
+ * "Title:" and "Declared as realistic AI-generated or altered media" for
+ * every target, while Facebook, Instagram and a LinkedIn text post drop the
+ * title and only YouTube is sent the declaration, so an owner approved a post
+ * believing Meta had been told. This answers from capability data, so the
+ * tools and the CLI can say which platform gets what without naming one.
+ *
+ * Each platform is listed once, in the order given, however many of its
+ * accounts are targeted. `capabilitiesOf` defaults to the capability table; a
+ * caller holding adapters may pass theirs.
+ */
+export function fieldsSentTo(
+  draft: PostDraft,
+  platforms: readonly Platform[],
+  capabilitiesOf: (platform: Platform) => Capabilities = capabilitiesFor,
+): FieldsSent {
+  const titles: Array<{ readonly platform: Platform; readonly title: string }> = []
+  const disclosedTo: Platform[] = []
+  const notDisclosedTo: Platform[] = []
+  for (const platform of new Set(platforms)) {
+    const caps = capabilitiesOf(platform)
+    const title = titleIsSent(draft, caps) ? titleForPlatform(draft, platform) : undefined
+    if (title !== undefined) titles.push({ platform, title })
+    if (!syntheticMediaForPlatform(draft, platform)) continue
+    if (caps.sendsSyntheticMediaDisclosure === true) disclosedTo.push(platform)
+    else notDisclosedTo.push(platform)
+  }
+  return { titles, disclosedTo, notDisclosedTo }
 }
 
 /**
@@ -109,12 +176,13 @@ export function validateAgainstCapabilities(
   }
 
   /**
-   * Title, only where the platform has one. Counted in graphemes like the body,
-   * so an emoji in a title costs what the platform charges for it. A missing
-   * title is not an error here: some titled platforms fall back to the first
-   * line of the text, and that rule belongs to their adapter.
+   * Title, only where this post sends one (`titleIsSent`): a title that never
+   * goes out cannot be too long. Counted in graphemes like the body, so an
+   * emoji in a title costs what the platform charges for it. A missing title is
+   * not an error here: some titled platforms fall back to the first line of
+   * the text, and that rule belongs to their adapter.
    */
-  if (caps.titleMaxLength !== undefined) {
+  if (caps.titleMaxLength !== undefined && titleIsSent(draft, caps)) {
     const title = titleForPlatform(draft, platform)
     const titleLength = title === undefined ? 0 : countGraphemes(title)
     if (titleLength > caps.titleMaxLength) {
@@ -124,6 +192,21 @@ export function validateAgainstCapabilities(
         `Title is ${titleLength} characters, ${titleLength - caps.titleMaxLength} over the ${caps.titleMaxLength} limit.`,
       )
     }
+  }
+
+  /**
+   * The AI-media declaration, where publishing here does not send one. A
+   * warning rather than an error: the post itself is fine, but the platform is
+   * not told, and nothing else would say so. Without it, the declaration read
+   * as made everywhere it was asked for.
+   */
+  if (syntheticMediaForPlatform(draft, platform) && caps.sendsSyntheticMediaDisclosure !== true) {
+    add(
+      'warning',
+      'synthetic_media_not_sent',
+      'Marked as realistic AI-generated or altered media, but publishing here does not send that declaration, ' +
+        "so this platform is not told. Label it in the platform's app after posting, or say so in the text.",
+    )
   }
 
   const media = draft.media

@@ -724,8 +724,12 @@ describe('what is sent', () => {
   test('declares synthetic media when the post says so', async () => {
     const file = await videoFile(10)
     const { yt, calls } = make([MINE, STARTED, CREATED(), READ_BACK()])
-    await yt.publish(ctx(), draft({ syntheticMedia: true, media: [vid(file)] }))
+    const declared = draft({ syntheticMedia: true, media: [vid(file)] })
+    await yt.publish(ctx(), declared)
     assert.equal((json(calls[1]!).status as Record<string, unknown>).containsSyntheticMedia, true)
+    // It really is sent, so the capability says so and validation has nothing to warn about.
+    assert.equal(yt.capabilities.sendsSyntheticMediaDisclosure, true)
+    assert.ok(!yt.validate(declared).issues.some((i) => i.code === 'synthetic_media_not_sent'))
   })
 
   test("a scheduled post's title and disclosure, stored as overrides, are what is sent", async () => {
