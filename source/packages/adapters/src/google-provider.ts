@@ -34,7 +34,9 @@ import {
  *     hour after connecting.
  *   - **Granted is not requested.** People can untick individual permissions on
  *     Google's consent screen, so the token response's `scope` field, not the
- *     request, is the record of what the connection can do.
+ *     request, is the record of what the connection can do, and a grant that
+ *     cannot do what its product needs is refused before anything is stored
+ *     (`missingPermissions`).
  *   - **The refresh token arrives once.** Google issues it on the first consent
  *     only, unless asked again with `prompt=consent`. A reconnect without it
  *     would come back with no refresh token and overwrite the stored one with
@@ -81,6 +83,52 @@ export const GOOGLE_SCOPE_BUNDLES: Readonly<Record<string, readonly string[]>> =
  */
 export const DEFAULT_GOOGLE_SCOPE_BUNDLES: readonly string[] = ['youtube']
 
+/** One thing a product needs a grant to allow. */
+export interface GooglePermission {
+  /** What Google's consent screen calls it: the box the person ticks or unticks. */
+  readonly label: string
+  /** Any one of these scopes allows it. */
+  readonly anyOf: readonly string[]
+}
+
+const SCOPE = 'https://www.googleapis.com/auth/'
+
+/**
+ * What each product needs a grant to allow, judged by capability rather than
+ * by the scope strings asked for.
+ *
+ * People can untick permissions on Google's consent screen, so a grant is
+ * checked before a connection is stored (`Provider.missingPermissions`). The
+ * check cannot be "was every requested scope granted": with
+ * `include_granted_scopes=true` a broader scope from an earlier sign-in, such
+ * as full `youtube`, comes back in place of the narrow one, and it does
+ * everything the narrow one does. So each permission lists every scope that
+ * allows the calls behind it, as Google's discovery document lists them
+ * (research/2026-10-02-youtube-api-facts.md):
+ *
+ *   - uploading: `videos.insert` takes youtube.upload, youtube,
+ *     youtube.force-ssl or youtubepartner;
+ *   - reading the channel and the video back: `channels.list` (discovery, and
+ *     the identity check before every upload) and `videos.list` (the privacy
+ *     YouTube applied) both take youtube.readonly, youtube, youtube.force-ssl
+ *     or youtubepartner.
+ *
+ * Identity is not checked: Google renames those scopes in its answer, and the
+ * exchange has already proven who signed in.
+ */
+export const GOOGLE_BUNDLE_PERMISSIONS: Readonly<Record<string, readonly GooglePermission[]>> = {
+  youtube: [
+    {
+      label: 'Manage your YouTube videos',
+      anyOf: [`${SCOPE}youtube.upload`, `${SCOPE}youtube`, `${SCOPE}youtube.force-ssl`, `${SCOPE}youtubepartner`],
+    },
+    {
+      label: 'View your YouTube account',
+      anyOf: [`${SCOPE}youtube.readonly`, `${SCOPE}youtube`, `${SCOPE}youtube.force-ssl`, `${SCOPE}youtubepartner`],
+    },
+  ],
+}
+
 /**
  * A failure talking to Google's OAuth endpoints.
  *
@@ -97,13 +145,44 @@ export class GoogleOAuthError extends PublishError {
 }
 
 /**
- * Every scope to ask for, for the named bundles plus identity.
+ * Every scope to ask for, for the named bundles plus identity. An unknown
+ * bundle name throws, listing the real ones (`requestedBundles`).
+ */
+export function googleScopes(bundles: readonly string[] = []): string[] {
+  const scopes = new Set<string>(GOOGLE_SCOPE_BUNDLES.identity)
+  for (const bundle of requestedBundles(bundles)) {
+    for (const scope of GOOGLE_SCOPE_BUNDLES[bundle] ?? []) scopes.add(scope)
+  }
+  return [...scopes]
+}
+
+/**
+ * The consent-screen labels of what a grant lacks for the named bundles, in
+ * the order the products list them; empty when nothing is missing. Bundles are
+ * read exactly as `googleScopes` reads them, so the check covers what the
+ * sign-in asked for. See GOOGLE_BUNDLE_PERMISSIONS for why it goes by
+ * capability.
+ */
+export function missingGooglePermissions(granted: readonly string[], bundles: readonly string[] = []): string[] {
+  const have = new Set(granted)
+  const missing: string[] = []
+  for (const bundle of requestedBundles(bundles)) {
+    for (const permission of GOOGLE_BUNDLE_PERMISSIONS[bundle] ?? []) {
+      if (permission.anyOf.some((scope) => have.has(scope))) continue
+      if (!missing.includes(permission.label)) missing.push(permission.label)
+    }
+  }
+  return missing
+}
+
+/**
+ * The bundles a request names, normalised, or the default when it names none.
  *
  * An unknown name throws and lists the real ones. Asking Google for a product
  * the provider does not know is a typo, and silently connecting less than was
  * asked for would surface much later as a missing permission.
  */
-export function googleScopes(bundles: readonly string[] = []): string[] {
+function requestedBundles(bundles: readonly string[]): readonly string[] {
   const named = bundles.map((b) => b.trim().toLowerCase()).filter((b) => b !== '')
   const requested = named.length > 0 ? named : DEFAULT_GOOGLE_SCOPE_BUNDLES
   const unknown = requested.filter((b) => !Object.hasOwn(GOOGLE_SCOPE_BUNDLES, b))
@@ -114,12 +193,7 @@ export function googleScopes(bundles: readonly string[] = []): string[] {
       { failureClass: 'permanent' },
     )
   }
-
-  const scopes = new Set<string>(GOOGLE_SCOPE_BUNDLES.identity)
-  for (const bundle of requested) {
-    for (const scope of GOOGLE_SCOPE_BUNDLES[bundle] ?? []) scopes.add(scope)
-  }
-  return [...scopes]
+  return requested
 }
 
 export interface GoogleOAuthConfig {
@@ -448,6 +522,15 @@ export class GoogleProvider implements Provider {
 
   async exchangeCode(code: string): Promise<AuthorisedCredential> {
     return await new GoogleOAuth(this.#config).exchangeCode(code)
+  }
+
+  /**
+   * What the grant lacks for the products asked for, by consent-screen label:
+   * "Manage your YouTube videos" when nothing granted can upload, "View your
+   * YouTube account" when nothing granted can read the channel back.
+   */
+  missingPermissions(granted: readonly string[], scopeBundles: readonly string[]): readonly string[] {
+    return missingGooglePermissions(granted, scopeBundles)
   }
 
   /**

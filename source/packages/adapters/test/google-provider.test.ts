@@ -5,6 +5,7 @@ import { PublishError } from '@social-publisher/core'
 
 import {
   DEFAULT_GOOGLE_REDIRECT_URI,
+  GOOGLE_BUNDLE_PERMISSIONS,
   GOOGLE_SCOPE_BUNDLES,
   GoogleOAuth,
   GoogleOAuthError,
@@ -12,7 +13,9 @@ import {
   buildGoogleAuthUrl,
   googleProviderConfigFromEnv,
   googleScopes,
+  missingGooglePermissions,
 } from '../src/google-provider.ts'
+import { flattenAccounts } from '../src/provider.ts'
 
 /**
  * Google authorisation and channel discovery against a scripted Google. No
@@ -235,6 +238,86 @@ describe('exchanging the code', () => {
     const oauth = new GoogleOAuth({ clientId: 'C', clientSecret: 'S', fetch: fetchImpl })
     await assert.rejects(() => oauth.exchangeCode('CODE'), /redirect URI/)
     assert.equal(calls.length, 0)
+  })
+})
+
+describe('a partial grant', () => {
+  /**
+   * The connect command asks `missingPermissions` before storing anything.
+   * Without it, a sign-in with "Manage your YouTube videos" unticked stored a
+   * channel as ready that could never upload: discovery needs only read
+   * access, so nothing else noticed.
+   */
+  const FULL = 'https://www.googleapis.com/auth/youtube'
+  const FORCE_SSL = 'https://www.googleapis.com/auth/youtube.force-ssl'
+  const PARTNER = 'https://www.googleapis.com/auth/youtubepartner'
+  const IDENTITY = ['openid', 'https://www.googleapis.com/auth/userinfo.email', 'https://www.googleapis.com/auth/userinfo.profile']
+  const provider = new GoogleProvider(config)
+
+  test('upload unticked: discovery still finds the channel, so the grant itself is what says no', async () => {
+    const { fetchImpl } = mockGoogle([
+      { body: { ...TOKENS, scope: [...IDENTITY, READONLY].join(' ') } },
+      { body: PERSON },
+      { body: { items: [{ id: 'UC1', snippet: { title: 'My Channel' } }] } },
+    ])
+    const google = new GoogleProvider({ ...config, fetch: fetchImpl })
+    const credential = await google.exchangeCode('CODE')
+    // What made the gap: the only gate the connect command had was "found nothing".
+    assert.equal(flattenAccounts(await google.discover(credential.accessToken)).length, 1)
+
+    assert.deepEqual(google.missingPermissions(credential.grantedScopes!, ['youtube']), ['Manage your YouTube videos'])
+  })
+
+  test('the grant exactly as asked for lacks nothing', () => {
+    assert.deepEqual(provider.missingPermissions(TOKENS.scope.split(' '), ['youtube']), [])
+  })
+
+  test('a broader YouTube scope granted earlier counts, rather than being compared as a string', () => {
+    // include_granted_scopes=true can bring back full `youtube` from an
+    // earlier sign-in; it uploads and reads, so refusing it would be wrong.
+    assert.deepEqual(provider.missingPermissions(['openid', FULL, READONLY], ['youtube']), [])
+    for (const broad of [FULL, FORCE_SSL, PARTNER]) {
+      assert.deepEqual(provider.missingPermissions([...IDENTITY, broad], ['youtube']), [], broad)
+    }
+  })
+
+  test('read access unticked is named too: every upload checks the channel first', () => {
+    assert.deepEqual(provider.missingPermissions([...IDENTITY, UPLOAD], ['youtube']), ['View your YouTube account'])
+  })
+
+  test('a sign-in with only identity lacks both, upload first', () => {
+    assert.deepEqual(provider.missingPermissions(IDENTITY, ['youtube']), [
+      'Manage your YouTube videos',
+      'View your YouTube account',
+    ])
+  })
+
+  test('no named product means YouTube, as when signing in', () => {
+    assert.deepEqual(provider.missingPermissions([...IDENTITY, READONLY], []), ['Manage your YouTube videos'])
+    assert.deepEqual(provider.missingPermissions([...IDENTITY, READONLY], ['  YouTube ']), ['Manage your YouTube videos'])
+  })
+
+  test('scopes are matched exactly, as Google reports them case-sensitively', () => {
+    assert.deepEqual(missingGooglePermissions([`${UPLOAD}.extra`, READONLY.toUpperCase()], ['youtube']), [
+      'Manage your YouTube videos',
+      'View your YouTube account',
+    ])
+  })
+
+  test('an unknown product is refused, as when signing in', () => {
+    assert.throws(
+      () => provider.missingPermissions(TOKENS.scope.split(' '), ['youtub']),
+      (error: unknown) => error instanceof GoogleOAuthError && error.failureClass === 'permanent' && /youtube/.test(error.message),
+    )
+  })
+
+  test("every product declares what it needs, and its own scopes provide it", () => {
+    // A product added to the bundles without a permissions entry would never
+    // be checked, so a partial grant of it would connect as ready again.
+    for (const bundle of Object.keys(GOOGLE_SCOPE_BUNDLES).filter((b) => b !== 'identity')) {
+      assert.ok((GOOGLE_BUNDLE_PERMISSIONS[bundle] ?? []).length > 0, `${bundle} declares no permissions`)
+      assert.deepEqual(missingGooglePermissions(googleScopes([bundle]), [bundle]), [], bundle)
+    }
   })
 })
 

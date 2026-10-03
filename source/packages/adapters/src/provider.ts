@@ -148,6 +148,28 @@ export interface Provider {
   }): Promise<{ readonly accessToken: string; readonly refreshToken?: string; readonly expiresAt: Date }>
 
   /**
+   * The permissions a grant lacks for the products being connected, named as
+   * the consent screen names them, so the person can find the box they left
+   * unticked. Empty when nothing is missing.
+   *
+   * The connect command asks this before it stores anything and refuses when
+   * it names something. Without it, Google's granular consent screen let a
+   * sign-in with "Manage your YouTube videos" unticked connect a channel:
+   * discovery only needs read access, so the channel was found, stored and
+   * shown as ready, and every upload to it then failed.
+   *
+   * `granted` is the token's own record (`AuthorisedCredential.grantedScopes`)
+   * and `scopeBundles` the products asked for, as passed to `authUrl`. A
+   * provider judges by what the grant can do, not by comparing strings with
+   * what was requested: providers rename some scopes in their answer, and a
+   * broader scope granted earlier covers a narrower one asked for now.
+   *
+   * Optional. A provider that omits it is not checked at all, so any provider
+   * whose consent can be granted in part should implement it.
+   */
+  missingPermissions?(granted: readonly string[], scopeBundles: readonly string[]): readonly string[]
+
+  /**
    * What to tell someone whose authorisation reached no postable account, in
    * this provider's own terms — for Google, that the account may have no
    * channel. Without it the connect command can only say "nothing found".
