@@ -2,13 +2,14 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 
 import type { TokenIdentity } from '@social-publisher/auth'
-import { PLATFORMS, formatResolution, overridesForStorage, resolutionFor, type ErrorCode } from '@social-publisher/core'
+import { PLATFORMS, overridesForStorage, type ErrorCode } from '@social-publisher/core'
 import { queueStats } from '@social-publisher/db'
 import type { Logger } from '@social-publisher/telemetry'
 
 import { loadConnections, postingDeps } from './context.ts'
 import {
   buildDraft,
+  callFailure,
   formatPostList,
   publishPost,
   storeHostedMedia,
@@ -33,8 +34,8 @@ type ToolResult = { content: Array<{ type: 'text'; text: string }> }
 
 const text = (body: string): ToolResult => ({ content: [{ type: 'text' as const, text: body }] })
 
-const fail = (code: ErrorCode, detail?: string): ToolResult =>
-  text(formatResolution(resolutionFor(code), detail))
+// Never "retried automatically": nothing retries a tool call on its own.
+const fail = (code: ErrorCode, detail?: string): ToolResult => text(callFailure(code, detail))
 
 /** Maps an unexpected throw onto the catalogue rather than leaking a raw message. */
 function diagnose(error: unknown): ToolResult {

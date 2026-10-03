@@ -9,6 +9,7 @@ import {
   type Connection,
   type ErrorCode,
   type MediaRef,
+  type Resolution,
   type Platform,
   type PostDraft,
 } from '@social-publisher/core'
@@ -45,7 +46,7 @@ export type ToolResult = { content: Array<{ type: 'text'; text: string }> }
 
 const text = (body: string): ToolResult => ({ content: [{ type: 'text' as const, text: body }] })
 
-const fail = (code: ErrorCode, detail?: string): ToolResult => text(formatResolution(resolutionFor(code), detail))
+const fail = (code: ErrorCode, detail?: string): ToolResult => text(callFailure(code, detail))
 
 /** A tool's draft arguments. The hosted schema has no `localPath`; stdio's does. */
 export interface DraftArgs {
@@ -421,34 +422,52 @@ export function formatPublishReport(report: PublishReport, options: { readonly a
 }
 
 /**
- * A failed target's diagnosis, as it is true for a post published now.
+ * A resolution as it is true in an MCP reply, where nothing retries on its own.
  *
- * The catalogue speaks for the worker, which retries a transient failure on
- * its own: "This will be retried automatically", and for some codes a first
+ * The catalogue speaks for the worker, which retries a transient failure by
+ * itself: "This will be retried automatically", and for some codes a first
  * step of "No action needed — it will retry automatically". Nothing retries a
- * post published now, so for one of those both were false, and an AI caller
- * repeats them to the user, who then waits for a retry that never comes. They
- * are replaced by when to publish it again.
+ * post published now, or any tool call, so both were false there, and an AI
+ * caller repeats them to the user, who then waits for a retry that never
+ * comes. Those steps are dropped and the closing sentence is `closing`.
  *
  * The retry sentence is the last line of every formatted resolution, so that
- * line is the one replaced.
+ * line is the one replaced. A resolution that is not retryable is unchanged.
  */
+function withoutAutomaticRetry(resolution: Resolution, detail: string | undefined, closing: string): string {
+  if (!resolution.retryable) return formatResolution(resolution, detail)
+  const kept = resolution.fix.filter((step) => !/automatic/i.test(step))
+  const fix = kept.length > 0 ? kept : ['Try again once the wait has passed']
+  const lines = formatResolution({ ...resolution, fix }, detail).split('\n')
+  lines[lines.length - 1] = closing
+  return lines.join('\n')
+}
+
+/** A failed target's diagnosis, for a post published now: when to publish it again. */
 export function publishNowResolution(
   error: { readonly failureClass: string; readonly code?: ErrorCode | undefined; readonly platformCode?: string | undefined; readonly retryAfterMs?: number | undefined },
   now: Date = new Date(),
 ): string {
-  const resolution = resolutionFor(codeForFailure(error))
-  if (!resolution.retryable) return formatResolution(resolution, error.platformCode)
-
-  const kept = resolution.fix.filter((step) => !/automatic/i.test(step))
-  const fix = kept.length > 0 ? kept : ['Publish it again once the wait has passed']
-  const lines = formatResolution({ ...resolution, fix }, error.platformCode).split('\n')
   const when =
     error.retryAfterMs !== undefined ? `after ${new Date(now.getTime() + error.retryAfterMs).toISOString()}` : 'once the wait has passed'
-  lines[lines.length - 1] =
-    `Nothing retries a post that was published now: call publish_post again ${when}, ` +
-    'without confirm, to get a new approval.'
-  return lines.join('\n')
+  return withoutAutomaticRetry(
+    resolutionFor(codeForFailure(error)),
+    error.platformCode,
+    `Nothing retries a post that was published now: call publish_post again ${when}, without confirm, to get a new approval.`,
+  )
+}
+
+/**
+ * A failed tool call's diagnosis, such as a database that could not be
+ * reached. Used by both transports for every tool's failure, publish_post's
+ * included.
+ */
+export function callFailure(code: ErrorCode, detail?: string): string {
+  return withoutAutomaticRetry(
+    resolutionFor(code),
+    detail,
+    'Nothing retries this call on its own: call the tool again once the cause has passed.',
+  )
 }
 
 /**

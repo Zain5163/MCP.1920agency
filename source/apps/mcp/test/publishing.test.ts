@@ -613,3 +613,21 @@ describe('an approval publishes once, and a client that gives up stops the uploa
     assert.match(reply(await publishPost(scope as never, { ...args, confirm: token }, ctx)), /^PUBLISHED/)
   })
 })
+
+describe('a tool call that fails before publishing never promises a retry either (finding #9)', () => {
+  test('publish_post with the database down says to call again, not that it will be retried', async () => {
+    const { deps, scope } = harness([adapter('facebook_page', async () => published('never'))])
+    scope.connections = async () => {
+      throw new Error("Can't reach database server at db.example.supabase.co:6543")
+    }
+    const server = new McpServer({ name: 't', version: '0' })
+    const logger = new Logger([{ name: 'memory', write: async () => {} }])
+    registerTools(server, { tokenId: 'tok', tenantId: TENANT, userId: 'user-7', scope: scope as never }, logger, deps)
+    const tools = (server as unknown as { _registeredTools: Record<string, { handler: Function }> })._registeredTools
+
+    const answer = reply(await tools.publish_post!.handler({ body: 'Hello', platforms: ['facebook_page'] }, {}))
+    assert.match(answer, /\[DB_UNREACHABLE\]/)
+    assert.match(answer, /Nothing retries this call on its own: call the tool again once the cause has passed\./)
+    assert.doesNotMatch(answer, /automatic/i)
+  })
+})

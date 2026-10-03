@@ -3,7 +3,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
 
 import { checkConfig } from '@social-publisher/config'
-import { PLATFORMS, formatResolution, resolutionFor, type ErrorCode } from '@social-publisher/core'
+import { PLATFORMS, type ErrorCode } from '@social-publisher/core'
 import { disconnect, health, queueStats, type TenantScope } from '@social-publisher/db'
 
 import { registerAdsTools } from './ads-tools.ts'
@@ -14,7 +14,7 @@ import { registerSetupTools } from './setup-tools.ts'
 import { SERVER_INSTRUCTIONS, registerPlaybooks } from './playbooks.ts'
 import { registerSkillsLibrary } from './skills-library.ts'
 import { currentScope, loadConnections, postingDeps } from './context.ts'
-import { buildDraft, formatPostList, publishPost } from './publishing.ts'
+import { buildDraft, callFailure, formatPostList, publishPost } from './publishing.ts'
 
 /**
  * AdsPilot MCP server.
@@ -35,7 +35,8 @@ const deps = postingDeps()
 
 const text = (body: string) => ({ content: [{ type: 'text' as const, text: body }] })
 
-const fail = (code: ErrorCode, detail?: string) => text(formatResolution(resolutionFor(code), detail))
+// Never "retried automatically": nothing retries a tool call on its own.
+const fail = (code: ErrorCode, detail?: string) => text(callFailure(code, detail))
 
 /** Maps an unexpected throw onto the catalogue rather than leaking a raw message. */
 function diagnose(error: unknown): { content: Array<{ type: 'text'; text: string }> } {
