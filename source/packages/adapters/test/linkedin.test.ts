@@ -41,6 +41,8 @@ interface Reply {
   /** Sent as is instead of JSON, e.g. the bytes of a downloaded file. */
   raw?: string | Uint8Array
   headers?: Record<string, string>
+  /** Thrown instead of answering, as a dropped connection does. */
+  error?: Error
 }
 
 function mockLinkedIn(replies: Reply[]) {
@@ -64,6 +66,7 @@ function mockLinkedIn(replies: Reply[]) {
 
     const next = replies[Math.min(index, replies.length - 1)] ?? {}
     index += 1
+    if (next.error !== undefined) throw next.error
     return new Response(next.raw !== undefined ? next.raw : next.body === undefined ? '' : JSON.stringify(next.body), {
       status: next.status ?? 200,
       headers: next.headers ?? {},
@@ -973,10 +976,12 @@ describe('documents (PDF carousels)', () => {
       [DOC_INIT, DOC_PUT, DOC_STATUS('WAITING_UPLOAD'), DOC_STATUS('PROCESSING'), DOC_STATUS('AVAILABLE'), CREATED],
       { documentPollIntervalMs: 1_234 },
     )
-    await li.publish(ctx(), draft({ title: 'T', media: [doc({ localPath: file })] }))
+    const result = await li.publish(ctx(), draft({ title: 'T', media: [doc({ localPath: file })] }))
     assert.deepEqual(sleeps, [1_234, 1_234])
     assert.equal(calls.filter((c) => c.method === 'GET').length, 3)
     assert.equal(posts(calls).length, 1)
+    // Seen AVAILABLE, so it is plainly published.
+    assert.equal(result.notice, undefined)
   })
 
   test('a document LinkedIn could not process is never posted, and says why', async () => {
@@ -1029,13 +1034,42 @@ describe('documents (PDF carousels)', () => {
     assert.equal(calls.filter((c) => c.method === 'GET').length, 1, 'one read, no retry loop on a 403')
     assert.equal(posts(calls).length, 1)
     assert.equal(result.platformPostId, 'urn:li:share:999')
+    // Posted on trust, so it must not be reported as plainly published: a
+    // notice is what turns PUBLISHED into UPLOADED with a note everywhere.
+    assert.match(result.notice!, /not confirmed as published/)
+    assert.match(result.notice!, /could not read whether LinkedIn finished processing the document/)
+    assert.match(result.notice!, /Check on LinkedIn that it shows the document's pages/)
   })
 
   test('the default pause for an unreadable status is 15 seconds', async () => {
     const file = await onDisk()
     const { li, sleeps } = makeDocs([DOC_INIT, DOC_PUT, { body: {} }, CREATED])
-    await li.publish(ctx(), draft({ title: 'T', media: [doc({ localPath: file })] }))
+    const result = await li.publish(ctx(), draft({ title: 'T', media: [doc({ localPath: file })] }))
     assert.deepEqual(sleeps, [15_000])
+    assert.match(result.notice!, /not confirmed as published/)
+  })
+
+  test('a status read that fails partway through the polling still posts, but not as confirmed', async () => {
+    // LinkedIn last said PROCESSING; the next read failed. The post goes out
+    // after the pause, as the agreed fix keeps it, so the result must say the
+    // document was never seen processed.
+    const file = await onDisk()
+    const serverError: Reply = { status: 500, body: { message: 'Internal Server Error', status: 500 } }
+    const { li, calls, sleeps } = makeDocs([DOC_INIT, DOC_PUT, DOC_STATUS('PROCESSING'), serverError, CREATED])
+    const result = await li.publish(ctx(), draft({ title: 'T', media: [doc({ localPath: file })] }))
+    assert.deepEqual(sleeps, [3_000, 15_000])
+    assert.equal(calls.filter((c) => c.method === 'GET').length, 2)
+    assert.equal(posts(calls).length, 1)
+    assert.match(result.notice!, /not confirmed as published/)
+  })
+
+  test('a status read lost to the network posts after the pause, but not as confirmed', async () => {
+    const file = await onDisk()
+    const { li, sleeps } = makeDocs([DOC_INIT, DOC_PUT, { error: new TypeError('fetch failed') }, CREATED])
+    const result = await li.publish(ctx(), draft({ title: 'T', media: [doc({ localPath: file })] }))
+    assert.deepEqual(sleeps, [15_000])
+    assert.equal(result.platformPostId, 'urn:li:share:999')
+    assert.match(result.notice!, /not confirmed as published/)
   })
 
   test('no upload address: transient, and nothing is uploaded or posted', async () => {
@@ -1121,7 +1155,12 @@ describe('documents (PDF carousels)', () => {
       {},
       CREATED,
     ])
-    await new LinkedInAdapter({ fetch: fetchImpl }).publish(ctx(), draft({ title: 'Not for images', media: [img()] }))
+    const result = await new LinkedInAdapter({ fetch: fetchImpl }).publish(
+      ctx(),
+      draft({ title: 'Not for images', media: [img()] }),
+    )
     assert.deepEqual(posts(calls)[0]!.body.content, { media: { id: 'urn:li:image:IMG1' } })
+    // Only a document has processing to confirm; an image post reads as it always did.
+    assert.equal(result.notice, undefined)
   })
 })

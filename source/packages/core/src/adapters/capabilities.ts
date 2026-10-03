@@ -321,8 +321,9 @@ export const CAPABILITIES: Readonly<Record<Platform, CapabilityRecord>> = {
       'DOCX, at most 100 MB and 300 pages. Processing status (PROCESSING, AVAILABLE, ' +
       'PROCESSING_FAILED, WAITING_UPLOAD) is read back where the token may read it; a ' +
       'member token is documented as write-only for image reads and reported to be the ' +
-      'same for documents, so the adapter then pauses and posts. Nothing has been posted ' +
-      'as a document for real yet. ' +
+      'same for documents, so the adapter then pauses and posts, and the result carries a ' +
+      'notice that the post is not confirmed as published (reported as uploaded, not ' +
+      'published). Nothing has been posted as a document for real yet. ' +
       'Remaining limits here are unverified.',
   },
 

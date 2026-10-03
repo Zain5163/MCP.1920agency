@@ -108,6 +108,21 @@ const DOCUMENT_TYPES: ReadonlySet<string> = new Set([
 const PDF_SIGNATURE = '%PDF-'
 const PDF_SIGNATURE_WINDOW = 1024
 
+/**
+ * The notice on a document post whose processing was never seen to finish.
+ *
+ * A member token may not read a document's status, and a read can also fail
+ * partway through the polling. Either way the post goes out after a pause, on
+ * the assumption, unverified for documents, that LinkedIn publishes it once
+ * processing completes. If processing fails instead, the post never shows,
+ * while a result without a notice is reported everywhere as plainly
+ * PUBLISHED. The notice makes every surface report it as uploaded and tells
+ * the owner what to look at.
+ */
+const DOCUMENT_UNCONFIRMED_NOTICE =
+  'Posted, but this connection could not read whether LinkedIn finished processing the document, ' +
+  "so the post is not confirmed as published. Check on LinkedIn that it shows the document's pages."
+
 export interface LinkedInAdapterOptions {
   readonly fetch?: typeof globalThis.fetch
   readonly apiVersion?: string
@@ -304,11 +319,15 @@ export class LinkedInAdapter implements PlatformAdapter {
     const firstDocument = documents[0]
     const documentTitle =
       firstDocument !== undefined ? this.#documentTitle(draft, firstDocument).text : undefined
+    // False only for a document LinkedIn was not seen to finish processing.
+    let documentProcessed = true
     const firstVideo = videos[0]
     if (firstVideo !== undefined) {
       uploaded.push(await this.#uploadVideo(ctx, author, firstVideo))
     } else if (firstDocument !== undefined) {
-      uploaded.push(await this.#uploadDocument(ctx, author, firstDocument))
+      const document = await this.#uploadDocument(ctx, author, firstDocument)
+      uploaded.push(document.urn)
+      documentProcessed = document.processed
     } else {
       for (const image of draft.media) {
         uploaded.push(await this.#uploadImage(ctx, author, image))
@@ -354,9 +373,11 @@ export class LinkedInAdapter implements PlatformAdapter {
       )
     }
 
+    const notice = documentProcessed ? undefined : DOCUMENT_UNCONFIRMED_NOTICE
     return {
       platformPostId: postId,
       url: `https://www.linkedin.com/feed/update/${postId}/`,
+      ...(notice !== undefined ? { notice } : {}),
     }
   }
 
@@ -547,8 +568,15 @@ export class LinkedInAdapter implements PlatformAdapter {
    *
    * The file is opened and checked first, so an empty, oversized or mislabelled
    * file is refused before anything is registered with LinkedIn.
+   *
+   * Says whether processing was seen to finish (`processed`), so the post can
+   * carry a notice when it was not.
    */
-  async #uploadDocument(ctx: PublishContext, owner: string, media: MediaRef): Promise<string> {
+  async #uploadDocument(
+    ctx: PublishContext,
+    owner: string,
+    media: MediaRef,
+  ): Promise<{ readonly urn: string; readonly processed: boolean }> {
     const source = await openMedia(media, this.#fetch, ctx.signal !== undefined ? { signal: ctx.signal } : {})
     let urn: string
     try {
@@ -602,8 +630,8 @@ export class LinkedInAdapter implements PlatformAdapter {
       await source.close()
     }
 
-    await this.#awaitDocument(ctx, urn)
-    return urn
+    const processed = await this.#awaitDocument(ctx, urn)
+    return { urn, processed }
   }
 
   /**
@@ -653,14 +681,19 @@ export class LinkedInAdapter implements PlatformAdapter {
    * PUBLISH_REQUESTED state), and the live video posts of 2026-09-26 were created
    * straight after upload, so the pause only gives a fresh upload time to
    * register. UNVERIFIED for documents until the first real one.
+   *
+   * Resolves true once LinkedIn reports AVAILABLE, and false when the status
+   * could not be read: refused outright, as for a member token, or failing
+   * partway through the polling. A post made after a false is not confirmed,
+   * and its result says so (DOCUMENT_UNCONFIRMED_NOTICE).
    */
-  async #awaitDocument(ctx: PublishContext, urn: string): Promise<void> {
+  async #awaitDocument(ctx: PublishContext, urn: string): Promise<boolean> {
     for (let check = 1; ; check += 1) {
       const status = await this.#documentStatus(ctx, urn)
-      if (status === 'AVAILABLE') return
+      if (status === 'AVAILABLE') return true
       if (status === undefined) {
         await this.#sleep(this.#documentUnreadableWaitMs)
-        return
+        return false
       }
       if (status === 'PROCESSING_FAILED') {
         throw new PublishError(
