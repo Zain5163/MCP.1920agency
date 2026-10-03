@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
 import type { MediaRef, Platform, PostDraft } from '@social-publisher/core'
-import { db, publishedColumns } from '@social-publisher/db'
+import { db, failedColumns, publishedColumns } from '@social-publisher/db'
 
 import { authenticate } from '@social-publisher/auth'
 
@@ -214,12 +214,9 @@ export async function createPost(_prev: unknown, formData: FormData): Promise<Ac
           ? // A notice is kept with the target, with its code, so the
             // dashboard shows it as "uploaded" with the notice.
             publishedColumns(outcome.result!)
-          : {
-              state: 'failed',
-              failureClass: outcome.error!.failureClass,
-              platformMessage: outcome.error!.message,
-              errorCode: outcome.error!.platformCode ?? null,
-            }),
+          : // Every attachment from the browser was hosted and stored above,
+            // so a Retry rebuilds this post with them.
+            { state: 'failed', ...failedColumns(outcome.error!, { attachmentsStored: true }) }),
       },
     })
   }

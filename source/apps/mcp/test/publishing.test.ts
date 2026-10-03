@@ -2,8 +2,8 @@ import { strict as assert } from 'node:assert'
 import { describe, test } from 'node:test'
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
-import { capabilitiesFor, type Platform, type PlatformAdapter, type PublishResult } from '@social-publisher/core'
-import { NOTICE_CODE } from '@social-publisher/db'
+import { PublishError, capabilitiesFor, type Platform, type PlatformAdapter, type PublishResult } from '@social-publisher/core'
+import { ATTACHMENTS_NOT_STORED_CODE, ATTACHMENTS_NOT_STORED_MESSAGE, NOTICE_CODE } from '@social-publisher/db'
 import { PublishService } from '@social-publisher/publisher'
 import { Logger } from '@social-publisher/telemetry'
 
@@ -324,5 +324,80 @@ describe('hosted schedule_post stores the attachments the worker will need (find
     const text = hostedTools([adapter('facebook_page', async () => published('never'))])
     await text.call('schedule_post', { body: 'Just words', platforms: ['facebook_page'], at })
     assert.deepEqual(text.rows.media, [])
+  })
+})
+
+describe('a failed post whose attachments were not stored is never retried without them (finding #6)', () => {
+  const rejectedUpload = async (): Promise<PublishResult> => {
+    throw new PublishError('LinkedIn rejected the video upload (HTTP 503). Nothing was posted.', {
+      failureClass: 'transient',
+      platformCode: '503',
+    })
+  }
+
+  async function publishApproved(adapters: PlatformAdapter[], args: Record<string, unknown>) {
+    const h = harness(adapters)
+    const approval = reply(await publishPost(h.scope as never, args as never, { deps: h.deps, actor: 'mcp' }))
+    const done = reply(await publishPost(h.scope as never, { ...args, confirm: tokenIn(approval) } as never, { deps: h.deps, actor: 'mcp' }))
+    return { ...h, done }
+  }
+
+  test("the reviewers' case: a local file that fails is marked, and the answer says how to send it", async () => {
+    const { rows, done } = await publishApproved([adapter('linkedin', rejectedUpload)], {
+      body: 'Slides below. Save it for the next time code 10 shows up.',
+      platforms: ['linkedin'],
+      media: [{ kind: 'video', localPath: 'D:/clip.mp4', mime: 'video/mp4' }],
+    })
+
+    assert.deepEqual(rows.media, [], 'a local file cannot be stored for a later rebuild')
+    assert.equal(rows.targets[0]!.state, 'failed')
+    assert.equal(rows.targets[0]!.errorCode, ATTACHMENTS_NOT_STORED_CODE)
+    assert.match(rows.targets[0]!.platformMessage!, /HTTP 503/, "the platform's reason is kept")
+    assert.ok(done.includes(`NOTE: ${ATTACHMENTS_NOT_STORED_MESSAGE}`), done)
+
+    const listed = formatPostList([
+      {
+        createdAt: new Date('2026-10-03T10:00:00Z'),
+        body: 'Slides below',
+        targets: [{ state: 'failed', platformUrl: null, platformMessage: rows.targets[0]!.platformMessage!, errorCode: ATTACHMENTS_NOT_STORED_CODE, connection: { displayName: 'Rana' } }],
+      },
+    ])
+    assert.ok(listed.includes('(not retryable: Its attachments were not stored'), listed)
+  })
+
+  test('an attachment with a public URL is stored, so its failed target stays retryable', async () => {
+    const { rows, done } = await publishApproved([adapter('linkedin', rejectedUpload)], {
+      body: 'Hello',
+      platforms: ['linkedin'],
+      media: [{ kind: 'image', publicUrl: 'https://cdn.example.com/a.jpg', mime: 'image/jpeg' }],
+    })
+
+    assert.equal(rows.media.length, 1)
+    assert.equal(rows.media[0]!.publicUrl, 'https://cdn.example.com/a.jpg')
+    assert.equal(rows.targets[0]!.errorCode, '503', 'the platform code, not the mark')
+    assert.doesNotMatch(done, /NOTE: Its attachments/)
+  })
+
+  test('one local file among hosted ones is enough to mark it', async () => {
+    const { rows } = await publishApproved([adapter('linkedin', rejectedUpload)], {
+      body: 'Two pictures',
+      platforms: ['linkedin'],
+      media: [
+        { kind: 'image', publicUrl: 'https://cdn.example.com/a.jpg', mime: 'image/jpeg' },
+        { kind: 'image', localPath: 'D:/b.jpg', mime: 'image/jpeg' },
+      ],
+    })
+    assert.equal(rows.media.length, 1)
+    assert.equal(rows.targets[0]!.errorCode, ATTACHMENTS_NOT_STORED_CODE)
+  })
+
+  test('a success from a local file is recorded as usual: only failures can be retried', async () => {
+    const { rows } = await publishApproved([adapter('linkedin', async () => published('li-1'))], {
+      body: 'Hello',
+      platforms: ['linkedin'],
+      media: [{ kind: 'video', localPath: 'D:/clip.mp4', mime: 'video/mp4' }],
+    })
+    assert.equal(rows.targets[0]!.state, 'published')
+    assert.equal(rows.targets[0]!.errorCode, null)
   })
 })

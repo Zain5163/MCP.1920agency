@@ -1,4 +1,5 @@
 import { db } from './client.ts'
+import { attachmentsNotStored } from './target-codes.ts'
 
 /**
  * Tenant-scoped data access.
@@ -158,11 +159,17 @@ export class TenantScope {
    *
    * Attempts are reset so the retry gets a full backoff budget rather than
    * immediately exhausting whatever remained from the original run.
+   *
+   * A target whose post's attachments were never stored is refused too: the
+   * worker rebuilds the post from the database, so it would publish the text
+   * without them. See ATTACHMENTS_NOT_STORED_CODE.
    */
-  async retryTarget(targetId: string): Promise<'queued' | 'not_found' | 'already_published'> {
+  async retryTarget(
+    targetId: string,
+  ): Promise<'queued' | 'not_found' | 'already_published' | 'attachments_not_stored'> {
     const target = await db().target.findFirst({
       where: { id: targetId, tenantId: this.tenantId },
-      select: { id: true, state: true, platformPostId: true },
+      select: { id: true, state: true, platformPostId: true, errorCode: true },
     })
 
     if (target === null) return 'not_found'
@@ -173,6 +180,8 @@ export class TenantScope {
       return 'already_published'
     }
     if (target.state !== 'failed' && target.state !== 'needs_reauth') return 'not_found'
+    // Left as it is, code included, so it stays refused.
+    if (attachmentsNotStored(target)) return 'attachments_not_stored'
 
     await db().target.update({
       where: { id: target.id },

@@ -12,7 +12,14 @@ import {
   type Platform,
   type PostDraft,
 } from '@social-publisher/core'
-import { carriesNotice, publishedColumns, type TenantScope } from '@social-publisher/db'
+import {
+  ATTACHMENTS_NOT_STORED_MESSAGE,
+  attachmentsNotStored,
+  carriesNotice,
+  failedColumns,
+  publishedColumns,
+  type TenantScope,
+} from '@social-publisher/db'
 import type { PublishReport, PublishService, TargetOutcome, TargetSpec } from '@social-publisher/publisher'
 
 import { loadConnections } from './context.ts'
@@ -309,13 +316,16 @@ export async function publishPost(scope: TenantScope, args: PublishArgs, ctx: Po
     createdBy: ctx.actor,
     overrides: overridesForStorage(draft, platforms),
   })
+  // And the attachments, so a Retry rebuilds the post with them. A local file
+  // cannot be stored: a target that fails is then marked never to be retried.
+  const attachmentsStored = await storeHostedMedia(ctx.deps.rows, scope.tenantId, post.id, draft.media)
 
   const report = await service.publish(draft, chosen.map(ctx.deps.targetFor), {
     idempotencyKeyFor: (connectionId) => `${post.id}:${connectionId}`,
   })
 
   for (const outcome of [...report.succeeded, ...report.failed]) {
-    await ctx.deps.rows.createTarget(targetRow(scope.tenantId, post.id, outcome))
+    await ctx.deps.rows.createTarget(targetRow(scope.tenantId, post.id, outcome, { attachmentsStored }))
   }
   await scope.record(ctx.actor, 'post.published', {
     postId: post.id,
@@ -323,11 +333,16 @@ export async function publishPost(scope: TenantScope, args: PublishArgs, ctx: Po
     failed: report.failed.length,
   })
 
-  return text(formatPublishReport(report))
+  return text(formatPublishReport(report, { attachmentsStored }))
 }
 
 /** The target row for one finished publish. */
-export function targetRow(tenantId: string, postId: string, outcome: TargetOutcome): TargetRow {
+export function targetRow(
+  tenantId: string,
+  postId: string,
+  outcome: TargetOutcome,
+  options: { readonly attachmentsStored: boolean },
+): TargetRow {
   const base = {
     tenantId,
     postId,
@@ -337,17 +352,12 @@ export function targetRow(tenantId: string, postId: string, outcome: TargetOutco
   // A notice is kept with the target, with its code, so list_posts and the
   // dashboard show it as "uploaded" with the notice.
   if (outcome.ok) return { ...base, ...publishedColumns(outcome.result!) }
-  return {
-    ...base,
-    state: 'failed',
-    failureClass: outcome.error!.failureClass,
-    platformMessage: outcome.error!.message,
-    errorCode: outcome.error!.platformCode ?? null,
-  }
+  // Marked when its attachments were not stored, so no Retry rebuilds it without them.
+  return { ...base, state: 'failed', ...failedColumns(outcome.error!, options) }
 }
 
 /** What publish_post answers once the publish has run. */
-export function formatPublishReport(report: PublishReport): string {
+export function formatPublishReport(report: PublishReport, options: { readonly attachmentsStored: boolean }): string {
   const lines: string[] = []
   for (const ok of report.succeeded) {
     // A notice means it went through but is not what "published" implies — a
@@ -359,6 +369,8 @@ export function formatPublishReport(report: PublishReport): string {
   for (const bad of report.failed) {
     lines.push(`FAILED     ${bad.displayName}  ${bad.error!.message}`)
     lines.push(formatResolution(resolutionFor(codeForFailure(bad.error!)), bad.error!.platformCode))
+    // The dashboard will not retry it, so say how it can be sent.
+    if (!options.attachmentsStored) lines.push(`           NOTE: ${ATTACHMENTS_NOT_STORED_MESSAGE}`)
   }
   return lines.join('\n')
 }
@@ -407,7 +419,9 @@ export function formatPostList(posts: readonly ListedPost[]): string {
         (t) =>
           `    ${(carriesNotice(t) ? 'uploaded' : t.state).padEnd(10)} ${t.connection.displayName}` +
           (t.platformUrl !== null ? `  ${t.platformUrl}` : '') +
-          (t.platformMessage !== null ? `  — ${t.platformMessage}` : ''),
+          (t.platformMessage !== null ? `  — ${t.platformMessage}` : '') +
+          // So nobody suggests a dashboard Retry that will be refused.
+          (attachmentsNotStored(t) ? `  (not retryable: ${ATTACHMENTS_NOT_STORED_MESSAGE})` : ''),
       )
       return [head, ...rows].join('\n')
     })

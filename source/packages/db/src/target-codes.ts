@@ -52,3 +52,41 @@ export function publishedColumns(
     errorCode: result.notice !== undefined ? NOTICE_CODE : null,
   }
 }
+
+/**
+ * On a failed or needs-reauth target: its post had attachments that were never
+ * stored, because it was published now, straight from a local file. Rebuilt
+ * from the database, as a Retry is, it would go out as text alone, and a
+ * platform that allows a bare post (LinkedIn, Facebook) would publish it so.
+ * Such a target is never re-queued: `TenantScope.retryTarget` refuses it, and
+ * the worker refuses it again should anything else queue it.
+ */
+export const ATTACHMENTS_NOT_STORED_CODE = 'adspilot:attachments_not_stored'
+
+export const ATTACHMENTS_NOT_STORED_MESSAGE =
+  'Its attachments were not stored with it (it was published now, from a local file), so a retry would ' +
+  'publish the text without them. Publish it again from the file.'
+
+/** A target that must not be retried, because its attachments were never stored. */
+export function attachmentsNotStored(target: { readonly errorCode: string | null }): boolean {
+  return target.errorCode === ATTACHMENTS_NOT_STORED_CODE
+}
+
+/**
+ * The columns a failed publish writes to its target; the caller sets the state.
+ *
+ * When not every attachment was stored, the target is marked with
+ * ATTACHMENTS_NOT_STORED_CODE in place of the platform's own code. The column
+ * holds one code and this one decides what may happen next; the platform's
+ * reason stays in the message.
+ */
+export function failedColumns(
+  error: { readonly failureClass: string; readonly message: string; readonly platformCode?: string | undefined },
+  options: { readonly attachmentsStored: boolean },
+) {
+  return {
+    failureClass: error.failureClass,
+    platformMessage: error.message,
+    errorCode: options.attachmentsStored ? (error.platformCode ?? null) : ATTACHMENTS_NOT_STORED_CODE,
+  }
+}

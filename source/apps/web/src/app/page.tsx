@@ -193,11 +193,12 @@ export default async function Dashboard() {
                       />
                       {view.note.text !== null && <span>{view.note.text}</span>}
                     </div>
-                    {t.state === 'needs_reauth' && (
+                    {t.state === 'needs_reauth' && view.retry && (
                       <div className="text-[0.76rem] text-muted">
                         Reconnect this account first, then retry.
                       </div>
                     )}
+                    {view.noRetry !== undefined && <div className="text-[0.76rem] text-muted">{view.noRetry}</div>}
                   </div>
                   {/* Only failures get a retry button — a published target must
                       never be re-run, or it posts twice. */}

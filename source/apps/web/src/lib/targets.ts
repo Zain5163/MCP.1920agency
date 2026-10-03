@@ -1,4 +1,4 @@
-import { carriesNotice } from '@social-publisher/db'
+import { ATTACHMENTS_NOT_STORED_MESSAGE, attachmentsNotStored, carriesNotice } from '@social-publisher/db'
 
 /**
  * How the dashboard draws one target of a recent post.
@@ -25,6 +25,8 @@ export interface TargetView {
    * re-run would post a second copy.
    */
   readonly retry: boolean
+  /** Why a failure offers no Retry, shown in its place. */
+  readonly noRetry?: string
 }
 
 export function targetView(target: {
@@ -39,6 +41,21 @@ export function targetView(target: {
    */
   if (carriesNotice(target)) {
     return { label: 'uploaded', tone: 'warn', note: { kind: 'notice', text: target.platformMessage }, retry: false }
+  }
+  /**
+   * Published now from a local file, its attachments were never stored. A
+   * Retry would rebuild it without them and publish the text alone, so none
+   * is offered (and retryTarget would refuse one): the owner is told why, and
+   * how to send it instead.
+   */
+  if ((target.state === 'failed' || target.state === 'needs_reauth') && attachmentsNotStored(target)) {
+    return {
+      label: target.state,
+      tone: target.state === 'failed' ? 'bad' : 'plain',
+      note: { kind: 'failure', text: target.platformMessage },
+      retry: false,
+      noRetry: ATTACHMENTS_NOT_STORED_MESSAGE,
+    }
   }
   switch (target.state) {
     case 'published':

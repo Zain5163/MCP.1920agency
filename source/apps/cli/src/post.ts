@@ -22,7 +22,14 @@ import {
   type Platform,
   type PostDraft,
 } from '@social-publisher/core'
-import { TenantScope, db, disconnect, publishedColumns } from '@social-publisher/db'
+import {
+  ATTACHMENTS_NOT_STORED_MESSAGE,
+  TenantScope,
+  db,
+  disconnect,
+  failedColumns,
+  publishedColumns,
+} from '@social-publisher/db'
 import { MediaStore } from '@social-publisher/media'
 import { PublishService } from '@social-publisher/publisher'
 import { TokenVault, parseKey } from '@social-publisher/vault'
@@ -313,13 +320,18 @@ async function main(): Promise<void> {
   const tenantScope = new TenantScope(tenant.id)
 
   /**
-   * Scheduled path: persist the post, its media and one job per target, then stop.
-   * The worker picks it up when it is due.
+   * Stores the post with every attachment that was hosted, and says whether
+   * that was all of them.
    *
-   * Media rows are written here rather than at publish time because the worker
-   * runs in another process and rebuilds the draft purely from the database.
+   * The worker runs in another process and rebuilds a post from the database
+   * alone: at a scheduled slot, and when a failed target is retried from the
+   * dashboard. So hosted media rows are written on both paths; an immediate
+   * post used to store none, and a Retry of its failed target published the
+   * text without its document. An attachment that was not hosted (published
+   * now, straight from disk) cannot be stored; a target that then fails is
+   * marked so that it is never retried without it (failedColumns).
    */
-  if (scheduledFor !== undefined) {
+  const storePost = async (): Promise<{ id: string; attachmentsStored: boolean }> => {
     const post = await tenantScope.createPost({
       body,
       createdBy: 'cli',
@@ -345,6 +357,16 @@ async function main(): Promise<void> {
         data: { postId: post.id, mediaId: asset.id, position },
       })
     }
+    return { id: post.id, attachmentsStored: media.every((item) => uploaded.has(item.id)) }
+  }
+
+  /**
+   * Scheduled path: persist the post, its media and one job per target, then stop.
+   * The worker picks it up when it is due. Every attachment of a scheduled post
+   * was hosted above, or the command stopped there.
+   */
+  if (scheduledFor !== undefined) {
+    const post = await storePost()
 
     console.log(`\n  Scheduled for ${scheduledFor.toISOString()}:`)
     for (const connection of targets) {
@@ -376,11 +398,7 @@ async function main(): Promise<void> {
     store: credentialStore(),
   })
 
-  const post = await tenantScope.createPost({
-    body,
-    createdBy: 'cli',
-    ...(overrides !== undefined ? { overrides } : {}),
-  })
+  const post = await storePost()
 
   const report = await service.publish(
     draft,
@@ -416,9 +434,9 @@ async function main(): Promise<void> {
             publishedColumns(outcome.result!)
           : {
               state: 'failed',
-              failureClass: outcome.error!.failureClass,
-              platformMessage: outcome.error!.message,
-              errorCode: outcome.error!.platformCode ?? null,
+              // Marked when its attachments were not stored, so that no Retry
+              // ever rebuilds it without them.
+              ...failedColumns(outcome.error!, { attachmentsStored: post.attachmentsStored }),
             }),
       },
     })
@@ -433,6 +451,8 @@ async function main(): Promise<void> {
     } else {
       console.log(`    FAILED     ${outcome.displayName}`)
       console.log(`               ${outcome.error!.message}${outcome.error!.retryable ? '  [retryable]' : ''}`)
+      // The dashboard will not retry it, so say how it can be sent.
+      if (!post.attachmentsStored) console.log(`               NOTE: ${ATTACHMENTS_NOT_STORED_MESSAGE}`)
     }
   }
 

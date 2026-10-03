@@ -12,8 +12,11 @@ import {
 import { optional, required } from '@social-publisher/config'
 import { backoffMs, type Connection } from '@social-publisher/core'
 import {
+  ATTACHMENTS_NOT_STORED_CODE,
+  ATTACHMENTS_NOT_STORED_MESSAGE,
   MAX_ATTEMPTS,
   WORKER_ID,
+  attachmentsNotStored,
   claimNext,
   completeJob,
   db,
@@ -136,6 +139,27 @@ async function processOne(service: PublishService, vault: TokenVault): Promise<b
   if (target.platformPostId !== null) {
     await completeJob(job.jobId)
     log(`job ${job.jobId}: already published as ${target.platformPostId}, skipping`)
+    return true
+  }
+
+  /**
+   * A post published now from a local file never had its attachments stored.
+   * Rebuilt from the rows below it would go out as text alone, and a platform
+   * that allows a bare post would publish it so. retryTarget refuses to queue
+   * such a target; this refuses it again, should anything else ever queue it.
+   */
+  if (attachmentsNotStored(target)) {
+    await db().target.update({
+      where: { id: target.id },
+      data: {
+        state: 'failed',
+        failureClass: 'permanent',
+        platformMessage: ATTACHMENTS_NOT_STORED_MESSAGE,
+        errorCode: ATTACHMENTS_NOT_STORED_CODE,
+      },
+    })
+    await failJob(job.jobId, ATTACHMENTS_NOT_STORED_MESSAGE)
+    log(`job ${job.jobId}: REFUSED, nothing published — ${ATTACHMENTS_NOT_STORED_MESSAGE}`)
     return true
   }
 

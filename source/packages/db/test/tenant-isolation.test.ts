@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { after, before, describe, test } from 'node:test'
 
 import { db, disconnect } from '../src/client.ts'
+import { ATTACHMENTS_NOT_STORED_CODE } from '../src/target-codes.ts'
 import {
   TenantScope,
   TenantScopeError,
@@ -290,6 +291,30 @@ describe('retrying a failed target', () => {
       },
     })
     assert.equal(await alice.retryTarget(target.id), 'already_published')
+  })
+
+  test('a target whose attachments were never stored is not queued again', async () => {
+    // Published now from a local file: rebuilt from the database, a retry would
+    // publish the text without its document.
+    const post = await alice.createPost({ body: `no media ${tag}`, createdBy: 'test' })
+    const target = await db().target.create({
+      data: {
+        tenantId: aliceTenantId,
+        postId: post.id,
+        connectionId: aliceConnectionId,
+        state: 'failed',
+        failureClass: 'transient',
+        platformMessage: 'LinkedIn rejected the document upload (HTTP 503). Nothing was posted.',
+        errorCode: ATTACHMENTS_NOT_STORED_CODE,
+        idempotencyKey: `nomedia-${tag}`,
+      },
+    })
+
+    assert.equal(await alice.retryTarget(target.id), 'attachments_not_stored')
+    const after = await db().target.findUnique({ where: { id: target.id } })
+    assert.equal(after!.state, 'failed', 'left as it was')
+    assert.equal(after!.errorCode, ATTACHMENTS_NOT_STORED_CODE, 'still marked, so it stays refused')
+    assert.equal(await db().job.count({ where: { targetId: target.id } }), 0, 'nothing queued')
   })
 
   test("Bob cannot retry Alice's failed target", async () => {

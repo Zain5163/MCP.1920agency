@@ -1,7 +1,13 @@
 import { strict as assert } from 'node:assert'
 import { describe, test } from 'node:test'
 
-import { NOTICE_CODE, publishedColumns } from '@social-publisher/db'
+import {
+  ATTACHMENTS_NOT_STORED_CODE,
+  ATTACHMENTS_NOT_STORED_MESSAGE,
+  NOTICE_CODE,
+  failedColumns,
+  publishedColumns,
+} from '@social-publisher/db'
 
 import { targetView } from '../src/lib/targets.ts'
 
@@ -37,6 +43,31 @@ describe('the dashboard draws each target from what its row says', () => {
     // Before notices, a retry that succeeded kept the previous attempt's error.
     const view = targetView({ state: 'published', errorCode: null, platformMessage: 'Rate limited, try later' })
     assert.deepEqual(view, { label: 'published', tone: 'ok', retry: false })
+  })
+
+  test("finding #6, the reviewers' case: a failed post whose document was never stored offers no Retry, and says why", () => {
+    // What `post --document carousel.pdf --publish` now records when LinkedIn refuses the upload.
+    const row = {
+      state: 'failed',
+      ...failedColumns(
+        { failureClass: 'transient', message: 'LinkedIn rejected the document upload (HTTP 503). Nothing was posted.', platformCode: '503' },
+        { attachmentsStored: false },
+      ),
+    }
+    assert.equal(row.errorCode, ATTACHMENTS_NOT_STORED_CODE)
+
+    const view = targetView(row)
+    assert.equal(view.retry, false, 'a Retry would post the carousel text without its slides')
+    assert.equal(view.noRetry, ATTACHMENTS_NOT_STORED_MESSAGE)
+    assert.deepEqual(view.note, { kind: 'failure', text: row.platformMessage }, "the platform's reason is still shown")
+    assert.equal(view.label, 'failed')
+
+    // Stored attachments: the platform's own code is kept and Retry is offered.
+    const stored = { state: 'failed', ...failedColumns({ failureClass: 'transient', message: 'x', platformCode: '503' }, { attachmentsStored: true }) }
+    assert.equal(stored.errorCode, '503')
+    assert.equal(targetView(stored).retry, true)
+
+    assert.equal(targetView({ ...row, state: 'needs_reauth' }).retry, false, 'not after reconnecting either')
   })
 
   test('failures show their reason and offer a Retry; scheduled posts are amber', () => {
