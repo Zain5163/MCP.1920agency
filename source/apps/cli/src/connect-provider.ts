@@ -27,6 +27,7 @@ import {
 import { TokenVault, parseKey } from '@social-publisher/vault'
 
 import { waitForCallback } from './callback-server.ts'
+import { partialGrantRefusal } from './grant-check.ts'
 
 /**
  * `pnpm connect:provider <name>` — authorise any registered provider.
@@ -256,6 +257,15 @@ async function main(): Promise<void> {
   console.log('  Authorised. Exchanging tokens…')
 
   const credential = await provider.exchangeCode(code)
+
+  // Before discovery and before anything is stored: a channel found through a
+  // sign-in that cannot upload would be listed as ready and fail every post.
+  const refusal = partialGrantRefusal(provider, credential.grantedScopes, scopeBundles)
+  if (refusal !== undefined) {
+    console.error(`\n${refusal.map((line) => (line === '' ? '' : `  ${line}`)).join('\n')}\n`)
+    await disconnect()
+    process.exit(1)
+  }
 
   console.log('  Looking up which accounts this reaches…')
   const discovered = await provider.discover(credential.accessToken)
