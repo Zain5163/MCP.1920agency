@@ -1,6 +1,7 @@
 # What is planned
 
-**Updated 2026-10-02.** Everything here is **not built yet**. What exists today is
+**Updated 2026-10-03.** Everything here is **not built yet**, apart from a few
+items that are built but not yet proven live, which say so. What exists today is
 in `CURRENT-STATE.md`. Detail for each item is in `ROADMAP.md`, the decision
 records and the research files named beside it. When an item is built and
 proven, it moves to `CURRENT-STATE.md` and out of here.
@@ -21,15 +22,20 @@ Agency's own accounts.
 |---|---|---|---|
 | — | ~~**Facebook Page management**~~ built 2026-10-02 (CURRENT-STATE); was: read and reply to comments and reviews, hide spam, Messenger replies, insights | Owner's Page works without Meta review | ROADMAP 5b.7 |
 | 2 | **Google Business Profile posting** | Owner's priority #1; waiting on Google's access form (up to 14 days) | `architecture/google-suite-plan.md` |
-| 3 | **YouTube posting** | Uploads stay private until Google's audit passes | same |
-| 4 | **Search Console and Google Analytics** reads | | same |
+| 3 | **YouTube: prove it live** | Built and unit-tested 2026-10-02 (CURRENT-STATE 🟡), never run for real. Waits on the owner's Google Cloud steps (`SETUP.md` §8), then a first private upload; an upload that takes over about an hour stays unproven until one is tried. Uploads stay private until Google's audit passes | `architecture/2026-10-02-youtube-build-spec.md` |
+| 4 | **Search Console and Google Analytics** reads | | `architecture/google-suite-plan.md` |
 | 5 | **One-click tracking setup**: Tag Manager, GA4, Google Ads conversions, Search Console verified, events mapped; WordPress fully automatic, others one paste | | same |
 | 6 | **Google Ads** with Keyword Planner | Needs Basic access; customer use waits on Google's answer about MCP "proxies" | same, WAITING-LIST #15 |
 
 ## Social posting
 
+- Prove live what is built but only unit-tested (CURRENT-STATE 🟡): YouTube,
+  LinkedIn document posts and scheduled LinkedIn image posts.
 - Google Business Profile: posts, reviews and replies, insights (UK, Europe, Pakistan).
-- YouTube: upload, metadata, analytics.
+- YouTube beyond upload: analytics (its own consent, later), YouTube's own
+  scheduled publish time once the audit passes, and resuming an interrupted upload
+  where it stopped rather than from the beginning (needs the upload session stored,
+  which is a database change).
 - TikTok, X, Threads (credentials), Pinterest (Standard access), LinkedIn company page.
 - Comments and inbox management on every platform, not only Facebook.
 - Analytics and charts in the dashboard.
@@ -83,6 +89,13 @@ approval and adapter. Rule: no platform launches without its playbook (decision 
 - Per-client design system (gated by research first).
 - Serve only the playbook section a task needs, to protect the expertise
   (decision 0008).
+
+## Platform underneath
+
+- **A test database for the database tests.** The `auth` and `db` suites run
+  against the live Supabase database. On 2026-10-02 running them starved the live
+  publisher's connection pool, so until they have a database of their own they are
+  left out of routine test runs and run only at quiet times.
 
 ## Business and launch
 

@@ -1,6 +1,6 @@
 # What is built today
 
-**Updated 2026-10-02.** This file lists only what exists now. Everything planned
+**Updated 2026-10-03.** This file lists only what exists now. Everything planned
 is in `FUTURE-PLANS.md`. The history of how each piece was built and proven is in
 `PROJECT-LOG.md`.
 
@@ -21,11 +21,12 @@ Working name: **AdsPilot**. It is being renamed because the name is taken (see
 |---|---|---|
 | Facebook Page | ✅ token restored 2026-10-02 | 4 real posts earlier. Reconnected with all permissions; 35 Pages connected. Posting not re-proven yet: switch the Meta app back to Live first |
 | Instagram | ✅ token restored 2026-10-02 | 2 real posts earlier; 21 accounts connected |
-| LinkedIn personal profile | ✅ | Text, image and video posts, all proven 2026-09-26 |
-| LinkedIn document posts (PDF carousels) | 🟡 2026-10-02 | Built and unit-tested only, checked against LinkedIn's docs (`research/2026-10-02-linkedin-documents.md`). `post --document <pdf> --title "..."`; the approval script now schedules the week-1 carousels with it. No document has been posted for real; a scheduled one also needs the media bucket to accept PDFs (unchecked) |
+| LinkedIn personal profile | ✅ | Text, image and video posts proven 2026-09-26, published at once. Scheduled text proven 2026-10-02: the first of 11 queued posts went out unattended at 15:30:11 PKT (`urn:li:share:7511734273188626432`) |
+| LinkedIn scheduled image posts | 🟡 | Built and unit-tested only. The CLI puts the image in the media bucket when the post is scheduled, and the worker sends it to LinkedIn at the slot. Never run end to end; the LinkedIn approval script schedules image drafts this way |
+| LinkedIn document posts (PDF carousels) | 🟡 2026-10-02 | Built and unit-tested only, checked against LinkedIn's docs (`research/2026-10-02-linkedin-documents.md`). `post --document <pdf> --title "..."`; the approval script can schedule the week-1 carousels with it (none approved yet). When LinkedIn will not say whether the PDF finished processing, the post still goes out but carries a notice to check that its pages show. No document has been posted for real; a scheduled one also needs the media bucket to accept PDFs (unchecked) |
 | LinkedIn company page | ⏸ | Waiting on LinkedIn's approval |
 | Threads, Pinterest | 🟡 | Code built; no credentials yet. Pinterest Trial access shows pins only to the owner |
-| YouTube (Google connection) | 🟡 2026-10-02 | Built and unit-tested only: Google sign-in, resumable upload, title and AI disclosure. Never connected or uploaded for real; needs the owner's Google Cloud steps (`SETUP.md` §8). Uploads stay private, and are reported as private, until the YouTube API audit passes |
+| YouTube (Google connection) | 🟡 2026-10-02 | Built and unit-tested only: Google sign-in, resumable upload, title and AI disclosure, plus the fixes agreed in the 2026-10-02 review (`architecture/2026-10-02-review-findings.md`). Never connected or uploaded for real; needs the owner's Google Cloud steps (`SETUP.md` §8). Uploads stay private, and are reported as private, until the YouTube API audit passes. An upload taking over about an hour needs its own live test (`SETUP.md` §8) |
 | Google Business Profile, TikTok, X | not built | See `FUTURE-PLANS.md` |
 
 Around the posting:
@@ -92,13 +93,13 @@ Around the posting:
 | Error catalogue: every error says why and how to fix it | ✅ |
 | Audit log of every action | ✅ |
 | Database lockdown (RLS on all tables) | ✅ |
-| Tests | ✅ 658 passing, 13 workspaces typecheck clean |
+| Tests | ✅ 827 passing on 2026-10-03 in the eight suites that need no database (after the package-side review fixes); 13 workspaces typecheck clean. The auth and db suites (89 more at their last run, 2026-10-02) use the live database, so they are run only at quiet times until they have a test database (`FUTURE-PLANS.md`) |
 
 ## 6. Automations running on this PC
 
 | Task | When | What |
 |---|---|---|
-| `AdsPilot-Worker` | every 5 min | Publishes scheduled posts |
+| `AdsPilot-Worker` | every 5 min | Publishes scheduled posts. Windows stops a run after 30 minutes, and the task does not wake the PC |
 | `AdsPilot-Refresh` / `AdsPilot-Monitor` | daily | Renews tokens, warns on problems |
 | `Social-Publisher-Keepalive` | Sundays | Stops the free database pausing |
 | `LinkedIn-Content-Drafts` | 07:00 daily | Writes LinkedIn drafts. **Never posts**; the owner approves each one with `approve-linkedin-posts.cmd` (in `AI-Automation\LinkedIn-Content-Ops`) |
@@ -108,10 +109,15 @@ They run only while this PC is on.
 ## 7. Content and research done
 
 - LinkedIn strategy, 14-day calendar and 18 drafts (2–8 October), in
-  `Marketing-and-Content\LinkedIn-Content-System`.
+  `Marketing-and-Content\LinkedIn-Content-System`. 11 text posts were approved and
+  queued on 2026-10-02 and the first went out that day; 7 are still drafts (that
+  folder's `PROJECT-CONTEXT.md` says why).
 - Research: competitors, product name, Google suite, Conversions API,
-  personal-profile posting, LinkedIn (`research/`).
+  personal-profile posting, LinkedIn, LinkedIn documents, YouTube API facts,
+  Meta's official MCPs (`research/`).
 - Google suite plan with the owner's checklist (`architecture/google-suite-plan.md`).
+- The YouTube and LinkedIn-documents build spec, and its review with the fix agreed
+  for each finding (`architecture/2026-10-02-*.md`).
 - Decisions 0001–0008 (`decisions/`).
 
 ---
@@ -123,3 +129,11 @@ They run only while this PC is on.
 - Ads tools work only on the owner's own account (single-tenant by design until
   per-customer ad accounts exist).
 - Everything runs only while this PC is on.
+- A scheduled upload that takes more than 30 minutes cannot finish: Windows stops
+  the worker's run and the job starts over from the beginning (`SETUP.md` §8).
+  Very large videos are published now instead.
+- If the Google OAuth client's secret is changed or the client is deleted, every
+  Google refresh fails (`invalid_client`, `deleted_client`), and the vault marks
+  each YouTube channel as needing reconnection when it next refreshes, although
+  fixing `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` would be enough. The
+  2026-10-02 review's fixes do not cover this.

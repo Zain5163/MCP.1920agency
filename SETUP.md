@@ -210,14 +210,37 @@ and choose `YOUTUBE_DEFAULT_PRIVACY` (`private`, `unlisted` or `public`).
 Other things worth knowing:
 
 - **Quota:** 100 uploads a day for the whole project, reset at midnight Pacific
-  time. A quota error waits for the reset and retries; it never says "reconnect".
+  time; each channel also has its own daily upload limit. Neither error says
+  "reconnect". What happens next depends on how the video was sent:
+  - **Scheduled** (`--at`, or any post the worker publishes later): the worker
+    waits for the reset and tries again on its own.
+  - **Published now** (`pnpm post ... --publish` without `--at`, or
+    `publish_post`): the post is recorded as failed and nothing retries it.
+    Its video was never stored with the post, so the dashboard's Retry cannot
+    resend it either. Publish it again from the file once the limit has reset.
 - **Large videos:** publish them now, straight from disk
   (`pnpm post --video <file> --title "..." --platform youtube --publish`, or
   `publish_post` with a `localPath`). A *scheduled* post needs its file in the
   Supabase media bucket, which caps file size.
+- **Uploads over about an hour are unproven.** A Google access token lasts an
+  hour, so a longer upload renews it on the way and carries on where it was.
+  That has only been tested against a scripted Google, not with a real upload
+  that long.
+- **The worker stops after 30 minutes.** Scheduled posts are published by the
+  `AdsPilot-Worker` task, and Windows stops each of its runs after 30 minutes.
+  A scheduled upload still going then is cut off, and 15 to 20 minutes later
+  the job starts again from the beginning, so a video that needs more than 30
+  minutes to upload keeps starting over and never goes out on a schedule:
+  publish it now instead. A cut-off upload creates no video unless its final
+  chunk had already been sent, and only then can the restart leave a second
+  copy.
+- **"Sent, but not confirmed"** (`YOUTUBE_UPLOAD_UNCONFIRMED`): the whole video
+  reached YouTube but the reply was lost, so the video may already be on the
+  channel. Nothing retries it: look in YouTube Studio before publishing again.
 - **AI disclosure:** add `--synthetic` (or `syntheticMedia: true`) when the video
   contains realistic AI-generated or altered content. Every upload states it
-  either way, along with "not made for kids".
+  either way, along with "not made for kids". Only YouTube receives it through
+  its API: on Facebook, Instagram and LinkedIn, label the post in their app.
 - **Videos over 15 minutes** need a verified channel: https://www.youtube.com/verify.
 - **Reconnect only when needed.** Google keeps at most 100 refresh tokens per
   account for one client; each connect issues a new one and the oldest silently
