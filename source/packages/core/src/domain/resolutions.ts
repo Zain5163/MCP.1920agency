@@ -52,6 +52,7 @@ export type ErrorCode =
   | 'YOUTUBE_WRONG_CHANNEL'
   | 'YOUTUBE_CHANNEL_UPLOAD_LIMIT'
   | 'YOUTUBE_UPLOAD_UNCONFIRMED'
+  | 'YOUTUBE_UPLOAD_TOKEN_EXPIRED'
   // internal
   | 'UNKNOWN'
 
@@ -370,6 +371,22 @@ const CATALOGUE: Readonly<Record<ErrorCode, Omit<Resolution, 'code'>>> = {
       'Open YouTube Studio (https://studio.youtube.com) and look for the video under Content; a new upload can take a few minutes to appear',
       'If it is there, do not publish it again: change its title, privacy or other details in YouTube Studio if needed',
       'If it is still missing after about 15 minutes, publish it again',
+    ],
+    retryable: false,
+    needsHuman: true,
+  },
+  /**
+   * Its own code so the token running out mid-upload is not reported as a
+   * rate limit "retried automatically": a publish-now upload is never retried
+   * by anything, and retrying a long upload unchanged meets the same wall.
+   */
+  YOUTUBE_UPLOAD_TOKEN_EXPIRED: {
+    what: 'The YouTube upload stopped because its access token ran out partway through.',
+    why: 'A Google access token lasts an hour, so a long upload has to renew it as it goes, and this one could not: the app publishing it had no way to renew Google tokens (usually because GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are not set where it runs) or Google refused the app’s own client. YouTube then refused the rest of the file. An unfinished upload creates no video, so nothing was published.',
+    fix: [
+      'Check that GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are set in ~/.social-publisher/.env and match the OAuth client in Google Cloud',
+      'Publish the video again: it starts a fresh upload from the beginning',
+      'If it stops the same way again, run the status command and reconnect the channel with pnpm connect:provider google youtube in source/apps/cli',
     ],
     retryable: false,
     needsHuman: true,

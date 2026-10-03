@@ -21,8 +21,18 @@ import {
 
 export interface TargetSpec {
   readonly connection: Connection
-  /** Resolved by the caller from the vault. Never loaded here. */
-  readonly withCredential: <T>(fn: (accessToken: string) => Promise<T>) => Promise<T>
+  /**
+   * Resolved by the caller from the vault. Never loaded here.
+   *
+   * The caller may hand `fn` a second argument, `renew`: it renews the
+   * credential from inside the same vault callback, stores it, and resolves to
+   * the new access token. It reaches the adapter as
+   * `PublishContext.renewAccessToken`, so an upload that outlasts its token
+   * can carry on instead of starting again. Optional, and added after the
+   * fact: a caller that cannot renew passes only the token, and every adapter
+   * behaves as before.
+   */
+  readonly withCredential: <T>(fn: (accessToken: string, renew?: () => Promise<string>) => Promise<T>) => Promise<T>
 }
 
 export interface TargetOutcome {
@@ -165,12 +175,13 @@ export class PublishService {
     }
 
     try {
-      const result = await target.withCredential(async (accessToken) => {
+      const result = await target.withCredential(async (accessToken, renew) => {
         const ctx = {
           connection,
           credential: { accessToken },
           idempotencyKey: options.idempotencyKeyFor(connection.id),
           ...(options.signal !== undefined ? { signal: options.signal } : {}),
+          ...(renew !== undefined ? { renewAccessToken: renew } : {}),
         }
         return await adapter.publish(ctx, draft)
       })

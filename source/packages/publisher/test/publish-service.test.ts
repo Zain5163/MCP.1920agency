@@ -1,6 +1,10 @@
 import { strict as assert } from 'node:assert'
+import { mkdtemp, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { test, describe } from 'node:test'
 
+import { YouTubeAdapter } from '@social-publisher/adapters'
 import {
   CAPABILITIES,
   PublishError,
@@ -8,6 +12,7 @@ import {
   type Connection,
   type PlatformAdapter,
   type PostDraft,
+  type PublishContext,
   type PublishResult,
 } from '@social-publisher/core'
 
@@ -278,6 +283,108 @@ describe('publish', () => {
     const report = await svc.publish(draft(), [target(connection())], keys)
     assert.equal(report.failed[0]!.error!.message, 'unexpected')
     assert.equal(report.failed[0]!.error!.retryable, false)
+  })
+
+  test("hands the caller's renewal to the adapter as renewAccessToken, and nothing when there is none", async () => {
+    const contexts: PublishContext[] = []
+    const adapter: PlatformAdapter = {
+      platform: 'facebook_page',
+      capabilities: CAPABILITIES.facebook_page,
+      validate: () => ({ ok: true, issues: [] }),
+      publish: async (ctx) => {
+        contexts.push(ctx)
+        return { platformPostId: ctx.renewAccessToken === undefined ? 'no renewal' : await ctx.renewAccessToken() }
+      },
+    }
+    const renewing: TargetSpec = {
+      connection: connection({ id: 'a' }),
+      withCredential: async (fn) => await fn('TOKEN', async () => 'RENEWED'),
+    }
+    const report = await new PublishService([adapter]).publish(draft(), [renewing, target(connection({ id: 'b' }))], keys)
+
+    assert.deepEqual(
+      report.succeeded.map((o) => o.result!.platformPostId),
+      ['RENEWED', 'no renewal'],
+    )
+    // Absent, not undefined: an adapter tells "cannot renew" by the key's absence.
+    assert.equal('renewAccessToken' in contexts.find((c) => c.connection.id === 'b')!, false)
+  })
+
+  test('an upload that outlives its token finishes in one attempt when the caller renews inside the vault callback', async () => {
+    // The contract the apps follow: `renew` is built inside the vault callback
+    // from the adapter's refreshCredential, merges what the refresh returned
+    // into the credential (as the vault does, so the refresh token survives)
+    // and stores the result before handing the new token over.
+    const dir = await mkdtemp(join(tmpdir(), 'pub-yt-'))
+    const file = join(dir, 'clip.mp4')
+    const size = 3 * 262_144
+    await writeFile(file, Buffer.alloc(size, 1))
+
+    let stored: { accessToken: string; refreshToken?: string; expiresAt?: Date } = {
+      accessToken: 'ya29.OLD',
+      refreshToken: '1//KEEP',
+      expiresAt: new Date(Date.now() + 10 * 60_000),
+    }
+    const refreshCredential = async () => ({ accessToken: 'ya29.NEW', expiresAt: new Date(Date.now() + 3_600_000) })
+
+    const session = 'https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&upload_id=S1'
+    const puts: string[] = []
+    let held = 0
+    let sessions = 0
+    const fetchImpl = (async (url: string | URL | Request, init?: RequestInit) => {
+      const headers = (init?.headers as Record<string, string> | undefined) ?? {}
+      const auth = headers.Authorization ?? ''
+      if (String(url).includes('/youtube/v3/channels')) return new Response(JSON.stringify({ items: [{ id: 'UC1' }] }))
+      if (init?.method === 'POST') {
+        sessions += 1
+        return new Response(null, { status: 200, headers: { location: session } })
+      }
+      if (init?.method === 'GET') return new Response(JSON.stringify({ items: [{ status: { privacyStatus: 'private' } }] }))
+      const range = headers['Content-Range'] ?? ''
+      puts.push(`${range} ${auth}`)
+      // The old token runs out after the first chunk.
+      if (auth === 'Bearer ya29.OLD' && held > 0) return new Response(null, { status: 401 })
+      if (range.startsWith('bytes */')) return new Response(null, { status: 308, headers: { range: `bytes=0-${held - 1}` } })
+      const last = Number(/bytes \d+-(\d+)\//.exec(range)![1])
+      held = last + 1
+      if (held === size) {
+        return new Response(JSON.stringify({ id: 'VID1', status: { privacyStatus: 'private' } }), { status: 201 })
+      }
+      return new Response(null, { status: 308, headers: { range: `bytes=0-${last}` } })
+    }) as unknown as typeof globalThis.fetch
+
+    const youtube = new YouTubeAdapter({ fetch: fetchImpl, chunkBytes: 262_144, sleep: async () => {} })
+    const channel: TargetSpec = {
+      connection: connection({ id: 'conn-yt', platform: 'youtube', platformAccountId: 'UC1' }),
+      withCredential: async (fn) => {
+        let current = stored // what the vault hands to its callback
+        const renew = async (): Promise<string> => {
+          current = { ...current, ...(await refreshCredential()) }
+          stored = current // vault.store(connectionId, tenantId, current)
+          return current.accessToken
+        }
+        return await fn(current.accessToken, renew)
+      },
+    }
+
+    const report = await new PublishService([youtube]).publish(
+      draft({ body: 'Launch day\nWe shipped it.', media: [{ id: 'v', kind: 'video', mime: 'video/mp4', bytes: size, localPath: file }] }),
+      [channel],
+      keys,
+    )
+
+    assert.equal(report.allSucceeded, true, JSON.stringify(report.failed[0]?.error))
+    assert.equal(report.succeeded[0]!.result!.platformPostId, 'VID1')
+    assert.equal(sessions, 1, 'one session: the upload carried on rather than starting again')
+    assert.deepEqual(puts, [
+      `bytes 0-262143/${size} Bearer ya29.OLD`,
+      `bytes 262144-524287/${size} Bearer ya29.OLD`,
+      `bytes */${size} Bearer ya29.NEW`,
+      `bytes 262144-524287/${size} Bearer ya29.NEW`,
+      `bytes 524288-786431/${size} Bearer ya29.NEW`,
+    ])
+    assert.equal(stored.accessToken, 'ya29.NEW', 'the renewed token is stored for the next publish')
+    assert.equal(stored.refreshToken, '1//KEEP', 'merged, so the refresh token survives')
   })
 
   test('targets publish concurrently rather than one after another', async () => {

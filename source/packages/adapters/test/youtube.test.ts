@@ -387,12 +387,25 @@ describe('the resumable upload', () => {
     assert.equal(calls.length, 3, 'nothing is sent to a dead session')
   })
 
-  test('a token that runs out mid-upload is transient: the next attempt renews it', async () => {
-    const file = await videoFile(2 * SMALL_CHUNK)
-    const { yt } = make([MINE, STARTED, { status: 401 }], { chunkBytes: SMALL_CHUNK })
+  test('without a way to renew, a token refused mid-upload says so, with its own code, and is not left to a retry', async () => {
+    // It used to be transient with no code, promising "the next attempt renews
+    // the token and uploads again": MCP showed it as a rate limit "retried
+    // automatically", though a publish-now upload is never retried, and an
+    // upload longer than the token's life fails the same way every time.
+    // Three chunks, so the refusal lands on a middle one, not the last.
+    const file = await videoFile(3 * SMALL_CHUNK)
+    const { yt } = make([MINE, STARTED, ackChunk, { status: 401 }], { chunkBytes: SMALL_CHUNK })
     await assert.rejects(
       () => yt.publish(ctx(), draft({ media: [vid(file)] })),
-      (error: unknown) => error instanceof PublishError && error.failureClass === 'transient',
+      (error: unknown) => {
+        assert.ok(error instanceof PublishError)
+        assert.equal(error.code, 'YOUTUBE_UPLOAD_TOKEN_EXPIRED')
+        assert.equal(error.failureClass, 'permanent')
+        assert.equal(error.httpStatus, 401)
+        assert.match(error.message, /Nothing was published/)
+        assert.doesNotMatch(error.message, /next attempt/)
+        return true
+      },
     )
   })
 
@@ -979,6 +992,279 @@ describe('renewing the hour-long access token', () => {
       (error: unknown) => (error as { failureClass?: string }).failureClass === 'credential',
     )
     assert.equal(calls.length, 0)
+  })
+})
+
+describe('renewing the token during an upload', () => {
+  const renewing = (results: Array<string | Error>) => {
+    const asked: number[] = []
+    const renewAccessToken = async (): Promise<string> => {
+      asked.push(asked.length + 1)
+      const next = results[Math.min(asked.length - 1, results.length - 1)]!
+      if (next instanceof Error) throw next
+      return next
+    }
+    return { renewAccessToken, asked }
+  }
+
+  test('a token refused mid-upload is renewed once, and the same session is asked where to carry on', async () => {
+    const size = 3 * SMALL_CHUNK
+    const file = await videoFile(size)
+    const { renewAccessToken, asked } = renewing(['YT_TOKEN_2'])
+    const { yt, calls } = make(
+      [
+        MINE,
+        STARTED,
+        ackChunk, // chunk 1
+        { status: 401 }, // chunk 2: the hour ran out
+        { status: 308, headers: { range: `bytes=0-${SMALL_CHUNK - 1}` } }, // status: chunk 1 is still held
+        ackChunk, // chunk 2 again, with the new token
+        CREATED(), // chunk 3
+        READ_BACK(),
+      ],
+      { chunkBytes: SMALL_CHUNK },
+    )
+    const result = await yt.publish({ ...ctx(), renewAccessToken }, draft({ media: [vid(file)] }))
+
+    assert.equal(result.platformPostId, 'VID123')
+    assert.equal(asked.length, 1)
+    assert.equal(calls.filter((c) => c.method === 'POST').length, 1, 'one session: nothing starts again from byte 0')
+    const puts = calls.filter((c) => c.method === 'PUT')
+    assert.ok(puts.every((c) => c.url === SESSION))
+    assert.deepEqual(
+      puts.map((c) => [header(c, 'Content-Range'), header(c, 'Authorization')]),
+      [
+        [`bytes 0-262143/${size}`, 'Bearer YT_TOKEN'],
+        [`bytes 262144-524287/${size}`, 'Bearer YT_TOKEN'],
+        [`bytes */${size}`, 'Bearer YT_TOKEN_2'],
+        [`bytes 262144-524287/${size}`, 'Bearer YT_TOKEN_2'],
+        [`bytes 524288-786431/${size}`, 'Bearer YT_TOKEN_2'],
+      ],
+    )
+    assert.equal(header(calls.at(-1)!, 'Authorization'), 'Bearer YT_TOKEN_2', 'the read-back uses the token the upload ended with')
+  })
+
+  test('a refusal straight after renewing means the authorisation is gone: reconnect, not retry', async () => {
+    const file = await videoFile(2 * SMALL_CHUNK)
+    const { renewAccessToken, asked } = renewing(['YT_TOKEN_2'])
+    const { yt } = make([MINE, STARTED, { status: 401 }, { status: 401 }], { chunkBytes: SMALL_CHUNK })
+    await assert.rejects(
+      () => yt.publish({ ...ctx(), renewAccessToken }, draft({ media: [vid(file)] })),
+      (error: unknown) => {
+        assert.ok(error instanceof PublishError)
+        assert.equal(error.failureClass, 'credential')
+        assert.equal(error.code, 'GOOGLE_TOKEN_REVOKED')
+        assert.match(error.message, /reconnecting/)
+        return true
+      },
+    )
+    assert.equal(asked.length, 1, 'renewed once, not in a loop')
+  })
+
+  test('the same refusal after the last chunk went out is unconfirmed, not a reconnect', async () => {
+    const file = await videoFile(10)
+    const { renewAccessToken } = renewing(['YT_TOKEN_2'])
+    const { yt } = make([MINE, STARTED, { status: 401 }, { status: 401 }])
+    await assert.rejects(() => yt.publish({ ...ctx(), renewAccessToken }, draft({ media: [vid(file)] })), unconfirmedUpload)
+  })
+
+  test("a renewal Google refuses keeps Google's diagnosis: the authorisation is gone", async () => {
+    const file = await videoFile(2 * SMALL_CHUNK)
+    const refused = new PublishError('Google refused to renew the access token: Token has been expired or revoked.', {
+      failureClass: 'credential',
+      platformCode: 'invalid_grant',
+      code: 'GOOGLE_TOKEN_REVOKED',
+    })
+    const { renewAccessToken, asked } = renewing([refused])
+    const { yt } = make([MINE, STARTED, { status: 401 }], { chunkBytes: SMALL_CHUNK })
+    await assert.rejects(
+      () => yt.publish({ ...ctx(), renewAccessToken }, draft({ media: [vid(file)] })),
+      (error: unknown) => {
+        assert.ok(error instanceof PublishError)
+        assert.equal(error.failureClass, 'credential')
+        assert.equal(error.code, 'GOOGLE_TOKEN_REVOKED')
+        assert.match(error.message, /renewing it failed \(Google refused to renew the access token: Token has been expired or revoked\.\)/)
+        assert.match(error.message, /Nothing was published/)
+        return true
+      },
+    )
+    assert.equal(asked.length, 1, 'a refusal is not asked again')
+  })
+
+  test('a busy token endpoint is tried again, and the upload carries on', async () => {
+    const file = await videoFile(2 * SMALL_CHUNK)
+    const busy = new PublishError('Could not reach Google to renew the access token.', { failureClass: 'transient' })
+    const { renewAccessToken, asked } = renewing([busy, busy, 'YT_TOKEN_2'])
+    const { yt, sleeps } = make([MINE, STARTED, { status: 401 }, { status: 308 }, ackChunk, CREATED(), READ_BACK()], {
+      chunkBytes: SMALL_CHUNK,
+    })
+    const result = await yt.publish({ ...ctx(), renewAccessToken }, draft({ media: [vid(file)] }))
+    assert.equal(result.platformPostId, 'VID123')
+    assert.equal(asked.length, 3)
+    assert.equal(sleeps.length, 2, 'backs off between attempts')
+  })
+
+  test('a token endpoint that stays unreachable stops the upload as transient: nothing was published', async () => {
+    const file = await videoFile(2 * SMALL_CHUNK)
+    const busy = new PublishError('Could not reach Google to renew the access token.', { failureClass: 'transient' })
+    const { renewAccessToken } = renewing([busy])
+    const { yt } = make([MINE, STARTED, { status: 401 }], { chunkBytes: SMALL_CHUNK, maxResumeAttempts: 1 })
+    await assert.rejects(
+      () => yt.publish({ ...ctx(), renewAccessToken }, draft({ media: [vid(file)] })),
+      (error: unknown) => {
+        assert.ok(error instanceof PublishError)
+        assert.equal(error.failureClass, 'transient')
+        assert.equal(error.code, 'PLATFORM_UNREACHABLE')
+        assert.match(error.message, /Nothing was published/)
+        return true
+      },
+    )
+  })
+
+  test('a renewal that fails for any other reason needs a person, with the mid-upload diagnosis', async () => {
+    for (const failure of [
+      new PublishError('Google refused to renew the access token: Unauthorized. Check GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.', {
+        failureClass: 'permanent',
+        platformCode: 'invalid_client',
+      }),
+      new Error('the credential store is unreachable'),
+    ]) {
+      const file = await videoFile(2 * SMALL_CHUNK)
+      const { renewAccessToken } = renewing([failure])
+      const { yt } = make([MINE, STARTED, { status: 401 }], { chunkBytes: SMALL_CHUNK })
+      await assert.rejects(
+        () => yt.publish({ ...ctx(), renewAccessToken }, draft({ media: [vid(file)] })),
+        (error: unknown) => {
+          assert.ok(error instanceof PublishError)
+          assert.equal(error.failureClass, 'permanent', failure.message)
+          assert.equal(error.code, 'YOUTUBE_UPLOAD_TOKEN_EXPIRED', failure.message)
+          assert.ok(error.message.includes(failure.message))
+          return true
+        },
+      )
+    }
+  })
+})
+
+describe('an upload longer than a token lasts', () => {
+  const MINUTE = 60_000
+
+  /**
+   * A Google that refuses any access token more than an hour old, which is
+   * what the adapter assumes: Google's guide lists Authorization on every
+   * chunk PUT, though whether an open session re-checks it has not been seen
+   * live. Each chunk takes ten minutes of a fake clock, so eight chunks are
+   * eighty minutes of upload.
+   */
+  function hourLongTokens(options: { firstTokenAgeMinutes?: number; renewFailures?: number } = {}) {
+    let clock = Date.parse('2026-10-03T10:00:00Z')
+    const issuedAt = new Map<string, number>([['YT_TOKEN', clock - (options.firstTokenAgeMinutes ?? 0) * MINUTE]])
+    let renewFailuresLeft = options.renewFailures ?? 0
+    const renewals: string[] = []
+    const refusals: string[] = []
+    let sessions = 0
+    let held = 0
+
+    const renewAccessToken = async (): Promise<string> => {
+      if (renewFailuresLeft > 0) {
+        renewFailuresLeft -= 1
+        throw new PublishError('Could not reach Google to renew the access token.', { failureClass: 'transient' })
+      }
+      const next = `YT_TOKEN_${renewals.length + 2}`
+      renewals.push(next)
+      issuedAt.set(next, clock)
+      return next
+    }
+
+    const fetchImpl = (async (url: string | URL | Request, init?: RequestInit) => {
+      const address = String(url)
+      const method = init?.method ?? 'GET'
+      const headers = (init?.headers as Record<string, string> | undefined) ?? {}
+      const token = (headers.Authorization ?? '').replace('Bearer ', '')
+      const issued = issuedAt.get(token)
+      if (issued === undefined || clock - issued >= 60 * MINUTE) {
+        refusals.push(`${method} ${token} at minute ${(clock - Date.parse('2026-10-03T10:00:00Z')) / MINUTE}`)
+        return new Response(JSON.stringify(googleFailure(401, 'authError', 'Invalid Credentials').body), { status: 401 })
+      }
+      if (address.includes('/youtube/v3/channels')) return new Response(JSON.stringify(MINE.body))
+      if (method === 'POST') {
+        sessions += 1
+        return new Response(null, { status: 200, headers: { location: SESSION } })
+      }
+      if (method === 'GET') return new Response(JSON.stringify(READ_BACK().body))
+
+      const range = headers['Content-Range'] ?? ''
+      if (range.startsWith('bytes */')) {
+        return new Response(null, { status: 308, headers: held > 0 ? { range: `bytes=0-${held - 1}` } : {} })
+      }
+      clock += 10 * MINUTE
+      const [, , last, total] = /bytes (\d+)-(\d+)\/(\d+)/.exec(range)!.map(Number) as [number, number, number, number]
+      held = last + 1
+      if (held === total) return new Response(JSON.stringify(CREATED().body), { status: 201 })
+      return new Response(null, { status: 308, headers: { range: `bytes=0-${last}` } })
+    }) as unknown as typeof globalThis.fetch
+
+    const adapter = new YouTubeAdapter({
+      fetch: fetchImpl,
+      chunkBytes: SMALL_CHUNK,
+      sleep: async () => {},
+      now: () => new Date(clock),
+    })
+    return { adapter, renewAccessToken, renewals, refusals, sessions: () => sessions }
+  }
+
+  test('an eighty-minute upload renews ahead of time and finishes in one session, without a refusal', async () => {
+    // Before the fix every attempt died at the hour mark and started again at
+    // byte 0, so an upload this long could never finish.
+    const file = await videoFile(8 * SMALL_CHUNK)
+    const google = hourLongTokens()
+    const result = await google.adapter.publish(
+      { ...ctx(), renewAccessToken: google.renewAccessToken },
+      draft({ media: [vid(file)] }),
+    )
+    assert.equal(result.platformPostId, 'VID123')
+    assert.deepEqual(google.renewals, ['YT_TOKEN_2'], 'once, at the first chunk after 45 minutes')
+    assert.deepEqual(google.refusals, [])
+    assert.equal(google.sessions(), 1)
+    assert.doesNotMatch(result.notice ?? '', /confirm it failed/, 'the read-back worked with the renewed token')
+  })
+
+  test('a token handed over with ten minutes left is renewed when YouTube refuses it, and the upload carries on', async () => {
+    // The vault passes on any token with more than five minutes left, so a
+    // publish can start on a nearly spent one.
+    const file = await videoFile(3 * SMALL_CHUNK)
+    const google = hourLongTokens({ firstTokenAgeMinutes: 50 })
+    const result = await google.adapter.publish(
+      { ...ctx(), renewAccessToken: google.renewAccessToken },
+      draft({ media: [vid(file)] }),
+    )
+    assert.equal(result.platformPostId, 'VID123')
+    assert.deepEqual(google.refusals, ['PUT YT_TOKEN at minute 10'])
+    assert.deepEqual(google.renewals, ['YT_TOKEN_2'])
+    assert.equal(google.sessions(), 1)
+  })
+
+  test('an early renewal that fails is not an error: the token is used until YouTube refuses it', async () => {
+    const file = await videoFile(8 * SMALL_CHUNK)
+    const google = hourLongTokens({ renewFailures: 1 })
+    const result = await google.adapter.publish(
+      { ...ctx(), renewAccessToken: google.renewAccessToken },
+      draft({ media: [vid(file)] }),
+    )
+    assert.equal(result.platformPostId, 'VID123')
+    assert.deepEqual(google.refusals, ['PUT YT_TOKEN at minute 60'], 'tried early once, then renewed on the refusal')
+    assert.deepEqual(google.renewals, ['YT_TOKEN_2'])
+    assert.equal(google.sessions(), 1)
+  })
+
+  test('without a way to renew, the same upload stops at the hour with its own diagnosis', async () => {
+    const file = await videoFile(8 * SMALL_CHUNK)
+    const google = hourLongTokens()
+    await assert.rejects(
+      () => google.adapter.publish(ctx(), draft({ media: [vid(file)] })),
+      (error: unknown) => error instanceof PublishError && error.code === 'YOUTUBE_UPLOAD_TOKEN_EXPIRED',
+    )
+    assert.deepEqual(google.refusals, ['PUT YT_TOKEN at minute 60'])
   })
 })
 

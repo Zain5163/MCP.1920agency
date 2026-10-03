@@ -10,6 +10,7 @@ import {
   validateAgainstCapabilities,
   type Capabilities,
   type Credential,
+  type FailureClass,
   type Platform,
   type PlatformAdapter,
   type PostDraft,
@@ -104,6 +105,19 @@ const RESUMABLE_STATUSES: ReadonlySet<number> = new Set([500, 502, 503, 504])
 const LONGEST_INLINE_WAIT_MS = 60_000
 
 /**
+ * How long a token is used before the upload renews it unprompted.
+ *
+ * A Google access token lasts an hour. Renewing at 45 minutes leaves a quarter
+ * of an hour for the chunk in flight, far longer than an 8 MiB chunk takes on
+ * any line an upload this long would survive, at the cost of one token call
+ * per 45 minutes of upload. The adapter cannot know how old the token already
+ * was when it was handed over (the vault passes on anything with more than
+ * five minutes left), so this counts from when the publish received it, and a
+ * token that runs out sooner is still renewed when YouTube refuses it.
+ */
+const RENEW_TOKEN_AFTER_MS = 45 * 60_000
+
+/**
  * Added to a missing-media error at publish time. Validation before scheduling
  * passes with the local file attached; the worker then rebuilds the draft from
  * the database, which holds the video only if it was hosted.
@@ -151,6 +165,8 @@ export interface YouTubeAdapterOptions {
   readonly retryBaseMs?: number
   /** How to wait between resume attempts. Injected so tests do not sleep. */
   readonly sleep?: (ms: number) => Promise<void>
+  /** The clock that decides when a token is old enough to renew. Injected so tests can move time. */
+  readonly now?: () => Date
 }
 
 /** The parts of a video resource this adapter reads. */
@@ -204,6 +220,7 @@ export class YouTubeAdapter implements PlatformAdapter {
   readonly #maxResumeAttempts: number
   readonly #retryBaseMs: number
   readonly #sleep: (ms: number) => Promise<void>
+  readonly #now: () => Date
 
   constructor(options: YouTubeAdapterOptions = {}) {
     const chunkBytes = options.chunkBytes ?? YOUTUBE_DEFAULT_CHUNK_BYTES
@@ -229,6 +246,7 @@ export class YouTubeAdapter implements PlatformAdapter {
           setTimeout(resolve, ms)
         })
       })
+    this.#now = options.now ?? (() => new Date())
 
     if (options.oauth !== undefined) {
       const oauth = new GoogleOAuth({
@@ -328,10 +346,11 @@ export class YouTubeAdapter implements PlatformAdapter {
     }
 
     const requested: YouTubePrivacy = this.#audited ? this.#privacy : 'private'
+    const token = new PublishToken(ctx, this.#now)
 
     // Before anything is opened or sent: a token for another channel must not
     // upload anywhere.
-    await this.#checkChannel(ctx)
+    await this.#checkChannel(ctx, token)
 
     const source = await openMedia(video, this.#fetch, ctx.signal !== undefined ? { signal: ctx.signal } : {})
     let created: VideoResource
@@ -348,7 +367,7 @@ export class YouTubeAdapter implements PlatformAdapter {
 
       // YouTube accepts any video/* type, or application/octet-stream for the rest.
       const contentType = video.mime.startsWith('video/') ? video.mime : 'application/octet-stream'
-      const session = await this.#startSession(ctx, {
+      const session = await this.#startSession(ctx, token, {
         title: title.text,
         description: bodyForPlatform(draft, this.platform),
         privacy: requested,
@@ -356,7 +375,7 @@ export class YouTubeAdapter implements PlatformAdapter {
         contentType,
         size: source.size,
       })
-      created = await this.#sendFile(ctx, session, source, contentType)
+      created = await this.#sendFile(ctx, token, session, source, contentType)
     } finally {
       // Closes the handle and removes any temporary download, whatever happened.
       await source.close()
@@ -364,7 +383,7 @@ export class YouTubeAdapter implements PlatformAdapter {
 
     // The video exists from here on. Nothing below may throw: a throw would
     // make the worker retry, and a retry is a second copy of the video.
-    const readBack = await this.#readPrivacy(ctx, created.id)
+    const readBack = await this.#readPrivacy(ctx, token, created.id)
     const applied = readBack ?? created.status?.privacyStatus
     const notice = privacyNotice({
       audited: this.#audited,
@@ -409,12 +428,13 @@ export class YouTubeAdapter implements PlatformAdapter {
    * is this connection's. Costs one quota unit, which is cheap insurance
    * against putting a video on the wrong channel.
    */
-  async #checkChannel(ctx: PublishContext): Promise<void> {
+  async #checkChannel(ctx: PublishContext, token: PublishToken): Promise<void> {
     const url = new URL(`${API_BASE}/channels`)
     url.searchParams.set('part', 'id')
     url.searchParams.set('mine', 'true')
     const data = await this.#getJson<{ items?: ReadonlyArray<{ id?: string }> }>(
       ctx,
+      token.value,
       url.toString(),
       'Checking which YouTube channel the token belongs to',
     )
@@ -444,6 +464,7 @@ export class YouTubeAdapter implements PlatformAdapter {
   /** Opens a resumable session with the metadata, and returns its address. */
   async #startSession(
     ctx: PublishContext,
+    token: PublishToken,
     upload: {
       readonly title: string
       readonly description: string
@@ -480,7 +501,7 @@ export class YouTubeAdapter implements PlatformAdapter {
       const init: RequestInit = {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${ctx.credential.accessToken}`,
+          Authorization: `Bearer ${token.value}`,
           'Content-Type': 'application/json; charset=UTF-8',
           // The real length from disk, never the declared one: Google holds the
           // upload to exactly this many bytes.
@@ -534,9 +555,18 @@ export class YouTubeAdapter implements PlatformAdapter {
    * video itself is a permanent YOUTUBE_UPLOAD_UNCONFIRMED: a retry, by the
    * worker or by an owner taking "nothing was published" at its word, would
    * put the video on the channel twice.
+   *
+   * The access token can run out partway, since an upload can take longer
+   * than the hour a Google token lasts. When the caller lent a way to renew
+   * it, the token is renewed ahead of time once it has been in use for 45
+   * minutes, and again whenever YouTube refuses it; after a refusal this same
+   * session is asked where to carry on, because the bytes it holds outlive
+   * the token they were sent with. Without that, an upload longer than the
+   * token's remaining life could never finish, however often it was retried.
    */
   async #sendFile(
     ctx: PublishContext,
+    token: PublishToken,
     session: string,
     source: MediaSource,
     contentType: string,
@@ -544,6 +574,12 @@ export class YouTubeAdapter implements PlatformAdapter {
     let offset = 0
     let failures = 0
     let mustAsk = false
+    /**
+     * True from a renewal forced by a refusal until a reply shows the new
+     * token was accepted. A refusal in between means the authorisation itself
+     * is gone, not an hour that ran out, and renewing again would only loop.
+     */
+    let renewedJustNow = false
     /**
      * Set the moment a request carrying the file's last byte goes out, and
      * cleared only by a 308 showing the session still lacks bytes, the one
@@ -570,11 +606,12 @@ export class YouTubeAdapter implements PlatformAdapter {
           { failureClass: 'transient' },
         )
       }
+      await token.renewIfOld()
       const asking = mustAsk || offset >= source.size
       if (!asking && offset + this.#chunkBytes >= source.size) finalSent = true
       const reply = asking
-        ? await this.#askStatus(ctx, session, source.size)
-        : await this.#putChunk(ctx, session, source, offset, contentType)
+        ? await this.#askStatus(ctx, token, session, source.size)
+        : await this.#putChunk(ctx, token, session, source, offset, contentType)
       mustAsk = false
 
       switch (reply.kind) {
@@ -593,21 +630,49 @@ export class YouTubeAdapter implements PlatformAdapter {
             { failureClass: 'transient', httpStatus: 404 },
           )
         case 'unauthorised':
-          if (finalSent) throw unconfirmed('YouTube stopped accepting the access token, so the upload session could not be asked whether it finished')
-          // An hour-long token can run out in the middle of a long upload. The
-          // next attempt renews it, and its channel check catches a token that
-          // was revoked rather than expired.
-          throw new PublishError(
-            'YouTube stopped accepting the access token partway through the upload, most likely because it expired. ' +
-              'Nothing was published; the next attempt renews the token and uploads again.',
-            { failureClass: 'transient', httpStatus: 401 },
-          )
+          if (renewedJustNow) {
+            if (finalSent) {
+              throw unconfirmed('YouTube refused the access token even after it was renewed, so the upload session could not be asked whether it finished')
+            }
+            throw new PublishError(
+              'YouTube refused the access token partway through the upload and refused the renewed one too, so this channel needs reconnecting. ' +
+                'Nothing was published: an unfinished upload creates no video.',
+              { failureClass: 'credential', code: 'GOOGLE_TOKEN_REVOKED', httpStatus: 401 },
+            )
+          }
+          if (!token.canRenew) {
+            if (finalSent) {
+              throw unconfirmed('YouTube stopped accepting the access token, and there was no way to renew it to ask the upload session whether it finished')
+            }
+            // Not transient: a retry without renewal meets the same wall on
+            // any upload longer than the token's remaining life, and a
+            // publish-now upload is never retried by anything anyway.
+            throw new PublishError(
+              'YouTube stopped accepting the access token partway through the upload, most likely because the hour-long token ran out, ' +
+                'and this publish had no way to renew it. Nothing was published: an unfinished upload creates no video.',
+              { failureClass: 'permanent', code: 'YOUTUBE_UPLOAD_TOKEN_EXPIRED', httpStatus: 401 },
+            )
+          }
+          try {
+            await this.#renewAfterRefusal(token)
+          } catch (cause) {
+            if (finalSent) {
+              throw unconfirmed(`YouTube stopped accepting the access token, and renewing it to ask the upload session failed (${describeFailure(cause)})`, cause)
+            }
+            throw renewalFailed(cause)
+          }
+          // The session keeps what it holds under the new token: ask it where
+          // to carry on, rather than starting the file again.
+          renewedJustNow = true
+          mustAsk = true
+          continue
         case 'refused':
           if (finalSent) {
             throw unconfirmed(`YouTube answered with an error instead: ${reply.error.platformMessage ?? reply.error.message}`, reply.error)
           }
           throw reply.error
         case 'incomplete': {
+          renewedJustNow = false
           // The only reply that proves the video does not exist yet.
           if (reply.received < source.size) finalSent = false
           const moved = reply.received > offset
@@ -662,8 +727,27 @@ export class YouTubeAdapter implements PlatformAdapter {
     }
   }
 
+  /**
+   * Renews a token YouTube refused. A failure the renewal calls transient (the
+   * token endpoint unreachable or busy) is tried again with the same backoff
+   * as an interrupted chunk, since the upload so far is worth a short wait;
+   * anything else is final and thrown as it came.
+   */
+  async #renewAfterRefusal(token: PublishToken): Promise<void> {
+    for (let attempt = 1; ; attempt += 1) {
+      try {
+        await token.renew()
+        return
+      } catch (error) {
+        if (failureClassOf(error) !== 'transient' || attempt > this.#maxResumeAttempts) throw error
+        await this.#sleep(backoffMs(attempt, { baseMs: this.#retryBaseMs, maxMs: 32_000 }))
+      }
+    }
+  }
+
   async #putChunk(
     ctx: PublishContext,
+    token: PublishToken,
     session: string,
     source: MediaSource,
     offset: number,
@@ -672,19 +756,20 @@ export class YouTubeAdapter implements PlatformAdapter {
     const last = Math.min(offset + this.#chunkBytes, source.size) - 1
     // Read only now, so one chunk at a time is in memory however large the file.
     const bytes = await source.read(offset, last)
-    return await this.#put(ctx, session, bytes, {
+    return await this.#put(ctx, token, session, bytes, {
       'Content-Type': contentType,
       'Content-Range': `bytes ${offset}-${last}/${source.size}`,
     })
   }
 
   /** An empty PUT that asks the session how much it holds. */
-  async #askStatus(ctx: PublishContext, session: string, size: number): Promise<UploadReply> {
-    return await this.#put(ctx, session, new Uint8Array(0), { 'Content-Range': `bytes */${size}` })
+  async #askStatus(ctx: PublishContext, token: PublishToken, session: string, size: number): Promise<UploadReply> {
+    return await this.#put(ctx, token, session, new Uint8Array(0), { 'Content-Range': `bytes */${size}` })
   }
 
   async #put(
     ctx: PublishContext,
+    token: PublishToken,
     session: string,
     body: Uint8Array,
     headers: Record<string, string>,
@@ -693,7 +778,8 @@ export class YouTubeAdapter implements PlatformAdapter {
     try {
       const init: RequestInit = {
         method: 'PUT',
-        headers: { Authorization: `Bearer ${ctx.credential.accessToken}`, ...headers },
+        // Read at send time: a renewal between two chunks must reach the next one.
+        headers: { Authorization: `Bearer ${token.value}`, ...headers },
         body,
         // A 308 here means "send more", not "go elsewhere".
         redirect: 'manual',
@@ -763,14 +849,19 @@ export class YouTubeAdapter implements PlatformAdapter {
    * documents no flag for "locked private", so comparing this with what was
    * asked for is the only honest check. Never throws: the video already exists,
    * and failing now would have it uploaded again.
+   *
+   * It uses the token the upload ended with, renewed first if it has grown
+   * old: after an hour-long upload the one the publish began with is dead.
    */
-  async #readPrivacy(ctx: PublishContext, videoId: string): Promise<string | undefined> {
+  async #readPrivacy(ctx: PublishContext, token: PublishToken, videoId: string): Promise<string | undefined> {
     try {
+      await token.renewIfOld()
       const url = new URL(`${API_BASE}/videos`)
       url.searchParams.set('part', 'status')
       url.searchParams.set('id', videoId)
       const data = await this.#getJson<{ items?: ReadonlyArray<{ status?: { privacyStatus?: string } }> }>(
         ctx,
+        token.value,
         url.toString(),
         'Reading back the uploaded video',
       )
@@ -780,12 +871,12 @@ export class YouTubeAdapter implements PlatformAdapter {
     }
   }
 
-  async #getJson<T>(ctx: PublishContext, url: string, what: string): Promise<T> {
+  async #getJson<T>(ctx: PublishContext, accessToken: string, url: string, what: string): Promise<T> {
     let response: Response
     try {
       const init: RequestInit = {
         method: 'GET',
-        headers: { Authorization: `Bearer ${ctx.credential.accessToken}` },
+        headers: { Authorization: `Bearer ${accessToken}` },
       }
       if (ctx.signal !== undefined) init.signal = ctx.signal
       response = await this.#fetch(url, init)
@@ -901,6 +992,114 @@ function privacyNotice(outcome: {
 }
 
 /**
+ * The access token one publish is using, and the means to replace it.
+ *
+ * An upload can outlast Google's hour-long access token, but a token exists
+ * only inside the vault's callback, so the adapter cannot load a new one: the
+ * caller lends `renewAccessToken` for the length of the publish. This keeps
+ * whichever token is current, so every request after a renewal carries the
+ * new one.
+ *
+ * One per publish, never one per adapter: a single adapter serves every
+ * channel, and a token kept on the instance could cross from one channel's
+ * upload into another's.
+ */
+class PublishToken {
+  #value: string
+  #obtainedAt: number
+  #earlyRenewalTried = false
+  readonly #renew: (() => Promise<string>) | undefined
+  readonly #now: () => Date
+
+  constructor(ctx: PublishContext, now: () => Date) {
+    this.#value = ctx.credential.accessToken
+    this.#renew = ctx.renewAccessToken
+    this.#now = now
+    this.#obtainedAt = now().getTime()
+  }
+
+  get value(): string {
+    return this.#value
+  }
+
+  get canRenew(): boolean {
+    return this.#renew !== undefined
+  }
+
+  /** Replaces the token now. Rejects with whatever the caller's renewal rejected with. */
+  async renew(): Promise<void> {
+    if (this.#renew === undefined) {
+      throw new PublishError('No way to renew the access token was given for this publish.', { failureClass: 'permanent' })
+    }
+    this.#value = await this.#renew()
+    this.#obtainedAt = this.#now().getTime()
+    this.#earlyRenewalTried = false
+  }
+
+  /**
+   * Renews ahead of expiry once the token has been in use for
+   * RENEW_TOKEN_AFTER_MS, so a long upload never meets an expired token.
+   *
+   * Best effort, and tried once per token. A failure here is not an error: the
+   * token may well have minutes left, and if it runs out YouTube's refusal is
+   * handled where it happens. Trying again before every chunk would only call
+   * a token endpoint that is down once per chunk.
+   */
+  async renewIfOld(): Promise<void> {
+    if (this.#renew === undefined || this.#earlyRenewalTried) return
+    if (this.#now().getTime() - this.#obtainedAt < RENEW_TOKEN_AFTER_MS) return
+    this.#earlyRenewalTried = true
+    try {
+      await this.renew()
+    } catch {
+      // Carry on with the current token; a refusal is renewed when it comes.
+    }
+  }
+}
+
+/**
+ * The error for a token YouTube refused mid-upload that could not be renewed.
+ *
+ * The renewal's own class decides what it means: Google refusing the refresh
+ * token (`invalid_grant`) is a reconnect, a token endpoint that stayed busy is
+ * worth trying later, and anything else, such as a misconfigured OAuth
+ * client, needs a person. The renewal's code is kept when it named one, so
+ * the diagnosis stays precise.
+ */
+function renewalFailed(cause: unknown): PublishError {
+  const failureClass = failureClassOf(cause) ?? 'permanent'
+  const named = cause instanceof PublishError ? cause.code : undefined
+  const unreachable = failureClass === 'transient' && cause instanceof PublishError && cause.httpStatus === undefined
+  const code =
+    named ??
+    (failureClass === 'credential'
+      ? 'GOOGLE_TOKEN_REVOKED'
+      : failureClass === 'permanent'
+        ? 'YOUTUBE_UPLOAD_TOKEN_EXPIRED'
+        : unreachable
+          ? 'PLATFORM_UNREACHABLE'
+          : undefined)
+  return new PublishError(
+    `YouTube stopped accepting the access token partway through the upload, and renewing it failed (${describeFailure(cause)}). ` +
+      'Nothing was published: an unfinished upload creates no video.',
+    { failureClass, httpStatus: 401, cause, ...(code !== undefined ? { code } : {}) },
+  )
+}
+
+/**
+ * The failure class an error carries, read by duck typing: the renewal comes
+ * from the caller, and its errors need not be this package's PublishError.
+ */
+function failureClassOf(error: unknown): FailureClass | undefined {
+  const value = typeof error === 'object' && error !== null ? (error as { failureClass?: unknown }).failureClass : undefined
+  return value === 'transient' || value === 'credential' || value === 'permanent' ? value : undefined
+}
+
+function describeFailure(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}
+
+/**
  * The error for an upload whose last byte went out but whose outcome is not
  * known.
  *
@@ -912,7 +1111,7 @@ function privacyNotice(outcome: {
  */
 function unconfirmed(why: string, cause?: unknown): PublishError {
   return new PublishError(
-    `The whole video was sent to YouTube, but YouTube's reply was lost: ${why}. ` +
+    `The whole video was sent to YouTube, but YouTube never confirmed the upload: ${why}. ` +
       'It may already be on the channel, so check YouTube Studio before publishing it again.',
     { failureClass: 'permanent', code: 'YOUTUBE_UPLOAD_UNCONFIRMED', ...(cause !== undefined ? { cause } : {}) },
   )

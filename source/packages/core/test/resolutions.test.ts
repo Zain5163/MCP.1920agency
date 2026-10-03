@@ -80,9 +80,19 @@ describe('classification steers agent behaviour', () => {
       'YOUTUBE_WRONG_CHANNEL',
       'YOUTUBE_CHANNEL_UPLOAD_LIMIT',
       'YOUTUBE_UPLOAD_UNCONFIRMED',
+      'YOUTUBE_UPLOAD_TOKEN_EXPIRED',
     ] as const) {
       assert.ok(codes.includes(expected), `missing catalogue entry: ${expected}`)
     }
+  })
+
+  test('a token that ran out mid-upload is not passed off as a rate limit that retries itself', () => {
+    // Without its own code it was shown as RATE_LIMITED, "retried automatically",
+    // though nothing retries a publish-now upload.
+    const r = resolutionFor('YOUTUBE_UPLOAD_TOKEN_EXPIRED')
+    assert.equal(r.retryable, false)
+    assert.doesNotMatch(formatResolution(r), /retried automatically/)
+    assert.ok(r.fix.some((step) => step.includes('GOOGLE_CLIENT_ID')))
   })
 
   test('an upload whose reply was lost is never retried, and says to look in YouTube Studio first', () => {

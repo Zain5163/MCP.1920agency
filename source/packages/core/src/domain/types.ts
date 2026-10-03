@@ -137,6 +137,26 @@ export interface PublishContext {
    */
   readonly idempotencyKey: string
   readonly signal?: AbortSignal
+  /**
+   * Renews the access token and resolves to the new one, for a publish that
+   * outlives its token: a large video can take longer to upload than a Google
+   * access token lasts, and a token that runs out mid-upload would otherwise
+   * throw away everything sent so far.
+   *
+   * A function, not a refresh token, because a credential exists only inside
+   * the vault's callback. The caller builds this inside that callback, stores
+   * the renewed credential before resolving, and it works only while
+   * `publish` runs. Absent when the caller cannot renew (no refresh function
+   * for this platform, or no refresh token stored), and then an adapter
+   * behaves exactly as it did before this existed.
+   *
+   * Each call is a round trip to the token endpoint, so an adapter calls it
+   * when the token has been refused or is about to run out, not before every
+   * request. A failed renewal rejects with the refresh error itself, carrying
+   * its `failureClass`, so the adapter can tell a dead authorisation from a
+   * busy endpoint.
+   */
+  readonly renewAccessToken?: () => Promise<string>
 }
 
 export interface PublishResult {
