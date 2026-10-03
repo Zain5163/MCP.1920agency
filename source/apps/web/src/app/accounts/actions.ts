@@ -6,6 +6,7 @@ import { redirect } from 'next/navigation'
 import { flattenAccounts, type DiscoveredAccount, type Provider } from '@social-publisher/adapters'
 import { db, disconnectAccount, listProviderAuths, reconnectAccount } from '@social-publisher/db'
 
+import { authorisationsToSearch } from '@/lib/accounts'
 import { currentUser } from '@/lib/auth'
 import { providerAuthVault, providerFor, scope, tokenVault } from '@/lib/engine'
 
@@ -98,16 +99,10 @@ export async function listAvailable(): Promise<{
 }> {
   const user = await requireUser()
   const auths = await listProviderAuths(user.tenantId)
-  if (auths.length === 0) {
-    return {
-      accounts: [],
-      error: 'No authorisation stored yet. Run the connect command once — after that, accounts can be added here.',
-    }
-  }
-  const usable = auths.filter((a) => !a.needsReauth)
-  if (usable.length === 0) {
-    return { accounts: [], error: 'The stored authorisation expired. Run the connect command again to renew it.' }
-  }
+  // Only authorisations whose provider this app registers: see accounts.ts.
+  const search = authorisationsToSearch(auths, (provider) => providerFor(provider) !== undefined)
+  if ('error' in search) return { accounts: [], error: search.error }
+  const usable = search.usable
 
   const existing = await scope(user.tenantId).connections()
   const accounts: AvailableAccount[] = []
