@@ -19,6 +19,7 @@ import {
   db,
   disconnect,
   failJob,
+  publishedColumns,
   queueStats,
   recordHeartbeat,
   reclaimStale,
@@ -209,18 +210,12 @@ async function processOne(service: PublishService, vault: TokenVault): Promise<b
 
   if (outcome.ok) {
     // A notice means it went through but not as "published" implies — a video
-    // uploaded private, for one. It is kept with the target and logged as such.
+    // uploaded private, for one. It is kept with the target, with the code that
+    // makes the dashboard show it as "uploaded", and logged as such.
     const notice = outcome.result!.notice
     await db().target.update({
       where: { id: target.id },
-      data: {
-        state: 'published',
-        publishedAt: new Date(),
-        platformPostId: outcome.result!.platformPostId,
-        platformUrl: outcome.result!.url ?? null,
-        platformMessage: notice ?? null,
-        attempts: { increment: 1 },
-      },
+      data: { ...publishedColumns(outcome.result!), attempts: { increment: 1 } },
     })
     await completeJob(job.jobId)
     log(

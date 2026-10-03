@@ -22,7 +22,7 @@ import {
   type Platform,
   type PostDraft,
 } from '@social-publisher/core'
-import { TenantScope, db, disconnect } from '@social-publisher/db'
+import { TenantScope, db, disconnect, publishedColumns } from '@social-publisher/db'
 import { MediaStore } from '@social-publisher/media'
 import { PublishService } from '@social-publisher/publisher'
 import { TokenVault, parseKey } from '@social-publisher/vault'
@@ -409,17 +409,13 @@ async function main(): Promise<void> {
         tenantId: tenant.id,
         postId: post.id,
         connectionId: outcome.connectionId,
-        state: outcome.ok ? 'published' : 'failed',
         idempotencyKey: `${post.id}:${outcome.connectionId}`,
         ...(outcome.ok
-          ? {
-              publishedAt: new Date(),
-              platformPostId: outcome.result!.platformPostId,
-              platformUrl: outcome.result!.url ?? null,
-              // Kept with the target, so the post list shows it too.
-              platformMessage: outcome.result!.notice ?? null,
-            }
+          ? // A notice is kept with the target, with its code, so the post
+            // list and the dashboard show it as "uploaded" with the notice.
+            publishedColumns(outcome.result!)
           : {
+              state: 'failed',
               failureClass: outcome.error!.failureClass,
               platformMessage: outcome.error!.message,
               errorCode: outcome.error!.platformCode ?? null,

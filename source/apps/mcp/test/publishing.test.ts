@@ -3,11 +3,13 @@ import { describe, test } from 'node:test'
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { capabilitiesFor, type Platform, type PlatformAdapter, type PublishResult } from '@social-publisher/core'
+import { NOTICE_CODE } from '@social-publisher/db'
 import { PublishService } from '@social-publisher/publisher'
 import { Logger } from '@social-publisher/telemetry'
 
 import {
   approvalSummary,
+  formatPostList,
   publishPost,
   type PostRows,
   type PostingDeps,
@@ -209,5 +211,54 @@ describe('the approval says per platform where the title and the AI declaration 
     const summary = approvalSummary({ body: 'Plain post', media: [] }, [connection('conn-fb')])
     assert.doesNotMatch(summary, /declared/i)
     assert.doesNotMatch(summary, /title/i)
+  })
+})
+
+describe('a target that went out with a notice is recorded and listed as uploaded (finding #7)', () => {
+  const NOTICE = 'Uploaded as private, not published. Only the channel can see it.'
+
+  test('the publish stores the notice with its code, and list_posts says "uploaded"', async () => {
+    const { deps, rows, scope } = harness([
+      adapter('youtube', async () => ({ platformPostId: 'VID1', url: 'https://www.youtube.com/watch?v=VID1', notice: NOTICE })),
+    ])
+    const args = { body: 'Launch video', platforms: ['youtube' as Platform] }
+    const approval = reply(await publishPost(scope as never, args, { deps, actor: 'mcp' }))
+    const done = reply(await publishPost(scope as never, { ...args, confirm: tokenIn(approval) }, { deps, actor: 'mcp' }))
+
+    assert.match(done, /^UPLOADED   PSX Ascend/)
+    assert.equal(rows.targets[0]!.state, 'published')
+    assert.equal(rows.targets[0]!.platformMessage, NOTICE)
+    assert.equal(rows.targets[0]!.errorCode, NOTICE_CODE)
+
+    const listed = formatPostList([
+      {
+        createdAt: new Date('2026-10-03T10:00:00Z'),
+        body: 'Launch video',
+        targets: [{ ...rows.targets[0]!, platformUrl: rows.targets[0]!.platformUrl ?? null, platformMessage: NOTICE, errorCode: NOTICE_CODE, connection: { displayName: 'PSX Ascend' } }],
+      },
+    ])
+    assert.ok(
+      listed.includes('    uploaded   PSX Ascend  https://www.youtube.com/watch?v=VID1  — Uploaded as private'),
+      listed,
+    )
+    assert.doesNotMatch(listed, /^ {4}published/m, 'not listed as published')
+  })
+
+  test('a plain success has no code, and an older row with a stale message stays "published"', async () => {
+    const { deps, rows, scope } = harness([adapter('facebook_page', async () => published('fb-9'))])
+    const args = { body: 'Hello', platforms: ['facebook_page' as Platform] }
+    const approval = reply(await publishPost(scope as never, args, { deps, actor: 'mcp' }))
+    await publishPost(scope as never, { ...args, confirm: tokenIn(approval) }, { deps, actor: 'mcp' })
+    assert.equal(rows.targets[0]!.errorCode, null)
+    assert.equal(rows.targets[0]!.platformMessage, null)
+
+    const listed = formatPostList([
+      {
+        createdAt: new Date('2026-10-03T10:00:00Z'),
+        body: 'Hello',
+        targets: [{ state: 'published', platformUrl: null, platformMessage: 'Rate limited', errorCode: null, connection: { displayName: 'PSX Page' } }],
+      },
+    ])
+    assert.match(listed, /^    published  PSX Page/m)
   })
 })

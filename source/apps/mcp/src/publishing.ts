@@ -12,7 +12,7 @@ import {
   type Platform,
   type PostDraft,
 } from '@social-publisher/core'
-import type { TenantScope } from '@social-publisher/db'
+import { carriesNotice, publishedColumns, type TenantScope } from '@social-publisher/db'
 import type { PublishReport, PublishService, TargetOutcome, TargetSpec } from '@social-publisher/publisher'
 
 import { loadConnections } from './context.ts'
@@ -281,17 +281,9 @@ export function targetRow(tenantId: string, postId: string, outcome: TargetOutco
     connectionId: outcome.connectionId,
     idempotencyKey: `${postId}:${outcome.connectionId}`,
   }
-  if (outcome.ok) {
-    return {
-      ...base,
-      state: 'published',
-      publishedAt: new Date(),
-      platformPostId: outcome.result!.platformPostId,
-      platformUrl: outcome.result!.url ?? null,
-      // Kept with the target, so list_posts shows it as well.
-      platformMessage: outcome.result!.notice ?? null,
-    }
-  }
+  // A notice is kept with the target, with its code, so list_posts and the
+  // dashboard show it as "uploaded" with the notice.
+  if (outcome.ok) return { ...base, ...publishedColumns(outcome.result!) }
   return {
     ...base,
     state: 'failed',
@@ -346,7 +338,13 @@ export interface ListedPost {
   }>
 }
 
-/** list_posts: each post, then one line per target. */
+/**
+ * list_posts: each post, then one line per target.
+ *
+ * A published target that went out with a notice is listed as "uploaded", as
+ * the publish reply said at the time: "published" first and the notice after
+ * it read as a public post with a footnote, when the video was private.
+ */
 export function formatPostList(posts: readonly ListedPost[]): string {
   if (posts.length === 0) return 'No posts yet.'
   return posts
@@ -354,7 +352,7 @@ export function formatPostList(posts: readonly ListedPost[]): string {
       const head = `${p.createdAt.toISOString()}  "${p.body.slice(0, 70)}${p.body.length > 70 ? '…' : ''}"`
       const rows = p.targets.map(
         (t) =>
-          `    ${t.state.padEnd(10)} ${t.connection.displayName}` +
+          `    ${(carriesNotice(t) ? 'uploaded' : t.state).padEnd(10)} ${t.connection.displayName}` +
           (t.platformUrl !== null ? `  ${t.platformUrl}` : '') +
           (t.platformMessage !== null ? `  — ${t.platformMessage}` : ''),
       )

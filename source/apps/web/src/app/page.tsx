@@ -9,6 +9,7 @@ import { retryTarget } from './retry-actions'
 import { currentUser } from '@/lib/auth'
 import { listConnections, scope } from '@/lib/engine'
 import { formatDateTime } from '@/lib/format'
+import { targetView, toneClasses } from '@/lib/targets'
 import { Composer, type AccountOption } from '@/components/Composer'
 import { PlatformBadge, humanisePlatform } from '@/components/PlatformBadge'
 
@@ -142,24 +143,13 @@ export default async function Dashboard() {
             </p>
             <div>
               {post.targets.map((target) => (
-                <span
-                  key={target.id}
-                  className={`tag ${
-                    target.state === 'published'
-                      ? 'border-ok/35 text-ok'
-                      : target.state === 'failed'
-                        ? 'border-bad/35 text-bad'
-                        : target.state === 'scheduled'
-                          ? 'border-warn/35 text-warn'
-                          : ''
-                  }`}
-                >
+                <span key={target.id} className={`tag ${toneClasses(targetView(target).tone)}`}>
                   {target.connection.displayName}
                   {' · '}
                   {CAPABILITIES[target.connection.platform].preview?.accountLabel ??
                     humanisePlatform(target.connection.platform)}
                   {' · '}
-                  {target.state}
+                  {targetView(target).label}
                   {target.platformUrl !== null && (
                     <>
                       {' '}
@@ -176,15 +166,23 @@ export default async function Dashboard() {
                 </span>
               ))}
             </div>
-            {post.targets
-              .filter((t) => t.state === 'failed' || t.state === 'needs_reauth')
-              .map((t) => (
+            {post.targets.map((t) => {
+              const view = targetView(t)
+              if (view.note === undefined) return null
+              // A notice is shown in the warn colour and never with a Retry:
+              // the target went out, and re-running it would post twice.
+              const notice = view.note.kind === 'notice'
+              return (
                 <div
-                  key={`${t.id}-err`}
-                  className="mt-2 flex flex-wrap items-center gap-3 rounded-lg border border-bad/25 bg-bad/5 px-3 py-2"
+                  key={`${t.id}-note`}
+                  className={`mt-2 flex flex-wrap items-center gap-3 rounded-lg border px-3 py-2 ${
+                    notice ? 'border-warn/25 bg-warn/5' : 'border-bad/25 bg-bad/5'
+                  }`}
                 >
                   <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2 text-[0.82rem] text-bad">
+                    <div
+                      className={`flex flex-wrap items-center gap-2 text-[0.82rem] ${notice ? 'text-warn' : 'text-bad'}`}
+                    >
                       <span>{t.connection.displayName}</span>
                       <PlatformBadge
                         label={
@@ -193,7 +191,7 @@ export default async function Dashboard() {
                         }
                         accent={CAPABILITIES[t.connection.platform].preview?.accent}
                       />
-                      {t.platformMessage !== null && <span>{t.platformMessage}</span>}
+                      {view.note.text !== null && <span>{view.note.text}</span>}
                     </div>
                     {t.state === 'needs_reauth' && (
                       <div className="text-[0.76rem] text-muted">
@@ -203,14 +201,17 @@ export default async function Dashboard() {
                   </div>
                   {/* Only failures get a retry button — a published target must
                       never be re-run, or it posts twice. */}
-                  <form action={retryTarget}>
-                    <input type="hidden" name="targetId" value={t.id} />
-                    <button type="submit" className="btn-ghost text-[0.8rem]">
-                      Retry
-                    </button>
-                  </form>
+                  {view.retry && (
+                    <form action={retryTarget}>
+                      <input type="hidden" name="targetId" value={t.id} />
+                      <button type="submit" className="btn-ghost text-[0.8rem]">
+                        Retry
+                      </button>
+                    </form>
+                  )}
                 </div>
-              ))}
+              )
+            })}
           </article>
         ))}
       </section>

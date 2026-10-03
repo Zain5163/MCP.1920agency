@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
 import type { MediaRef, Platform, PostDraft } from '@social-publisher/core'
-import { db } from '@social-publisher/db'
+import { db, publishedColumns } from '@social-publisher/db'
 
 import { authenticate } from '@social-publisher/auth'
 
@@ -209,17 +209,13 @@ export async function createPost(_prev: unknown, formData: FormData): Promise<Ac
         tenantId,
         postId: post.id,
         connectionId: outcome.connectionId,
-        state: outcome.ok ? 'published' : 'failed',
         idempotencyKey: `${post.id}:${outcome.connectionId}`,
         ...(outcome.ok
-          ? {
-              publishedAt: new Date(),
-              platformPostId: outcome.result!.platformPostId,
-              platformUrl: outcome.result!.url ?? null,
-              // Kept with the target, so the dashboard shows it too.
-              platformMessage: outcome.result!.notice ?? null,
-            }
+          ? // A notice is kept with the target, with its code, so the
+            // dashboard shows it as "uploaded" with the notice.
+            publishedColumns(outcome.result!)
           : {
+              state: 'failed',
               failureClass: outcome.error!.failureClass,
               platformMessage: outcome.error!.message,
               errorCode: outcome.error!.platformCode ?? null,
