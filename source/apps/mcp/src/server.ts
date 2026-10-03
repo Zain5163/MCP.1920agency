@@ -3,19 +3,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
 
 import { checkConfig } from '@social-publisher/config'
-import {
-  PLATFORMS,
-  decide,
-  formatApprovalRequest,
-  formatResolution,
-  overridesForStorage,
-  resolutionFor,
-  type ErrorCode,
-  type MediaRef,
-  type Platform,
-  type PostDraft,
-  selectTargets,
-} from '@social-publisher/core'
+import { PLATFORMS, formatResolution, resolutionFor, type ErrorCode } from '@social-publisher/core'
 import { disconnect, health, queueStats, type TenantScope } from '@social-publisher/db'
 
 import { registerAdsTools } from './ads-tools.ts'
@@ -25,7 +13,8 @@ import { registerPerformanceTools } from './performance-tools.ts'
 import { registerSetupTools } from './setup-tools.ts'
 import { SERVER_INSTRUCTIONS, registerPlaybooks } from './playbooks.ts'
 import { registerSkillsLibrary } from './skills-library.ts'
-import { currentScope, loadConnections, publishService, targetFor } from './context.ts'
+import { currentScope, loadConnections, postingDeps } from './context.ts'
+import { buildDraft, formatPostList, publishPost } from './publishing.ts'
 
 /**
  * AdsPilot MCP server.
@@ -40,6 +29,9 @@ import { currentScope, loadConnections, publishService, targetFor } from './cont
  */
 
 const server = new McpServer({ name: 'adspilot', version: '0.2.0' }, { instructions: SERVER_INSTRUCTIONS })
+
+/** The platforms and the database, for real. Publishing itself lives in publishing.ts, shared with the hosted server. */
+const deps = postingDeps()
 
 const text = (body: string) => ({ content: [{ type: 'text' as const, text: body }] })
 
@@ -186,7 +178,7 @@ server.tool(
     await guard(async (scope) => {
       const { draft, platforms, selection } = await buildDraft(scope, args)
       if (!selection.ok) return text(selection.message)
-      const report = publishService().validate(draft, platforms)
+      const report = deps.service().validate(draft, platforms)
 
       const lines = [report.ok ? 'Valid for all targets.' : 'NOT valid — fix these first:']
       for (const [platform, issues] of report.byPlatform) {
@@ -201,12 +193,9 @@ server.tool(
 )
 
 /**
- * Same approval token as the HTTP transport.
- *
- * Duplicated rather than shared because these two tool sets have genuinely
- * diverged — stdio also accepts local file paths. The duplication is a defect in
- * its own right and is recorded as such; leaving the STDIO transport ungated
- * while claiming R11 was closed would have been the worse of the two problems.
+ * Same approval token as the HTTP transport, and the same publish: both call
+ * publishPost in publishing.ts. Only the tool schema is this transport's own,
+ * because stdio also accepts local file paths.
  */
 const publishShape = {
   ...draftShape,
@@ -224,122 +213,14 @@ server.tool(
   'publish_post',
   'Publish a post immediately to connected social accounts. This is PUBLIC and cannot be undone. Call it once WITHOUT a confirm token to get a summary, show that to the user, and only call again with the token once they have approved.',
   publishShape,
-  async (args) =>
-    await guard(async (scope) => {
-      const { draft, platforms, selection } = await buildDraft(scope, args)
-      if (!selection.ok) return text(selection.message)
-
-      // Refuse anything invalid: a partial post is worse than none, because the
-      // content is already public wherever it succeeded.
-      const validation = publishService().validate(draft, platforms)
-      if (!validation.ok) {
-        const problems = [...validation.byPlatform.entries()]
-          .flatMap(([p, issues]) =>
-            issues.filter((i) => i.severity === 'error').map((i) => `${p}: ${i.message}`),
-          )
-          .join('; ')
-        return fail('PLATFORM_REJECTED', `Nothing was published. ${problems}`)
-      }
-
-      const chosen = selection.chosen
-      if (chosen.length === 0) return fail('NO_CONNECTION', 'No ready accounts match those platforms.')
-
-      // Proves every id belongs to this tenant. Throws rather than silently
-      // publishing the valid subset.
-      await scope.requireConnections(chosen.map((c) => c.id))
-
-      // After validation, so the summary describes a post that would really go
-      // out. Before createPost, so a refusal leaves no trace and "nothing has
-      // been sent" is literally true.
-      const gate = decide({
-        action: 'publish_post',
-        payload: {
-          body: draft.body,
-          accounts: chosen.map((c) => c.id).sort(),
-          media: draft.media.map((m) => m.publicUrl ?? m.localPath ?? m.id),
-          // Both change what goes out — a title is public, the disclosure is a
-          // statement to the platform — so changing either voids an approval.
-          ...(draft.title !== undefined ? { title: draft.title } : {}),
-          ...(draft.syntheticMedia !== undefined ? { syntheticMedia: draft.syntheticMedia } : {}),
-        },
-        ...(args.confirm !== undefined ? { confirmation: args.confirm } : {}),
-        describe: () =>
-          [
-            `Publishing to ${chosen.length} account(s):`,
-            ...chosen.map((c) => `  ${c.platform.padEnd(15)} ${c.displayName}`),
-            ...(draft.title !== undefined ? ['', `Title: ${draft.title}`] : []),
-            '',
-            'Text:',
-            ...draft.body.split('\n').map((line) => `  ${line}`),
-            ...(draft.media.length > 0 ? ['', `Attachments: ${draft.media.length}`] : []),
-            ...(draft.syntheticMedia === true ? ['', 'Declared as realistic AI-generated or altered media.'] : []),
-          ].join('\n'),
-      })
-      if (!gate.allowed) return text(formatApprovalRequest(gate))
-
-      // The title and disclosure travel in the overrides (there is no column
-      // for them), so retrying a failed target later keeps both.
-      const post = await scope.createPost({
-        body: draft.body,
-        createdBy: 'mcp',
-        overrides: overridesForStorage(draft, platforms),
-      })
-
-      const report = await publishService().publish(draft, chosen.map(targetFor), {
-        idempotencyKeyFor: (connectionId) => `${post.id}:${connectionId}`,
-      })
-
-      for (const outcome of [...report.succeeded, ...report.failed]) {
-        await recordTarget(scope, post.id, outcome)
-      }
-      await scope.record('mcp', 'post.published', {
-        postId: post.id,
-        succeeded: report.succeeded.length,
-        failed: report.failed.length,
-      })
-
-      const lines: string[] = []
-      for (const ok of report.succeeded) {
-        // A notice means it went through but is not what "published" implies —
-        // a video uploaded private, for one. It is never reported as PUBLISHED.
-        const notice = ok.result!.notice
-        lines.push(
-          `${notice === undefined ? 'PUBLISHED' : 'UPLOADED '}  ${ok.displayName}  ${ok.result!.url ?? ok.result!.platformPostId}`,
-        )
-        if (notice !== undefined) lines.push(`           NOTE: ${notice}`)
-      }
-      for (const bad of report.failed) {
-        lines.push(`FAILED     ${bad.displayName}  ${bad.error!.message}`)
-        lines.push(formatResolution(resolutionFor(codeForFailure(bad.error!)), bad.error!.platformCode))
-      }
-      return text(lines.join('\n'))
-    }),
+  async (args) => await guard(async (scope) => await publishPost(scope, args, { deps, actor: 'mcp' })),
 )
 
 server.tool(
   'list_posts',
   'Show recent posts and what happened to each target — published, failed, and the platform\'s own reason.',
   { limit: z.number().min(1).max(50).optional().describe('How many to show. Default 10.') },
-  async ({ limit }) =>
-    await guard(async (scope) => {
-      const posts = await scope.posts(limit ?? 10)
-      if (posts.length === 0) return text('No posts yet.')
-
-      return text(
-        posts
-          .map((p) => {
-            const head = `${p.createdAt.toISOString()}  "${p.body.slice(0, 70)}${p.body.length > 70 ? '…' : ''}"`
-            const rows = p.targets.map(
-              (t) =>
-                `    ${t.state.padEnd(10)} ${t.connection.displayName}` +
-                (t.platformUrl !== null ? `  ${t.platformUrl}` : '') +
-                (t.platformMessage !== null ? `  — ${t.platformMessage}` : ''),
-            )
-            return [head, ...rows].join('\n')
-          })
-          .join('\n\n'),
-      )
-    }),
+  async ({ limit }) => await guard(async (scope) => text(formatPostList(await scope.posts(limit ?? 10)))),
 )
 
 server.tool(
@@ -357,103 +238,6 @@ server.tool(
       )
     }),
 )
-
-// ---------------------------------------------------------------------------
-
-/**
- * The resolution to show for a failed target.
- *
- * The adapter's own diagnosis comes first: the class alone cannot tell a spent
- * YouTube quota from a revoked token, and guessing from it told the owner to
- * reconnect when he only had to wait. The class is the fallback for adapters
- * that name no code.
- */
-function codeForFailure(error: { failureClass: string; code?: ErrorCode | undefined }): ErrorCode {
-  if (error.code !== undefined) return error.code
-  if (error.failureClass === 'credential') return 'TOKEN_EXPIRED'
-  if (error.failureClass === 'transient') return 'RATE_LIMITED'
-  return 'PLATFORM_REJECTED'
-}
-
-async function recordTarget(
-  scope: TenantScope,
-  postId: string,
-  outcome: {
-    connectionId: string
-    ok: boolean
-    result?: { platformPostId: string; url?: string; notice?: string }
-    error?: { failureClass: string; message: string; platformCode?: string }
-  },
-): Promise<void> {
-  const { db } = await import('@social-publisher/db')
-  await db().target.create({
-    data: {
-      tenantId: scope.tenantId,
-      postId,
-      connectionId: outcome.connectionId,
-      state: outcome.ok ? 'published' : 'failed',
-      idempotencyKey: `${postId}:${outcome.connectionId}`,
-      ...(outcome.ok
-        ? {
-            publishedAt: new Date(),
-            platformPostId: outcome.result!.platformPostId,
-            platformUrl: outcome.result!.url ?? null,
-            // Kept with the target, so list_posts shows it as well.
-            platformMessage: outcome.result!.notice ?? null,
-          }
-        : {
-            failureClass: outcome.error!.failureClass,
-            platformMessage: outcome.error!.message,
-            errorCode: outcome.error!.platformCode ?? null,
-          }),
-    },
-  })
-}
-
-async function buildDraft(
-  scope: TenantScope,
-  args: {
-    body: string
-    title?: string | undefined
-    syntheticMedia?: boolean | undefined
-    platforms?: Platform[] | undefined
-    accounts?: string[] | undefined
-    media?:
-      | Array<{
-          kind: 'image' | 'video'
-          localPath?: string | undefined
-          publicUrl?: string | undefined
-          mime: string
-          durationSeconds?: number | undefined
-        }>
-      | undefined
-  },
-) {
-  const connections = await loadConnections(scope)
-
-  const media: MediaRef[] = (args.media ?? []).map((m, index) => ({
-    id: `m${index}`,
-    kind: m.kind,
-    mime: m.mime,
-    bytes: 0,
-    ...(m.localPath !== undefined ? { localPath: m.localPath } : {}),
-    ...(m.publicUrl !== undefined ? { publicUrl: m.publicUrl } : {}),
-    ...(m.durationSeconds !== undefined ? { durationSeconds: m.durationSeconds } : {}),
-  }))
-
-  const title = args.title?.trim()
-  const draft: PostDraft = {
-    body: args.body,
-    media,
-    ...(title !== undefined && title !== '' ? { title } : {}),
-    ...(args.syntheticMedia !== undefined ? { syntheticMedia: args.syntheticMedia } : {}),
-  }
-  // Which accounts, decided once for validate, publish and schedule alike.
-  const selection = selectTargets(connections, { platforms: args.platforms, accounts: args.accounts })
-  const platforms = selection.ok ? [...selection.platforms] : (args.platforms ?? [])
-
-  return { draft, platforms, connections, selection }
-}
 
 // Ads are local-only: the account comes from the owner's environment, which is
 // single-tenant by construction. See ads-tools.ts and decisions/0005.

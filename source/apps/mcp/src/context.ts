@@ -14,6 +14,7 @@ import { TokenVault, parseKey } from '@social-publisher/vault'
 import type { Connection } from '@social-publisher/core'
 
 import { credentialFor } from './credential.ts'
+import type { PostRows, PostingDeps } from './publishing.ts'
 
 /**
  * Wiring shared by every MCP tool.
@@ -121,4 +122,22 @@ export function targetFor(connection: Connection): TargetSpec {
       (message) => console.error(`[adspilot] ${message}`),
     ),
   }
+}
+
+/**
+ * What publishing reaches outside this process, for real: the platforms through
+ * the publish service, and the database. See `PostingDeps`.
+ */
+export function postingDeps(): PostingDeps {
+  return { service: publishService, targetFor, rows: prismaRows }
+}
+
+/** The rows a publish or schedule writes, through Prisma. */
+const prismaRows: PostRows = {
+  async createTarget(row) {
+    return await db().target.create({ data: row, select: { id: true } })
+  },
+  async createJob(row) {
+    await db().job.create({ data: row })
+  },
 }
