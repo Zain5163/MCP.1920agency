@@ -77,6 +77,17 @@ describe("the token endpoint's own errors", () => {
     assert.equal(classifyGoogleOAuthError({}, 429).failureClass, 'transient')
     assert.equal(classifyGoogleOAuthError({ error: 'internal_failure' }, 500).failureClass, 'transient')
   })
+
+  test('a server fault is transient whatever its body says, even invalid_grant', () => {
+    // The vault marks a channel dead on anything not transient; a 5xx is no verdict.
+    assert.equal(classifyGoogleOAuthError({ error: 'invalid_grant' }, 503).failureClass, 'transient')
+  })
+
+  test('a reply with no OAuth error in it is no verdict on the token', () => {
+    // An empty body, or an HTML page from a proxy: not Google's answer to anything.
+    assert.equal(classifyGoogleOAuthError({}, 400).failureClass, 'transient')
+    assert.equal(classifyGoogleOAuthError({ error: { code: 400 } }, 400).failureClass, 'transient')
+  })
 })
 
 describe('when the quota comes back', () => {

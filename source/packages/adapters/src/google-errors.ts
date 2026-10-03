@@ -167,10 +167,17 @@ export function classifyGoogleError(
  * newer tokens. Everything else that is not a server fault (`invalid_client`,
  * `unauthorized_client`, `deleted_client`, `invalid_request`) is a problem with
  * the app's own configuration: permanent, but not the person's token.
+ *
+ * Only a readable OAuth error is a verdict, because the vault marks a channel
+ * dead on anything that is not transient. So a server fault or a throttle is
+ * transient whatever its body says, and is checked first; and a reply with no
+ * OAuth error in it at all (an empty body, an HTML page from a proxy or a
+ * captive portal) is transient too: it is not Google's answer to anything.
  */
 export function classifyGoogleOAuthError(body: GoogleOAuthErrorBody, httpStatus: number): GoogleErrorClass {
-  if (body.error === 'invalid_grant') return { failureClass: 'credential', code: 'GOOGLE_TOKEN_REVOKED' }
   if (httpStatus === 429 || httpStatus >= 500) return { failureClass: 'transient' }
+  if (body.error === 'invalid_grant') return { failureClass: 'credential', code: 'GOOGLE_TOKEN_REVOKED' }
+  if (typeof body.error !== 'string') return { failureClass: 'transient' }
   return { failureClass: 'permanent' }
 }
 

@@ -354,7 +354,7 @@ export class GoogleOAuth {
       throw new GoogleOAuthError(`Could not reach Google to ${purpose}.`, { failureClass: 'transient', cause })
     }
 
-    const text = await response.text()
+    const text = await readBody(response, purpose)
     let parsed: unknown
     try {
       parsed = text === '' ? {} : JSON.parse(text)
@@ -371,7 +371,9 @@ export class GoogleOAuth {
         reason !== undefined && CLIENT_ERRORS.has(reason)
           ? ' Check GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in ~/.social-publisher/.env; a deleted client can be restored in Google Cloud within 30 days.'
           : ''
-      throw new GoogleOAuthError(`Google refused to ${purpose}: ${detail}.${hint}`, {
+      // "Refused" only for a verdict: a busy or unreadable endpoint refused nothing.
+      const lead = classified.failureClass === 'transient' ? `Google could not ${purpose} just now` : `Google refused to ${purpose}`
+      throw new GoogleOAuthError(`${lead}: ${detail}.${hint}`, {
         failureClass: classified.failureClass,
         platformMessage: detail,
         ...(reason !== undefined ? { platformCode: reason } : {}),
@@ -397,7 +399,7 @@ export class GoogleOAuth {
       throw new GoogleOAuthError(`Could not reach Google to ${purpose}.`, { failureClass: 'transient', cause })
     }
 
-    const text = await response.text()
+    const text = await readBody(response, purpose)
     let parsed: unknown
     try {
       parsed = text === '' ? {} : JSON.parse(text)
@@ -471,6 +473,27 @@ export class GoogleProvider implements Provider {
     readonly expiresAt?: Date
   }): Promise<{ accessToken: string; refreshToken: string; expiresAt: Date }> {
     return await new GoogleOAuth(this.#config).refreshCredential(current)
+  }
+}
+
+/**
+ * A reply's body as text.
+ *
+ * A reply can start and then break off before its body arrives: a reset
+ * socket, a dropped Wi-Fi link. That is no answer at all, so it is transient,
+ * like a reply that never came. Read bare, the failure reached the vault as a
+ * plain error with no failure class, and the vault marked a working channel
+ * as needing reconnection because of one network blip during a token renewal.
+ * No HTTP status is recorded: a status line without its body says nothing.
+ */
+async function readBody(response: Response, purpose: string): Promise<string> {
+  try {
+    return await response.text()
+  } catch (cause) {
+    throw new GoogleOAuthError(`Google's answer to the request to ${purpose} broke off before it could be read.`, {
+      failureClass: 'transient',
+      cause,
+    })
   }
 }
 

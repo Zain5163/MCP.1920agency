@@ -49,6 +49,18 @@ function mockGoogle(replies: Array<Reply | Error>) {
   return { fetchImpl, calls }
 }
 
+/** A reply whose headers arrive and whose body then breaks off, as a reset socket does. */
+const brokenOff = (status: number) =>
+  (async () =>
+    new Response(
+      new ReadableStream({
+        start(controller) {
+          controller.error(new TypeError('terminated'))
+        },
+      }),
+      { status },
+    )) as unknown as typeof globalThis.fetch
+
 const config = {
   clientId: 'CLIENT_ID.apps.googleusercontent.com',
   clientSecret: 'GOCSPX-not-a-real-secret',
@@ -278,6 +290,40 @@ describe('renewing', () => {
     }
   })
 
+  test('a reply that breaks off before its body is read is transient, so the vault marks nothing', async () => {
+    // The reviewers' case: headers arrive, then the socket drops. response.text()
+    // rejected with a bare TypeError, the vault saw no failure class, and it
+    // marked a working channel as needing reconnection.
+    for (const status of [200, 400]) {
+      await assert.rejects(
+        () => new GoogleOAuth({ ...config, fetch: brokenOff(status) }).refreshWithToken('1//R'),
+        (error: unknown) => {
+          assert.ok(error instanceof GoogleOAuthError, `HTTP ${status}`)
+          assert.equal(error.failureClass, 'transient')
+          assert.match(error.message, /broke off/)
+          assert.equal((error.cause as Error).message, 'terminated')
+          return true
+        },
+      )
+    }
+  })
+
+  test('a token endpoint answering with something other than Google is transient, not a dead token', async () => {
+    for (const status of [400, 502]) {
+      const fetchImpl = (async () =>
+        new Response('<html><body>Network login required</body></html>', { status })) as unknown as typeof globalThis.fetch
+      await assert.rejects(
+        () => new GoogleOAuth({ ...config, fetch: fetchImpl }).refreshWithToken('1//R'),
+        (error: unknown) => {
+          assert.ok(error instanceof GoogleOAuthError)
+          assert.equal(error.failureClass, 'transient', `HTTP ${status}`)
+          assert.doesNotMatch(error.message, /refused/)
+          return true
+        },
+      )
+    }
+  })
+
   test('a credential with no refresh token is dead, not retryable', async () => {
     const { fetchImpl, calls } = mockGoogle([{ body: {} }])
     await assert.rejects(
@@ -332,6 +378,12 @@ describe('discovery', () => {
       () => new GoogleProvider({ ...config, fetch: fetchImpl }).discover('T'),
       (error: unknown) => error instanceof PublishError && error.failureClass === 'transient',
     )
+  })
+
+  test('a reply that breaks off during discovery or sign-in is transient, not "no channel"', async () => {
+    const isBlip = (error: unknown) => error instanceof GoogleOAuthError && error.failureClass === 'transient'
+    await assert.rejects(() => new GoogleProvider({ ...config, fetch: brokenOff(200) }).discover('T'), isBlip)
+    await assert.rejects(() => new GoogleOAuth({ ...config, fetch: brokenOff(200) }).userinfo('T'), isBlip)
   })
 })
 
