@@ -162,6 +162,8 @@ trademarks, domains and handles before anything public carries it.
 
 ## 15. Google: owner setup, and two answers from Google
 
+**Update 2026-10-03: the YouTube code is built, reviewed and live in the code** (see PROJECT-LOG 2026-10-02/03). It needs only the owner's part: in project `gen-lang-client-0046538567`, enable **YouTube Data API v3**, create an OAuth client of type **Web application** with redirect `http://localhost:8787/google/callback`, put `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in `~/.social-publisher/.env`, then run `pnpm connect:provider google youtube` in `source/apps/cli` and tick **both** YouTube permissions. Full steps: SETUP.md §8. Uploads stay private until the YouTube API audit passes.
+
 Plan and full checklist with links: `architecture/google-suite-plan.md` (facts in
 `research/2026-10-01-google-suite.md`). **Waiting on the owner,** in order:
 Google Cloud projects (dev and prod, paid billing), OAuth consent screen set to

@@ -1608,12 +1608,72 @@ used live.
 
 658 tests, 13 workspaces typecheck clean.
 
+## 2026-10-02 and 03 — YouTube, LinkedIn carousels, brand visuals; reviewed, fixed, switched over
+
+**Built (commit `7303e89`), from `architecture/2026-10-02-youtube-build-spec.md`:**
+
+- **Google sign-in and YouTube publishing.** One Google connection with scope
+  bundles and granted-scope tracking; resumable chunked upload; an identity check
+  before every upload; uploads forced private until Google's API audit passes,
+  reported as "uploaded", never "published". Facts verified against Google's docs
+  in `research/2026-10-02-youtube-api-facts.md` (uploads now 1 unit in their own
+  bucket of 100 a day; unaudited uploads locked private with no appeal).
+- **Token lifecycle:** the vault merges refreshed credentials and lets a transient
+  refresh failure through; every publish site can renew an hour-long token.
+- **LinkedIn document posts** (PDF carousels) through the Documents API.
+- **Brand renderer** (`AI-Automation\Social-Render`): the owner's design system
+  rendered to exact-size PNGs and carousel PDFs with headless Chrome and no new
+  dependencies. 21 slides and 3 PDFs made for five drafts, every word taken from
+  the drafts.
+- **The approval step** schedules image posts (`--image`) and carousels
+  (`--document` + `--title-file`).
+
+**Reviewed** by five independent reviewers, each finding challenged by a skeptic:
+no regression in the live Facebook, Instagram, LinkedIn or Meta ads paths; 13
+real defects in the new code, the worst a duplicate YouTube upload when the reply
+to the final chunk is lost, and a private upload shown green "published". Agreed
+fixes in `architecture/2026-10-02-review-findings.md`.
+
+**Fixed in an isolated git worktree** (19 commits, `243bb4f`..`0aef638`), so the
+live publisher kept running tested code meanwhile. Highlights: a lost final reply
+is never retried (`YOUTUBE_UPLOAD_UNCONFIRMED`); the token is renewed mid-upload
+and the same session resumed; a sign-in missing the upload permission is refused
+before anything is stored; title and AI declaration reported only where they are
+really sent; "uploaded" shown on the dashboard and in `list_posts`; a retry never
+republishes a post without its attachments; hosted `schedule_post` keeps its
+media; an MCP approval publishes once and a client time-out stops the upload.
+
+**Verification:** a planned second adversarial pass was cut off twice by the
+owner's usage limit. In its place the live paths were checked by hand (the
+worker's text, image and document path; the CLI scheduled path the approval
+script uses) and all 983 tests passed, the database suites in a quiet window.
+**Switched over 2026-10-03 12:55 PKT** by fast-forward; packages and apps rebuilt
+except the dashboard, which needs a rebuild and restart.
+
+**Live today:** the first build-in-public post went out on schedule through the
+new code, 2026-10-02 15:30:11 PKT, `urn:li:share:7511734273188626432`.
+
+**Learned:**
+- Database tests run against the live database. Running them in parallel with
+  agents starved the pooler and briefly blocked a read; they now run only in
+  quiet windows, and a separate test database is planned (FUTURE-PLANS).
+- A git worktree under the long scratchpad path broke pnpm (Windows path length);
+  short paths only.
+- The 2026-10-02 22:00 image post was not approved in time; the approval step only
+  offers today or later, so it was moved to Sunday 2026-10-04 09:00 at the owner's
+  choice.
+
+**Not yet proven live:** YouTube (needs the owner's Google OAuth client), LinkedIn
+document posts and scheduled image posts (first ones: tonight's carousel and
+Sunday's image, once approved).
+
 ## Verified live, not just tested
 
 | What | How it was proven |
 |---|---|
 | LinkedIn authorisation | Connected 2026-09-26; person URN stored; visible in `pnpm status` |
 | LinkedIn publishing | Real post published 2026-09-26 through the approval gate, `urn:li:share:7509614451189239808` |
+| **Scheduled LinkedIn post, sent by the worker** | First build-in-public post, 2026-10-02 15:30:11 PKT, `urn:li:share:7511734273188626432` |
 | Little-text escaping | Same post: text with `(` `)` survived intact, escaped `#` rendered as a clean hashtag |
 | Meta ad campaign, end to end | Campaign, ad set, 3 creatives, 3 ads created PAUSED and read back from Meta 2026-09-30 |
 | **A real Meta campaign, live and delivering** | `120249127474910366` on 1920Agency 10, activated and approved by Meta 2026-09-30 |
