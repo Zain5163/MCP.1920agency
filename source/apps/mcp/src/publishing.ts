@@ -1,5 +1,6 @@
 import {
   decide,
+  fieldsSentTo,
   formatApprovalRequest,
   formatResolution,
   overridesForStorage,
@@ -153,18 +154,57 @@ export function approvalPayload(draft: PostDraft, chosen: readonly Connection[])
   }
 }
 
-/** What the person approving is shown. */
+/**
+ * What the person approving is shown.
+ *
+ * A summary is a statement about what will go out, so the title and the AI
+ * declaration are shown per platform, for the platforms that are really sent
+ * them. Both used to be shown once for every target, while Facebook, Instagram
+ * and a LinkedIn text post drop the title and only YouTube is sent the
+ * declaration: an owner approved a post believing Meta had been told.
+ */
 export function approvalSummary(draft: PostDraft, chosen: readonly Connection[]): string {
+  const fields = fieldsSentLines(draft, chosen.map((c) => c.platform))
   return [
     `Publishing to ${chosen.length} account(s):`,
     ...chosen.map((c) => `  ${c.platform.padEnd(15)} ${c.displayName}`),
-    ...(draft.title !== undefined ? ['', `Title: ${draft.title}`] : []),
+    ...(fields.titles.length > 0 ? ['', ...fields.titles] : []),
     '',
     'Text:',
     ...draft.body.split('\n').map((line) => `  ${line}`),
     ...(draft.media.length > 0 ? ['', `Attachments: ${draft.media.length}`] : []),
-    ...(draft.syntheticMedia === true ? ['', 'Declared as realistic AI-generated or altered media.'] : []),
+    ...(fields.declaration.length > 0 ? ['', ...fields.declaration] : []),
   ].join('\n')
+}
+
+/**
+ * Where the draft's title and AI-media declaration go, as lines to show.
+ *
+ * From capability data (`fieldsSentTo`), so no platform is named here. A title
+ * that some platforms drop says so, rather than vanishing from the summary: the
+ * owner gave it, and should know where it will not appear.
+ */
+export function fieldsSentLines(
+  draft: PostDraft,
+  platforms: readonly Platform[],
+): { titles: string[]; declaration: string[] } {
+  const sent = fieldsSentTo(draft, platforms)
+  const titled = new Set(sent.titles.map((t) => t.platform))
+  const untitled = [...new Set(platforms)].filter((p) => !titled.has(p))
+  const titles = sent.titles.map((t) => `Title on ${t.platform}: ${t.title}`)
+  if (draft.title !== undefined && untitled.length > 0) {
+    titles.push(`No title on ${untitled.join(', ')}: ${untitled.length === 1 ? 'it takes' : 'they take'} none for this post.`)
+  }
+  const declaration: string[] = []
+  if (sent.disclosedTo.length > 0) {
+    declaration.push(`Declared as realistic AI-generated or altered media on: ${sent.disclosedTo.join(', ')}`)
+  }
+  if (sent.notDisclosedTo.length > 0) {
+    declaration.push(
+      `NOT declared on ${sent.notDisclosedTo.join(', ')}: their API takes no such declaration, so label it in the app.`,
+    )
+  }
+  return { titles, declaration }
 }
 
 /**

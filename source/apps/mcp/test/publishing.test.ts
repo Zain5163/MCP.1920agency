@@ -6,7 +6,13 @@ import { capabilitiesFor, type Platform, type PlatformAdapter, type PublishResul
 import { PublishService } from '@social-publisher/publisher'
 import { Logger } from '@social-publisher/telemetry'
 
-import { publishPost, type PostRows, type PostingDeps, type TargetRow } from '../src/publishing.ts'
+import {
+  approvalSummary,
+  publishPost,
+  type PostRows,
+  type PostingDeps,
+  type TargetRow,
+} from '../src/publishing.ts'
 import { registerTools } from '../src/tools.ts'
 
 /**
@@ -25,6 +31,7 @@ const ACCOUNTS = [
   { id: 'conn-yt', platform: 'youtube', platformAccountId: 'UC1', displayName: 'PSX Ascend' },
   { id: 'conn-fb', platform: 'facebook_page', platformAccountId: 'P1', displayName: 'PSX Page' },
   { id: 'conn-li', platform: 'linkedin', platformAccountId: 'urn:li:person:1', displayName: 'Rana' },
+  { id: 'conn-ig', platform: 'instagram', platformAccountId: 'IG1', displayName: 'psx.ascend' },
 ].map((a) => ({
   ...a,
   tenantId: TENANT,
@@ -138,5 +145,69 @@ describe('publish_post (shared by both transports)', () => {
     assert.match(done, /^PUBLISHED  PSX Page/)
     assert.equal(scope.created[0]!.createdBy, 'mcp:user-7')
     assert.equal(rows.targets[0]!.tenantId, TENANT)
+  })
+})
+
+describe('the approval says per platform where the title and the AI declaration go (finding #4)', () => {
+  const connection = (id: string) => {
+    const row = ACCOUNTS.find((a) => a.id === id)!
+    return { ...row, platform: row.platform as Platform }
+  }
+
+  test("the reviewers' case: an Instagram image declared synthetic is not reported as declared", async () => {
+    const { deps, scope } = harness([adapter('instagram', async () => published('ig-1'))])
+    const approval = reply(
+      await publishPost(
+        scope as never,
+        {
+          body: 'A realistic scene that never happened',
+          platforms: ['instagram'],
+          syntheticMedia: true,
+          media: [{ kind: 'image', mime: 'image/jpeg', publicUrl: 'https://cdn.example.com/ai.jpg' }],
+        },
+        { deps, actor: 'mcp' },
+      ),
+    )
+    assert.match(approval, /NOT declared on instagram: their API takes no such declaration, so label it in the app\./)
+    assert.doesNotMatch(approval, /^Declared as realistic/m, 'Instagram is never sent the declaration')
+  })
+
+  test('a mixed post: declared and titled on YouTube only, and the others are named', () => {
+    const summary = approvalSummary(
+      {
+        body: 'Launch day',
+        title: 'We shipped it',
+        syntheticMedia: true,
+        media: [{ id: 'v', kind: 'video', mime: 'video/mp4', bytes: 1, localPath: 'D:/clip.mp4' }],
+      },
+      [connection('conn-yt'), connection('conn-fb'), connection('conn-li')],
+    )
+    assert.match(summary, /^Title on youtube: We shipped it$/m)
+    assert.match(summary, /^No title on facebook_page, linkedin: they take none for this post\.$/m)
+    assert.match(summary, /^Declared as realistic AI-generated or altered media on: youtube$/m)
+    assert.match(summary, /^NOT declared on facebook_page, linkedin: their API takes no such declaration/m)
+    assert.doesNotMatch(summary, /^Title: /m, 'no title line that claims every platform')
+  })
+
+  test('a LinkedIn document carries its title; a LinkedIn text post does not', () => {
+    const document = approvalSummary(
+      {
+        body: 'Slides below',
+        title: 'Fix code 10 in 5 steps',
+        media: [{ id: 'd', kind: 'document', mime: 'application/pdf', bytes: 1, localPath: 'D:/c.pdf' }],
+      },
+      [connection('conn-li')],
+    )
+    assert.match(document, /^Title on linkedin: Fix code 10 in 5 steps$/m)
+
+    const textPost = approvalSummary({ body: 'Just text', title: 'Ignored', media: [] }, [connection('conn-li')])
+    assert.match(textPost, /^No title on linkedin: it takes none for this post\.$/m)
+    assert.doesNotMatch(textPost, /Title on linkedin/)
+  })
+
+  test('nothing is said about a declaration that was not made', () => {
+    const summary = approvalSummary({ body: 'Plain post', media: [] }, [connection('conn-fb')])
+    assert.doesNotMatch(summary, /declared/i)
+    assert.doesNotMatch(summary, /title/i)
   })
 })

@@ -66,7 +66,9 @@ const draftShape = {
     .describe(
       'Set true when the media is realistic AI-generated or altered content: a real person shown saying or ' +
         'doing something they did not, altered footage of a real event or place, or a realistic scene that ' +
-        'never happened. YouTube requires this disclosure. Not needed for AI help with the script, captions, ' +
+        'never happened. YouTube requires this disclosure and is sent it; platforms whose API takes no such ' +
+        'declaration are not, and the approval summary names them so the post can be labelled in their app. ' +
+        'Not needed for AI help with the script, captions, ' +
         'thumbnail or ideas.',
     ),
   platforms: z

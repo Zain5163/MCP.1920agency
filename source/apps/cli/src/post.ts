@@ -28,6 +28,7 @@ import { PublishService } from '@social-publisher/publisher'
 import { TokenVault, parseKey } from '@social-publisher/vault'
 
 import { credentialFor } from './credential.ts'
+import { fieldsSentLines } from './fields-sent.ts'
 
 /**
  * `post` — publish from the command line.
@@ -41,7 +42,9 @@ import { credentialFor } from './credential.ts'
  * `--title-file <path>` reads it from a UTF-8 file instead, for callers whose
  * shell mangles quotes.
  * `--synthetic` declares that the media is realistic AI-generated or altered
- * content, which YouTube, Meta and TikTok ask to be disclosed.
+ * content. Only a platform whose API takes that declaration is sent it
+ * (YouTube today); Meta and LinkedIn take none through their APIs, so the
+ * output names them and the post has to be labelled in their own app.
  *
  * `--document <pdf>` attaches a PDF that a platform taking documents shows as
  * swipeable pages: a LinkedIn document post, the way carousels go out there.
@@ -261,8 +264,10 @@ async function main(): Promise<void> {
 
   console.log('\n  Targets:')
   for (const t of targets) console.log(`    ${t.platform.padEnd(15)} ${t.displayName}`)
-  if (draft.title !== undefined) console.log(`\n  Title: ${draft.title}`)
-  if (draft.syntheticMedia === true) console.log('\n  Declared as realistic AI-generated or altered media.')
+  // Per platform, and only where it is really sent: see fields-sent.ts.
+  const fields = fieldsSentLines(draft, platforms)
+  if (fields.titles.length > 0) console.log(`\n${fields.titles.map((line) => `  ${line}`).join('\n')}`)
+  if (fields.declaration.length > 0) console.log(`\n${fields.declaration.map((line) => `  ${line}`).join('\n')}`)
   console.log(`\n  Text (${body.length} chars):\n`)
   for (const line of body.split('\n')) console.log(`    ${line}`)
   if (media.length > 0) {
