@@ -265,6 +265,15 @@ confirm which of these applies.
 Then the next monitor run confirms both connections, and the Page tools are
 checked live.
 
+## 18. GradCollective ads: give the system user access
+
+Ad account `2014678929458900` (GradCollective). Checked 2026-10-05: the ads token
+gets Meta error 200, "Ad account owner has NOT grant ads_management or ads_read".
+**Waiting on the owner:** in Business Settings, get the account into (or shared
+with) the 1920 Agency business, assign it to system user **Mysmadspilot** with
+Manage campaigns, and assign the GradCollective Page with Advertise. Then re-check
+and point the ads tools at it (they work on one ad account at a time).
+
 ---
 
 ## How to use this file
