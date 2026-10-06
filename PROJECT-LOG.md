@@ -1667,6 +1667,39 @@ new code, 2026-10-02 15:30:11 PKT, `urn:li:share:7511734273188626432`.
 document posts and scheduled image posts (first ones: tonight's carousel and
 Sunday's image, once approved).
 
+## 2026-10-06 — Skills library: refreshed, four advertising skills added; first client account (Muzaree)
+
+**Owner's request:** add the best of `realkimbarrett/advertising-skills` and
+`coreyhaines31/marketingskills`, drop what duplicates what we have, so every skill
+can be used from the MCP when running ads.
+
+**Done (commit `5a7599a`, fast-forwarded to master at 12:10 PKT):**
+- marketingskills `5b2c000` → `dda3841`: same 50 skills, 76 files revised upstream.
+- advertising-skills (MIT, as declared in its README and in every skill; it ships no
+  LICENSE file, so `NOTICE.md` reproduces MIT with attribution): **4 of 12 kept**:
+  schwartz-awareness-mapper, mechanism-builder, conversion-path-builder,
+  full-funnel-campaign-orchestrator. The other 8 repeat deeper skills already
+  served; `get_skill` on their names returns the replacement (`COVERED_ELSEWHERE`).
+- The loader now serves several pinned sources, frames each skill with its own
+  source and licence, and refuses to start if two sources share a name.
+- `meta-ads` playbook: a "skills to use alongside" order (customer-research → offers
+  → awareness → mechanism → ad-creative → copywriting/copy-editing → funnel/cro).
+- Arrival scan re-run on both libraries: clean. Typecheck clean; 36 non-database MCP
+  tests pass (publishing.test.ts not run: it hits the live database).
+
+**Live after:** the MCP reads skills at start-up, so they appear after the next
+`/mcp` reconnect.
+
+**Muzaree (client ad account `act_144042365972084`):** audited and a Chelsea-led
+6-ad campaign prepared, not created. Full state in
+`AI-Automation/Muzaree-Paid-Media/STATUS.md`. Switching the ads tools to that
+account needs `~/.social-publisher/.env` edited; Claude's edit was blocked twice by
+the permission system, so the owner makes it.
+
+**Learned:** removing a worktree that has its own `node_modules` fails on Windows
+("Filename too long"); delete it with the `\\?\` long-path prefix, then
+`git worktree prune`.
+
 ## Verified live, not just tested
 
 | What | How it was proven |
