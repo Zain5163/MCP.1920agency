@@ -3,7 +3,7 @@
 How to plan, write and launch Meta (Facebook and Instagram) campaigns through
 this server. For an AI assistant working on a business's behalf.
 
-**Updated 2026-09-30.** Meta changes its ranking and its API often; treat
+**Updated 2026-10-06.** Meta changes its ranking and its API often; treat
 anything here older than six months as needing a check.
 
 ---
@@ -314,6 +314,29 @@ user.
 4. **Fatigue:** when the same people see an ad more than ~2.5–4 times, or
    click-through falls 20% from where it was, it needs replacing. Replace with a
    fresh version of the same idea before pausing the old one.
+
+---
+
+## Skills to use alongside this playbook
+
+The server carries marketing skills (`list_skills`, `get_skill`). For a new
+campaign, work through them in this order. Each answers one question before
+the next starts. Read the ones the job needs, and do not write copy before
+steps 1 to 3 are done.
+
+| Step | Skill | Answers |
+|---|---|---|
+| 1 | `customer-research` | Who buys, in their own words, and what they tried before |
+| 2 | `offers` | What exactly is sold, and why now (price, bundle, delivery, guarantee the business really gives) |
+| 3 | `schwartz-awareness-mapper` | How much the audience already knows, so the first line meets them there |
+| 4 | `mechanism-builder` | Why this works when other options did not, if the product needs explaining |
+| 5 | `ad-creative` | Angles, hooks and formats: several genuinely different ones |
+| 6 | `copywriting`, then `copy-editing` | The words, then cutting what is vague or generic |
+| 7 | `conversion-path-builder`, `cro` | Whether the landing page, form or shop page will convert the click |
+
+`full-funnel-campaign-orchestrator` runs the same chain in one pass. Where a
+skill and this playbook disagree about Meta, this playbook wins: it describes
+this server's tools, limits and approvals.
 
 ---
 

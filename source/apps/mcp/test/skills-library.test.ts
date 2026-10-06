@@ -3,7 +3,7 @@ import { test, describe } from 'node:test'
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 
-import { framing, loadLibrary, registerSkillsLibrary } from '../src/skills-library.ts'
+import { COVERED_ELSEWHERE, LIBRARIES, framing, loadLibrary, registerSkillsLibrary } from '../src/skills-library.ts'
 import { PLAYBOOKS, registerPlaybooks } from '../src/playbooks.ts'
 
 /**
@@ -22,8 +22,8 @@ async function callTool(server: McpServer, name: string, args: Record<string, un
 describe('the skills library', () => {
   const library = loadLibrary()
 
-  test('loads every skill in the pinned copy', () => {
-    assert.equal(library.size, 50)
+  test('loads every skill in the pinned copies', () => {
+    assert.equal(library.size, 54)
     for (const name of ['seo-audit', 'ai-seo', 'copywriting', 'ads', 'social', 'cro']) {
       assert.ok(library.has(name), `${name} is missing`)
     }
@@ -37,7 +37,7 @@ describe('the skills library', () => {
     const server = new McpServer({ name: 't', version: '1' })
     registerSkillsLibrary(server)
     const text = await callTool(server, 'list_skills', {})
-    assert.match(text, /^50 skills/)
+    assert.match(text, /^54 skills/)
     assert.match(text, /seo-audit/)
   })
 
@@ -90,6 +90,47 @@ describe('the skills library', () => {
     const server = new McpServer({ name: 't', version: '1' })
     registerSkillsLibrary(server)
     assert.match(await callTool(server, 'get_skill', { name: 'nope' }), /No skill called "nope"/)
+  })
+
+  test('serves the four advertising-skills additions under their own source', async () => {
+    const server = new McpServer({ name: 't', version: '1' })
+    registerSkillsLibrary(server)
+    for (const name of [
+      'schwartz-awareness-mapper',
+      'mechanism-builder',
+      'conversion-path-builder',
+      'full-funnel-campaign-orchestrator',
+    ]) {
+      assert.equal(library.get(name)?.library.source, 'realkimbarrett/advertising-skills', name)
+      const text = await callTool(server, 'get_skill', { name })
+      assert.match(text, /realkimbarrett\/advertising-skills/, name)
+      assert.doesNotMatch(text, /coreyhaines31/, name)
+    }
+  })
+
+  /**
+   * The orchestrator we keep names skills we chose not to serve. An AI that
+   * follows it must be sent to the deeper skill that replaces each one.
+   */
+  test('a skill left out on purpose points to its replacement', async () => {
+    const server = new McpServer({ name: 't', version: '1' })
+    registerSkillsLibrary(server)
+    assert.match(await callTool(server, 'get_skill', { name: 'avatar-extraction' }), /customer-research/)
+    assert.match(await callTool(server, 'get_skill', { name: 'performance-diagnosis' }), /meta-performance/)
+    for (const name of Object.keys(COVERED_ELSEWHERE)) assert.ok(!library.has(name), `${name} is served after all`)
+  })
+
+  test('every replacement it points to really exists', () => {
+    for (const target of Object.values(COVERED_ELSEWHERE)) {
+      for (const [, skill] of target.matchAll(/get_skill \{ name: "([^"]+)" \}/g)) {
+        assert.ok(library.has(skill!), `${skill} is not served`)
+      }
+    }
+  })
+
+  test('two sources serving the same name stop the server rather than one vanishing', () => {
+    const twice = [LIBRARIES[0]!, { ...LIBRARIES[0]!, source: 'someone/else' }]
+    assert.throws(() => loadLibrary(undefined, twice), /both provide/)
   })
 
   test('the framing tells the AI our playbooks win where both apply', () => {

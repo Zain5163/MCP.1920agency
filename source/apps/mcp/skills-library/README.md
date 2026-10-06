@@ -10,10 +10,34 @@ This folder **is** served, so what goes in it matters more.
 
 | Folder | Source | Licence | Commit | Skills |
 |---|---|---|---|---|
-| `marketingskills/` | github.com/coreyhaines31/marketingskills | MIT | `5b2c0007766c6a1cf1d53fd8fc73e979e0821022` | 50 |
+| `marketingskills/` | github.com/coreyhaines31/marketingskills | MIT | `dda3841f0b294e01e93b1541486beefbfab0915e` | 50 |
+| `advertising-skills/` | github.com/realkimbarrett/advertising-skills | MIT (declared; see its NOTICE.md) | `45f4a4a1dabe24113193369b55b929b1de4ff04a` | 4 of 12 |
 
-Fetched 2026-09-30, at the owner's request, so future SEO, WordPress and Google
-work starts from this knowledge rather than from new research.
+`marketingskills` was fetched 2026-09-30 at the owner's request, so future SEO,
+WordPress and Google work starts from this knowledge rather than from new
+research. **Updated 2026-10-06** from `5b2c000` to `dda3841`: same 50 skills, 76
+files revised upstream (ads, ad-creative, ai-seo, copywriting, social and others).
+Upstream `evals/` folders (test cases) and one HTML template are not copied,
+because they are never served.
+
+`advertising-skills` was added 2026-10-06 at the owner's request: *add what is
+missing, drop what we already have*. Kept, because nothing served covers them as a
+working tool:
+
+| Skill | Why kept |
+|---|---|
+| `schwartz-awareness-mapper` | Awareness stages appear only inside a marketing-council advisor persona |
+| `mechanism-builder` | "Unique mechanism" is only mentioned in passing in ad-creative |
+| `conversion-path-builder` | Funnel choice by trust gap (call, lead magnet, VSL, quiz) |
+| `full-funnel-campaign-orchestrator` | Chains the steps; dropped steps are redirected (below) |
+
+Left out, because a deeper skill is already served. `get_skill` on any of these
+names returns the replacement (`COVERED_ELSEWHERE` in `src/skills-library.ts`):
+`avatar-extraction` → customer-research · `offer-extraction` → offers ·
+`ad-angle-multiplier` and `scroll-stopping-creative` → ad-creative ·
+`headline-matrix` → copywriting and ad-creative · `objection-crusher` → offers and cro ·
+`generic-language-killer` → copy-editing · `performance-diagnosis` → the
+`meta-performance` playbook.
 
 ## Checked on arrival
 
@@ -27,6 +51,12 @@ Every file was scanned before being committed:
 Result: **clean.** The only hits were an `rm -rf` in the upstream README's install
 instructions (the README is not served) and a variable named `api_key` in a code
 example.
+
+Re-run 2026-10-06 on both libraries: **clean.** The only hit was a line in
+`ads/references/audit-guardrails.md` warning the AI *against* following
+"ignore previous instructions" found in fetched pages. New external references
+upstream are links back to the repo, the official MCP Registry, and the
+`hyperframes` and `mcp-publisher` CLIs named in documentation.
 
 ## Rules for this folder
 
