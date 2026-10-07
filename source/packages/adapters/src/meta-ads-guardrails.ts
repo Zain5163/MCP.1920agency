@@ -32,6 +32,68 @@ export const META_OBJECTIVES = [
 /** Goals that cannot work without a pixel and a conversion event. */
 export const META_CONVERSION_GOALS = new Set(['OFFSITE_CONVERSIONS', 'VALUE', 'LEAD_GENERATION'])
 
+/** Older and lower-case names some callers still use. */
+const OBJECTIVE_ALIASES: Record<string, string> = {
+  sales: 'OUTCOME_SALES',
+  conversions: 'OUTCOME_SALES',
+  leads: 'OUTCOME_LEADS',
+  traffic: 'OUTCOME_TRAFFIC',
+  awareness: 'OUTCOME_AWARENESS',
+  engagement: 'OUTCOME_ENGAGEMENT',
+  app_promotion: 'OUTCOME_APP_PROMOTION',
+}
+
+export function normaliseObjective(objective: string): string {
+  return OBJECTIVE_ALIASES[objective.toLowerCase()] ?? objective
+}
+
+/**
+ * The optimisation goal an objective means when the plan names none.
+ *
+ * The objective is what the business wants to pay for; the goal is what Meta
+ * actually hunts for. They must agree. Found live 2026-10-08: a Sales campaign
+ * asked for Purchase but named no goal, and creation fell back to LINK_CLICKS,
+ * so Meta would have bought clickers for a business that wanted buyers. The owner
+ * caught it in Ads Manager before it spent. One function now decides, and both the
+ * review and the creation use it, so they cannot disagree again.
+ */
+export function goalForObjective(objective: string, options: { instantForm: boolean; hasPixel: boolean }): string {
+  if (options.instantForm) return 'LEAD_GENERATION'
+  switch (normaliseObjective(objective)) {
+    case 'OUTCOME_SALES':
+    case 'OUTCOME_LEADS':
+      return 'OFFSITE_CONVERSIONS'
+    case 'OUTCOME_TRAFFIC':
+      // Without a pixel Meta cannot count page views, so clicks are all it can see.
+      return options.hasPixel ? 'LANDING_PAGE_VIEWS' : 'LINK_CLICKS'
+    case 'OUTCOME_AWARENESS':
+      return 'REACH'
+    case 'OUTCOME_ENGAGEMENT':
+      return 'POST_ENGAGEMENT'
+    case 'OUTCOME_APP_PROMOTION':
+      return 'APP_INSTALLS'
+    default:
+      return 'LINK_CLICKS'
+  }
+}
+
+/** The website event an objective means when the plan names none. */
+export function eventForObjective(objective: string): string | undefined {
+  const o = normaliseObjective(objective)
+  if (o === 'OUTCOME_SALES') return 'PURCHASE'
+  if (o === 'OUTCOME_LEADS') return 'LEAD'
+  return undefined
+}
+
+/**
+ * The only goals each paid-result objective may use. Anything else optimises
+ * for something the business did not ask to pay for.
+ */
+const GOALS_ALLOWED: Record<string, ReadonlySet<string>> = {
+  OUTCOME_SALES: new Set(['OFFSITE_CONVERSIONS', 'VALUE']),
+  OUTCOME_LEADS: new Set(['OFFSITE_CONVERSIONS', 'LEAD_GENERATION', 'QUALITY_LEAD']),
+}
+
 export const META_CTAS = new Set([
   'SHOP_NOW', 'LEARN_MORE', 'SIGN_UP', 'BOOK_TRAVEL', 'DOWNLOAD',
   'GET_OFFER', 'GET_QUOTE', 'CONTACT_US', 'SUBSCRIBE', 'APPLY_NOW',
@@ -142,8 +204,6 @@ export function checkMetaAdPlan(plan: AdPlan, context: MetaCheckContext = {}): A
   plan.adSets.forEach((entry, i) => {
     const at = `adSets[${i}]`
     const { adSet, ads } = entry
-    const goal = adSet.optimizationGoal
-    const optimisingForConversions = goal !== undefined && META_CONVERSION_GOALS.has(goal)
 
     /**
      * Instant-form leads are captured inside Meta, so the website machinery
@@ -152,6 +212,33 @@ export function checkMetaAdPlan(plan: AdPlan, context: MetaCheckContext = {}): A
      * every instant-form campaign for missing things it never needs.
      */
     const instantForm = adSet.leadDestination === 'instant_form'
+
+    // Checked as it will be built: the goal and event creation will really use.
+    const objective = normaliseObjective(String(plan.campaign.objective))
+    const goal =
+      adSet.optimizationGoal ?? goalForObjective(objective, { instantForm, hasPixel: context.hasPixel !== false })
+    const conversionEvent = adSet.conversionEvent ?? eventForObjective(objective)
+    const optimisingForConversions = META_CONVERSION_GOALS.has(goal)
+
+    const allowed = GOALS_ALLOWED[objective]
+    if (allowed !== undefined && !allowed.has(goal)) {
+      const wants = objective === 'OUTCOME_SALES' ? 'purchases' : 'leads'
+      issues.push({
+        severity: 'error',
+        message:
+          `A ${objective === 'OUTCOME_SALES' ? 'Sales' : 'Leads'} campaign must optimise for ${wants}, not "${goal}". ` +
+          `Meta finds the people a goal asks for: optimise for clicks and it finds clickers, not ${wants === 'purchases' ? 'buyers' : 'leads'}. ` +
+          `Leave optimizationGoal out (it becomes ${objective === 'OUTCOME_SALES' ? 'OFFSITE_CONVERSIONS on Purchase' : 'OFFSITE_CONVERSIONS on Lead, or LEAD_GENERATION for an instant form'}), or set it to one of: ${[...allowed].join(', ')}.`,
+        path: `${at}.optimizationGoal`,
+      })
+    }
+    if (objective === 'OUTCOME_SALES' && context.hasPixel === false) {
+      issues.push({
+        severity: 'error',
+        message: 'A Sales campaign needs the website pixel to see purchases, and this ad account has none configured.',
+        path: `${at}.conversionEvent`,
+      })
+    }
 
     if (instantForm) {
       if (goal !== undefined && goal !== 'LEAD_GENERATION') {
@@ -180,14 +267,14 @@ export function checkMetaAdPlan(plan: AdPlan, context: MetaCheckContext = {}): A
           path: `${at}.optimizationGoal`,
         })
       }
-      if (adSet.conversionEvent === undefined) {
+      if (conversionEvent === undefined) {
         issues.push({
           severity: 'error',
           message: `Optimising for "${goal}" needs a conversion event — Meta cannot optimise toward nothing.`,
           path: `${at}.conversionEvent`,
         })
       } else {
-        conversionEvents.add(adSet.conversionEvent)
+        conversionEvents.add(conversionEvent)
       }
 
       if ((adSet.audience.interests?.length ?? 0) > 0) {

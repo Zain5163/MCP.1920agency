@@ -10,6 +10,10 @@ The job: more sales at a lower cost per sale, every week, without breaking what
 already works. This skill is the method; the business's own rules file (targets,
 products, approvals) and the `meta-ads` / `meta-performance` playbooks sit beside it.
 
+Before building or changing any campaign, follow `get_skill campaign-setup`: the objective
+must match the result the business pays for, and every campaign is checked three times
+(plan, read-back after creation, read-back before activation).
+
 Read `references/research-2026-10.md` for the evidence behind each rule and
 `references/field-notes.md` for what real accounts have taught. Re-check anything
 older than about three months: Meta changes ranking, reporting and attribution often.

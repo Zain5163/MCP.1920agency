@@ -6,6 +6,8 @@ import { money, type AdPlan } from '@social-publisher/core'
 import {
   META_DEFAULT_GUARDRAILS,
   checkMetaAdPlan,
+  eventForObjective,
+  goalForObjective,
   learningPhaseFloor,
 } from '../src/meta-ads-guardrails.ts'
 
@@ -102,17 +104,83 @@ describe('conversion goals', () => {
   })
 
   test('refuse a conversion goal with no conversion event', () => {
+    // Sales and Leads imply Purchase and Lead; a conversion goal on any other
+    // objective has nothing to optimise toward unless the event is named.
     const p = plan()
     const issues = checkMetaAdPlan(
       {
         ...p,
+        campaign: { ...p.campaign, objective: 'OUTCOME_TRAFFIC' as never },
         adSets: [
-          { ...p.adSets[0]!, adSet: { ...p.adSets[0]!.adSet, conversionEvent: undefined } },
+          {
+            ...p.adSets[0]!,
+            adSet: { ...p.adSets[0]!.adSet, optimizationGoal: 'OFFSITE_CONVERSIONS', conversionEvent: undefined },
+          },
         ],
       },
       { guardrails: guards },
     )
     assert.ok(errors(issues).some((i) => i.path.includes('conversionEvent')))
+  })
+
+  /**
+   * Found live 2026-10-08: a Sales campaign was created optimising for link
+   * clicks. The owner caught it in Ads Manager before it spent. The objective is
+   * what the business pays for, so the goal must match it.
+   */
+  test('a Sales campaign that optimises for clicks is refused', () => {
+    const p = plan()
+    for (const goal of ['LINK_CLICKS', 'LANDING_PAGE_VIEWS', 'REACH', 'POST_ENGAGEMENT']) {
+      const issues = checkMetaAdPlan(
+        { ...p, adSets: [{ ...p.adSets[0]!, adSet: { ...p.adSets[0]!.adSet, optimizationGoal: goal } }] },
+        { guardrails: guards, hasPixel: true },
+      )
+      assert.ok(errors(issues).some((i) => /must optimise for purchases/.test(i.message)), goal)
+    }
+  })
+
+  test('a Leads campaign that optimises for clicks is refused', () => {
+    const p = plan()
+    const issues = checkMetaAdPlan(
+      {
+        ...p,
+        campaign: { ...p.campaign, objective: 'OUTCOME_LEADS' as never },
+        adSets: [{ ...p.adSets[0]!, adSet: { ...p.adSets[0]!.adSet, optimizationGoal: 'LINK_CLICKS' } }],
+      },
+      { guardrails: guards, hasPixel: true },
+    )
+    assert.ok(errors(issues).some((i) => /must optimise for leads/.test(i.message)))
+  })
+
+  test('a Sales campaign that names no goal or event is accepted as Purchase', () => {
+    const p = plan()
+    const issues = checkMetaAdPlan(
+      {
+        ...p,
+        adSets: [
+          {
+            ...p.adSets[0]!,
+            adSet: { ...p.adSets[0]!.adSet, optimizationGoal: undefined, conversionEvent: undefined },
+          },
+        ],
+      },
+      { guardrails: guards, hasPixel: true },
+    )
+    assert.ok(!errors(issues).some((i) => /optimise for|conversion event/.test(i.message)), JSON.stringify(errors(issues)))
+  })
+
+  test('each objective implies the goal a person would expect', () => {
+    const px = { instantForm: false, hasPixel: true }
+    assert.equal(goalForObjective('OUTCOME_SALES', px), 'OFFSITE_CONVERSIONS')
+    assert.equal(goalForObjective('OUTCOME_LEADS', px), 'OFFSITE_CONVERSIONS')
+    assert.equal(goalForObjective('OUTCOME_LEADS', { ...px, instantForm: true }), 'LEAD_GENERATION')
+    assert.equal(goalForObjective('OUTCOME_TRAFFIC', px), 'LANDING_PAGE_VIEWS')
+    assert.equal(goalForObjective('OUTCOME_TRAFFIC', { ...px, hasPixel: false }), 'LINK_CLICKS')
+    assert.equal(goalForObjective('OUTCOME_AWARENESS', px), 'REACH')
+    assert.equal(goalForObjective('sales', px), 'OFFSITE_CONVERSIONS')
+    assert.equal(eventForObjective('OUTCOME_SALES'), 'PURCHASE')
+    assert.equal(eventForObjective('OUTCOME_LEADS'), 'LEAD')
+    assert.equal(eventForObjective('OUTCOME_TRAFFIC'), undefined)
   })
 
   test('warn when one campaign mixes conversion events', () => {

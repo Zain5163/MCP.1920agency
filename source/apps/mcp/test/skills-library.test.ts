@@ -23,7 +23,7 @@ describe('the skills library', () => {
   const library = loadLibrary()
 
   test('loads every skill in the pinned copies', () => {
-    assert.equal(library.size, 55)
+    assert.equal(library.size, 56)
     for (const name of ['seo-audit', 'ai-seo', 'copywriting', 'ads', 'social', 'cro']) {
       assert.ok(library.has(name), `${name} is missing`)
     }
@@ -37,7 +37,7 @@ describe('the skills library', () => {
     const server = new McpServer({ name: 't', version: '1' })
     registerSkillsLibrary(server)
     const text = await callTool(server, 'list_skills', {})
-    assert.match(text, /^55 skills/)
+    assert.match(text, /^56 skills/)
     assert.match(text, /seo-audit/)
   })
 

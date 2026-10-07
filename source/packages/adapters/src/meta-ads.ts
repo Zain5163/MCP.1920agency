@@ -17,9 +17,12 @@ import {
 import {
   META_CONVERSION_GOALS,
   checkMetaAdPlan,
+  eventForObjective,
+  goalForObjective,
   isDynamicCreative,
   type MetaCheckContext,
 } from './meta-ads-guardrails.ts'
+import { adLinks, verifyCampaignSnapshot, type VerifyCheck } from './meta-ads-verify.ts'
 import { META_DEFAULT_NAMING, adName, adSetName, campaignName, urlTags } from './meta-ads-naming.ts'
 
 /**
@@ -609,6 +612,47 @@ export class MetaAdsClient {
    * `effective_status` and the review feedback so a rejection is visible
    * instead of looking like a quiet campaign.
    */
+  /**
+   * Reads a campaign back from Meta and checks it against the plan it was built
+   * from (when given) and against rules that must always hold: the goal matches
+   * the objective, the right pixel and event, Page and Instagram, budgets,
+   * countries, every landing page loads, no ad rejected. See meta-ads-verify.ts.
+   */
+  async verify(campaignId: string, expected?: AdPlan): Promise<VerifyCheck[]> {
+    const campaign = (await this.#get(campaignId, { fields: 'id,name,objective,status,daily_budget' })) as Record<string, unknown>
+    const adSets = (await this.#get(`${campaignId}/adsets`, {
+      fields: 'id,name,status,optimization_goal,promoted_object,destination_type,daily_budget,targeting{geo_locations,age_min,age_max}',
+      limit: '100',
+    })) as { data?: Record<string, unknown>[] }
+    const ads = (await this.#get(`${campaignId}/ads`, {
+      fields: 'id,name,status,effective_status,tracking_specs,creative{object_story_spec,asset_feed_spec}',
+      limit: '100',
+    })) as { data?: Record<string, unknown>[] }
+
+    // Each landing page is loaded once, as a visitor would, following redirects.
+    const links: Record<string, number> = {}
+    for (const url of new Set((ads.data ?? []).flatMap(adLinks))) {
+      try {
+        const response = await this.#fetch(url, { method: 'GET', redirect: 'follow', signal: AbortSignal.timeout(15_000) })
+        links[url] = response.status
+      } catch {
+        links[url] = 0
+      }
+    }
+
+    // Reviewed as built: an ad with several texts and shapes becomes several ads.
+    const plan = expected !== undefined ? expandForPlacements(expected) : undefined
+    return verifyCampaignSnapshot(
+      { campaign, adSets: adSets.data ?? [], ads: ads.data ?? [], links },
+      {
+        pageId: this.#account.pageId,
+        ...(this.#account.instagramId !== undefined ? { instagramId: this.#account.instagramId } : {}),
+        ...(this.#account.pixelId !== undefined ? { pixelId: this.#account.pixelId } : {}),
+      },
+      plan,
+    )
+  }
+
   async status(campaignId: string): Promise<CampaignStatus> {
     const campaign = await this.#get(campaignId, {
       fields: 'id,name,status,effective_status,daily_budget',
@@ -1159,11 +1203,9 @@ export class MetaAdsClient {
      */
     const goal =
       adSet.optimizationGoal ??
-      (instantForm
-        ? 'LEAD_GENERATION'
-        : ['OUTCOME_TRAFFIC', 'traffic'].includes(plan.campaign.objective as string) && this.#account.pixelId !== undefined
-          ? 'LANDING_PAGE_VIEWS'
-          : 'LINK_CLICKS')
+      goalForObjective(String(plan.campaign.objective), { instantForm, hasPixel: this.#account.pixelId !== undefined })
+    // A Sales or Leads plan that names no event means Purchase or Lead.
+    const conversionEvent = adSet.conversionEvent ?? eventForObjective(String(plan.campaign.objective))
 
     const body: Record<string, string> = {
       name: adSetName(META_DEFAULT_NAMING.adSet, {
@@ -1218,10 +1260,10 @@ export class MetaAdsClient {
     if (instantForm) {
       body.promoted_object = JSON.stringify({ page_id: this.#account.pageId })
       body.destination_type = 'ON_AD'
-    } else if (adSet.conversionEvent !== undefined && this.#account.pixelId !== undefined) {
+    } else if (conversionEvent !== undefined && this.#account.pixelId !== undefined) {
       body.promoted_object = JSON.stringify({
         pixel_id: this.#account.pixelId,
-        custom_event_type: adSet.conversionEvent,
+        custom_event_type: conversionEvent,
       })
       body.destination_type = 'WEBSITE'
     }

@@ -1,7 +1,14 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 
-import { META_OBJECTIVES, MetaAdsClient, expandForPlacements, type MetaAdAccount } from '@social-publisher/adapters'
+import {
+  META_OBJECTIVES,
+  MetaAdsClient,
+  expandForPlacements,
+  formatVerification,
+  verificationPassed,
+  type MetaAdAccount,
+} from '@social-publisher/adapters'
 import { optional } from '@social-publisher/config'
 import {
   checkSpend,
@@ -506,6 +513,18 @@ export function registerAdsTools(server: McpServer): void {
           dailyMinor: total?.minor,
         })
 
+        /**
+         * Second checkpoint: read what Meta actually stored and compare it with
+         * the plan. Creation succeeding is not the same as being built right
+         * (2026-10-08: a Sales campaign came back optimising for link clicks).
+         */
+        let verification: string
+        try {
+          verification = formatVerification(await loaded.client.verify(result.created.campaignId!, plan))
+        } catch (error) {
+          verification = `Could not read the campaign back to verify it: ${error instanceof Error ? error.message : String(error)}. Run verify_campaign before activating.`
+        }
+
         return text(
           [
             `Created in ${loaded.label}, everything PAUSED. Nothing is spending.`,
@@ -513,8 +532,11 @@ export function registerAdsTools(server: McpServer): void {
             `  ad sets   ${result.created.adSetIds.length}`,
             `  ads       ${result.created.adIds.length}`,
             '',
+            verification,
+            '',
             'Meta now reviews the ads, which can take hours. Check with get_campaign_status',
             'before activating: an ad can be rejected after it was created successfully.',
+            'activate_campaign verifies again and refuses if any check fails.',
           ].join('\n'),
         )
       }),
@@ -550,6 +572,18 @@ export function registerAdsTools(server: McpServer): void {
   )
 
   server.tool(
+    'verify_campaign',
+    "Read a Meta campaign back from Meta and check every setting: the optimisation goal matches the objective (Sales optimises for purchases, Leads for leads), the right pixel and event, Page and Instagram, landing pages load, and no ad is rejected. Run it after any change and before asking anyone to activate. Reads only.",
+    { campaignId: z.string(), account: accountArg },
+    async ({ campaignId, account }) =>
+      await guarded(async () => {
+        const loaded = loadClient(account)
+        if ('error' in loaded) return text(loaded.error)
+        return text(`Ad account: ${loaded.label}\n\n${formatVerification(await loaded.client.verify(campaignId))}`)
+      }),
+  )
+
+  server.tool(
     'activate_campaign',
     'Start a paused Meta campaign. THIS SPENDS REAL MONEY until stopped. Call once WITHOUT a confirm token to get the approval summary, show it to the user, and only call again with the token once they approve.',
     { campaignId: z.string(), confirm: z.string().optional(), account: accountArg },
@@ -567,6 +601,17 @@ export function registerAdsTools(server: McpServer): void {
             `Not activated. ${status.rejected.length} ad(s) were rejected by Meta. Run get_campaign_status for the reasons.`,
           )
         }
+
+        /**
+         * Third checkpoint, immediately before money moves: the campaign as Meta
+         * holds it now must pass every rule (goal matches objective, right pixel,
+         * Page and Instagram, pages load, nothing rejected). Any failure blocks.
+         */
+        const checks = await loaded.client.verify(campaignId)
+        if (!verificationPassed(checks)) {
+          return text(`Not activated. The campaign does not pass verification:\n\n${formatVerification(checks)}`)
+        }
+        const verifiedLine = formatVerification(checks).split('\n')[0]!
 
         // Days left, from now: an activation is priced from the moment it starts,
         // not from when the campaign was created.
@@ -608,6 +653,7 @@ export function registerAdsTools(server: McpServer): void {
             [
               `Activate "${status.campaign.name}"`,
               costLine,
+              `  ${verifiedLine}`,
               `  ${status.ads.length} ad(s)${status.inReview.length > 0 ? `, ${status.inReview.length} still in review` : ''}`,
               '',
               'Money leaves the ad account from this moment until the campaign is paused.',

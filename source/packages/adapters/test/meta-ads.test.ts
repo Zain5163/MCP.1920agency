@@ -266,10 +266,12 @@ describe('attribution windows', () => {
   test('a click goal sends NONE — Meta only allows (1, 0) and rejects the rest', async () => {
     // Found live. The click is the outcome, so there is nothing to attribute a
     // week later. Omitting it lets Meta apply a default that cannot be rejected.
+    // A Traffic campaign: the only kind that may optimise for clicks.
     const { fetchImpl, calls } = mockMeta([OK])
     const p = plan()
     await client(fetchImpl).create({
       ...p,
+      campaign: { ...p.campaign, objective: 'OUTCOME_TRAFFIC' as never },
       adSets: [
         {
           ...p.adSets[0]!,
@@ -352,6 +354,7 @@ describe('website tracking', () => {
     const { fetchImpl, calls } = mockMeta([OK])
     await new MetaAdsClient({ account: { ...account, pixelId: undefined }, accessToken: 'T', fetch: fetchImpl }).create({
       ...plan(),
+      campaign: { ...plan().campaign, objective: 'OUTCOME_TRAFFIC' as never },
       adSets: [
         {
           ...plan().adSets[0]!,
@@ -360,6 +363,62 @@ describe('website tracking', () => {
       ],
     })
     assert.equal(calls.find((c) => c.url.endsWith('/ads'))!.body.tracking_specs, undefined)
+  })
+})
+
+describe('a Sales campaign optimises for purchases', () => {
+  /**
+   * Found live 2026-10-08: Sales objective, Purchase event, no goal named, and
+   * the ad set was created on LINK_CLICKS. This is the regression test.
+   */
+  test('with no goal named, it is created on OFFSITE_CONVERSIONS with the Purchase event', async () => {
+    const { fetchImpl, calls } = mockMeta([OK])
+    const p = plan()
+    await client(fetchImpl).create({
+      ...p,
+      campaign: { ...p.campaign, objective: 'OUTCOME_SALES' as never },
+      adSets: [
+        {
+          ...p.adSets[0]!,
+          adSet: { ...p.adSets[0]!.adSet, optimizationGoal: undefined, conversionEvent: 'PURCHASE', leadDestination: undefined },
+        },
+      ],
+    })
+    const adset = calls.find((c) => c.url.endsWith('/adsets'))!
+    assert.equal(adset.body.optimization_goal, 'OFFSITE_CONVERSIONS')
+    assert.equal((JSON.parse(adset.body.promoted_object!) as Record<string, string>).custom_event_type, 'PURCHASE')
+  })
+
+  test('with no event named either, Purchase is used', async () => {
+    const { fetchImpl, calls } = mockMeta([OK])
+    const p = plan()
+    await client(fetchImpl).create({
+      ...p,
+      campaign: { ...p.campaign, objective: 'OUTCOME_SALES' as never },
+      adSets: [
+        {
+          ...p.adSets[0]!,
+          adSet: { ...p.adSets[0]!.adSet, optimizationGoal: undefined, conversionEvent: undefined, leadDestination: undefined },
+        },
+      ],
+    })
+    const adset = calls.find((c) => c.url.endsWith('/adsets'))!
+    assert.equal(adset.body.optimization_goal, 'OFFSITE_CONVERSIONS')
+    assert.equal((JSON.parse(adset.body.promoted_object!) as Record<string, string>).custom_event_type, 'PURCHASE')
+  })
+
+  test('asked to optimise a Sales campaign for clicks, it creates nothing', async () => {
+    const { fetchImpl, calls } = mockMeta([OK])
+    const p = plan()
+    await assert.rejects(
+      client(fetchImpl).create({
+        ...p,
+        campaign: { ...p.campaign, objective: 'OUTCOME_SALES' as never },
+        adSets: [{ ...p.adSets[0]!, adSet: { ...p.adSets[0]!.adSet, optimizationGoal: 'LINK_CLICKS', leadDestination: undefined } }],
+      }),
+      /must optimise for purchases/,
+    )
+    assert.equal(calls.length, 0)
   })
 })
 
