@@ -23,7 +23,7 @@ describe('the skills library', () => {
   const library = loadLibrary()
 
   test('loads every skill in the pinned copies', () => {
-    assert.equal(library.size, 54)
+    assert.equal(library.size, 55)
     for (const name of ['seo-audit', 'ai-seo', 'copywriting', 'ads', 'social', 'cro']) {
       assert.ok(library.has(name), `${name} is missing`)
     }
@@ -37,7 +37,7 @@ describe('the skills library', () => {
     const server = new McpServer({ name: 't', version: '1' })
     registerSkillsLibrary(server)
     const text = await callTool(server, 'list_skills', {})
-    assert.match(text, /^54 skills/)
+    assert.match(text, /^55 skills/)
     assert.match(text, /seo-audit/)
   })
 
@@ -131,6 +131,33 @@ describe('the skills library', () => {
   test('two sources serving the same name stop the server rather than one vanishing', () => {
     const twice = [LIBRARIES[0]!, { ...LIBRARIES[0]!, source: 'someone/else' }]
     assert.throws(() => loadLibrary(undefined, twice), /both provide/)
+  })
+
+  test('our own skill is framed as ours, not as third-party text', async () => {
+    const server = new McpServer({ name: 't', version: '1' })
+    registerSkillsLibrary(server)
+    const text = await callTool(server, 'get_skill', { name: 'meta-account-manager' })
+    assert.ok(text.startsWith('[AdsPilot skill: "meta-account-manager"'))
+    assert.doesNotMatch(text.slice(0, 600), /Third-party guidance/)
+    assert.match(text, /references\/field-notes\.md/)
+    assert.match(text, /references\/research-2026-10\.md/)
+  })
+
+  /**
+   * The skill is served to every AdsPilot user. Lessons come from client
+   * accounts, so the client must never be identifiable from the text.
+   */
+  test('our own skills never name a client business', async () => {
+    const { readFileSync } = await import('node:fs')
+    const { join } = await import('node:path')
+    for (const skill of [...library.values()].filter((s) => s.library.own === true)) {
+      for (const file of ['SKILL.md', ...skill.references]) {
+        const text = readFileSync(join(skill.dir, ...file.split('/')), 'utf8')
+        for (const client of ['Muzaree', 'GradCollective', 'Knightsbridge', 'PSX', 'Syndra']) {
+          assert.doesNotMatch(text, new RegExp(client, 'i'), `${skill.name}/${file} names ${client}`)
+        }
+      }
+    }
   })
 
   test('the framing tells the AI our playbooks win where both apply', () => {

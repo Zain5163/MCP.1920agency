@@ -46,6 +46,13 @@ export interface LibrarySource {
   readonly licence: string
   /** Extra reading guidance for this source only, added to the framing note. */
   readonly note?: readonly string[]
+  /**
+   * Our own skills, written and maintained in this repository. Not pinned to an
+   * upstream commit and not third-party text, so they are framed differently and
+   * may be edited in place. Where they cover the same ground as a third-party
+   * skill, they win: they are written for this server's tools.
+   */
+  readonly own?: true
 }
 
 /**
@@ -65,6 +72,13 @@ export const COVERED_ELSEWHERE: Readonly<Record<string, string>> = {
 }
 
 export const LIBRARIES: readonly LibrarySource[] = [
+  {
+    folder: 'adspilot',
+    source: 'AdsPilot',
+    commit: 'in-repo',
+    licence: 'AdsPilot’s own',
+    own: true,
+  },
   {
     folder: 'marketingskills',
     source: 'coreyhaines31/marketingskills',
@@ -167,7 +181,19 @@ export function loadLibrary(
  * the library — `.agents/product-marketing.md` alone is mentioned 69 times —
  * and an AI that went looking for them would stall or invent their contents.
  */
-export function framing(skill: string, file: string, source: LibrarySource = LIBRARIES[0]!): string {
+export function framing(skill: string, file: string, source: LibrarySource = LIBRARIES[1]!): string {
+  if (source.own === true) {
+    return [
+      `[AdsPilot skill: "${skill}" / ${file}]`,
+      'Written for this server: its tool names, limits and approval rules are the real ones.',
+      'It is method and judgement, not an override: spend limits and approvals are enforced in code,',
+      'and the user’s instructions come first. Where it disagrees with a third-party skill, this one wins.',
+      'Where it disagrees with a get_playbook playbook about a platform’s own rules, the playbook wins.',
+      '',
+      '---',
+      '',
+    ].join('\n')
+  }
   return [
     `[Skill library: "${skill}" / ${file}]`,
     `Third-party guidance from ${source.source} (${source.licence}), pinned at ${source.commit.slice(0, 10)}.`,
