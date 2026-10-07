@@ -41,18 +41,34 @@ we cannot enhance our product". Decisions: `decisions/0009-free-and-premium-plan
   `upgrade` (the link; until checkout exists, a waitlist/contact link).
 - Local stdio use by the owner is the owner's tenant on Premium (never blocked).
 
-### Phase 1 status: built 2026-10-08, migration not applied
+### Phase 1 status: LIVE and verified 2026-10-08
 
-Built and unit-tested on branch `phase1-usage` (not merged, not pushed). **Not
-live**: nothing is metered until the migration is applied and the branch merged,
-in that order. Only compiled and unit-tested (RULES R4); no call has been
-metered against the real database yet.
+- 2026-10-08 ~02:45 PKT: migration `20261008120000_add_plans_and_usage` applied
+  to the live database with the owner's approval (`migrate status` showed it as
+  the only pending one). `phase1-usage` was fast-forwarded into the checked-out
+  branch, which another session had switched to `own-skills` seconds earlier;
+  `own-skills` was merged into master at ~03:35 PKT (owner approved) and pushed.
+  Packages rebuilt, typecheck green. The live SQL test (`packages/db/test/usage.test.ts`,
+  two throwaway tenants) passed 6/6 and now runs with the db suite.
+- **Verified live ~03:20 PKT:** the owner ran the Premium line below in the
+  Supabase SQL editor and reloaded VS Code; `check_usage` answered "Plan: Premium
+  (unlimited use, fair use applies) / Calls this month: 2", so calls are being
+  recorded and counted. The Premium line, for any rebuild: `UPDATE tenants SET plan = 'premium' WHERE id = (SELECT id FROM tenants ORDER BY created_at LIMIT 1);`
+  (the local server uses the oldest tenant, `currentScope` in `context.ts`).
+- ~03:35 PKT: migration `20261008140000_lock_down_provider_auths` applied
+  (owner approved): `provider_auths` (encrypted Google sign-in grants) was the
+  one table without row level security, because it was created after the
+  2026-09-25 lockdown. `list_accounts` and `check_usage` worked afterwards.
+- `prisma generate` hit EPERM on the query engine DLL because the running MCP
+  holds it; the generated client code was written and the engine file is
+  byte-identical, so nothing was missing. Expect this whenever the MCP is
+  running; reload VS Code first if a Prisma version ever changes.
 
 | Piece | Where |
 |---|---|
 | Plan rules (200 calls, thresholds, notice and limit wording, UTC reset, https-only `UPGRADE_URL` with a plain-words fallback) | `packages/core/src/domain/plans.ts`; `USAGE_LIMIT_REACHED` in the error catalogue |
 | Schema: `tenants.plan` (enum, default `free`), `tenants.plan_renews_at`, `tool_calls`, `usage_months` | `packages/db/prisma/schema.prisma` |
-| Migration (written, **not applied**; additive; RLS on, Data API grants revoked on the new tables) | `packages/db/prisma/migrations/20261008120000_add_plans_and_usage/migration.sql` |
+| Migration (**applied 2026-10-08**; additive; RLS on, Data API grants revoked on the new tables) | `packages/db/prisma/migrations/20261008120000_add_plans_and_usage/migration.sql` |
 | Tenant-scoped reads and writes: `usage(month)`, `recordToolCall` (log + atomic upsert-increment in one transaction), `markNoticesShown` | `packages/db/src/tenant-scope.ts` |
 | One wrapper on every tool, both transports; `check_usage` and `upgrade` | `apps/mcp/src/metering.ts`, `mcp-server.ts` (the only place a server is built), `account-tools.ts` |
 | Stdio tool set as a function / hosted composition | `apps/mcp/src/local-server.ts`, `hosted-server.ts` |
@@ -71,25 +87,8 @@ and this is logged. On stdio the log goes to stderr, the log file and Slack.
 hosted transport is stateless, so the client is remembered per API token id in
 memory; after a restart it is unknown until the client next initializes.
 
-**To make it live (owner's approval needed for step 2):**
-
-1. `UPGRADE_URL` (optional) in `%USERPROFILE%\.social-publisher\.env`: an https
-   checkout or waitlist link. Without it the texts say checkout is not open yet.
-2. Apply the migration, **before** merging: the new Prisma client selects
-   `tenants.plan`, so new code on the old schema breaks every tool that reads a
-   tenant. Old code on the new schema is fine. From `source/packages/db`:
-   `node --env-file="%USERPROFILE%\.social-publisher\.env" node_modules/prisma/build/index.js migrate status`,
-   then the same with `migrate deploy`.
-3. Put the owner's own tenant on Premium, so local use is never blocked. The
-   local server uses the oldest tenant (`currentScope` in `context.ts`):
-   `SELECT id, name, created_at, plan FROM tenants ORDER BY created_at LIMIT 3;`
-   then `UPDATE tenants SET plan = 'premium' WHERE id = '<that id>';`
-4. Merge `phase1-usage`, rebuild, restart the MCP server, then run
-   `pnpm --filter @social-publisher/db run test:usage` at a quiet time (live-DB
-   test of the SQL, kept out of the default run until the migration exists) and
-   rename it to `usage.test.ts`.
-5. Verify live: call any tool, then `check_usage`; one `tool_calls` row and a
-   count of 1 in `usage_months` should exist.
+**Left:** set `UPGRADE_URL` once the Polar checkout exists (until then the
+texts say checkout is not open yet).
 
 ## Phase 2 — Analytics and troubleshooting
 
@@ -149,6 +148,16 @@ memory; after a restart it is unknown until the client next initializes.
   rejected ads; those sections are improved first.
 - Per-industry guidance (dentist, education, real estate, e-commerce, tool
   websites) added to the playbooks as the data shows what each industry runs.
+- **Skills learned in use become product skills** (owner, 2026-10-08): what we
+  learn running real accounts (e.g. the Muzaree work, which started AdsPilot's
+  own skills library on branch `own-skills`) and what works for users is written
+  into skills and playbooks, so every user benefits. Learning from users uses
+  patterns only (objective, budget range, industry, result), never one user's ads,
+  copy or data shown to another; the privacy policy says so, and the owner
+  approves each skill or playbook change before it ships.
+- **Troubleshooting from the call log:** `tool_calls` shows which tool failed,
+  for whom, with which error code and AI client, so support can see a user's
+  problem without asking them to describe it.
 
 ## Order and dependencies
 

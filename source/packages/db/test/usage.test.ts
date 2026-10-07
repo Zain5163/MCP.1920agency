@@ -8,14 +8,12 @@ import { TenantScope, deleteTenantCompletely } from '../src/tenant-scope.ts'
 /**
  * Usage metering against the real database.
  *
- * NOT in the default run, on purpose: the file name does not match
- * `test/*.test.ts`. It needs migration 20261008120000_add_plans_and_usage, which
- * is applied only with the owner's approval; before that, every test here fails
- * on the missing table. Run it once the migration is in, at a quiet time:
+ * Migration 20261008120000_add_plans_and_usage was applied on 2026-10-08 and
+ * this file passed against it (6/6), so it now runs with the rest of the db
+ * suite. Like that suite it hits the live database: run it at a quiet time.
+ * On its own:
  *
  *   pnpm --filter @social-publisher/db run test:usage
- *
- * then rename it to usage.test.ts so it joins the suite.
  *
  * What a fake cannot prove is the SQL: that the upsert increments atomically,
  * and that one tenant's counter is never another's. Two throwaway tenants are

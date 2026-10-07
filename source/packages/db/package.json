@@ -16,7 +16,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "keepalive": "node --experimental-strip-types src/keepalive-cli.ts",
     "test": "node --test --experimental-strip-types test/*.test.ts",
-    "test:usage": "node --test --experimental-strip-types test/usage.after-migration.ts"
+    "test:usage": "node --test --experimental-strip-types test/usage.test.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.1.0",

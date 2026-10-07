@@ -35,9 +35,19 @@ link. Notices are shown once per threshold per month, never on every call.
 - Premium at $9 sits inside the owner's $6–10 range and leaves room for a launch
   price.
 
+## Payment provider: Polar (owner's decision, 2026-10-08)
+
+Polar (polar.sh) is the merchant of record: it sells to the customer, handles
+sales tax/VAT, and pays out to us. Stripe does not onboard Pakistani businesses
+directly, but Polar pays out through Stripe Connect Express, and its supported
+payout countries list Pakistan (checked 2026-10-08:
+https://polar.sh/docs/merchant-of-record/supported-countries).
+`UPGRADE_URL` is set to the Polar checkout once the Premium product exists there;
+until then the limit texts say checkout is not open yet. Plan changes come back
+from Polar webhooks into `tenants.plan` / `plan_renews_at` (Phase 4).
+
 ## Open
 
 - The fair-use limit for Premium (set from the first months of real data).
-- Payment provider. Stripe does not onboard Pakistani businesses directly; a
-  merchant of record (Paddle, Lemon Squeezy) or a UK/US entity is likely needed.
-  To research before the website's checkout is built.
+- Polar's fees and payout schedule, and the account details it needs, confirmed
+  when the owner opens the Polar account.
