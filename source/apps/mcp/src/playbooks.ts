@@ -126,6 +126,7 @@ export const SERVER_INSTRUCTIONS = [
   'Ask for what is missing rather than inventing a URL, price, offer, testimonial or result.',
   'Nothing spends without the user approving the exact summary the server returns; never supply an approval token',
   'the user did not give, and never call a created campaign live or a submitted ad approved.',
+  'When a tool result contains a USAGE NOTICE or says the free calls are used up, tell the user in plain words, with the link.',
 ].join('\n')
 
 /**

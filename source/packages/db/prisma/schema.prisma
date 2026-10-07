@@ -81,12 +81,12 @@ enum Role {
 }
 
 model User {
-  id           String   @id @default(uuid(7))
-  tenantId     String   @map("tenant_id")
-  email        String   @unique
-  passwordHash String   @map("password_hash")
-  role         Role     @default(member)
-  displayName  String?  @map("display_name")
+  id           String  @id @default(uuid(7))
+  tenantId     String  @map("tenant_id")
+  email        String  @unique
+  passwordHash String  @map("password_hash")
+  role         Role    @default(member)
+  displayName  String? @map("display_name")
 
   lastLoginAt DateTime? @map("last_login_at")
   createdAt   DateTime  @default(now()) @map("created_at")
@@ -133,18 +133,32 @@ model ApiToken {
   @@map("api_tokens")
 }
 
+/// The plan an account is on. Decision 0009: Free is 200 MCP calls a month,
+/// Premium is unlimited (fair use). Anything new starts on Free.
+enum Plan {
+  free
+  premium
+}
+
 model Tenant {
   id        String   @id @default(uuid(7))
   name      String
   createdAt DateTime @default(now()) @map("created_at")
 
+  plan         Plan      @default(free)
+  /// When a paid plan next renews. Null on Free, and on Premium set by hand
+  /// (the owner's own account) until checkout exists.
+  planRenewsAt DateTime? @map("plan_renews_at")
+
   users         User[]
   apiTokens     ApiToken[]
   providerAuths ProviderAuth[]
-  connections  Connection[]
-  posts        Post[]
-  mediaAssets  MediaAsset[]
-  auditEntries AuditLog[]
+  connections   Connection[]
+  posts         Post[]
+  mediaAssets   MediaAsset[]
+  auditEntries  AuditLog[]
+  toolCalls     ToolCall[]
+  usageMonths   UsageMonth[]
 
   @@map("tenants")
 }
@@ -163,7 +177,7 @@ model ProviderAuth {
   tenantId String @map("tenant_id")
 
   /// 'meta', and later 'linkedin', 'google', 'tiktok'.
-  provider String
+  provider       String
   /// The provider's own id for the person who authorised. Lets us detect the
   /// same human reconnecting rather than creating a duplicate.
   externalUserId String  @map("external_user_id")
@@ -252,8 +266,8 @@ model Post {
 
 /// Join table: ordering matters for carousels, so it is explicit rather than implicit.
 model PostMedia {
-  postId  String @map("post_id")
-  mediaId String @map("media_id")
+  postId   String @map("post_id")
+  mediaId  String @map("media_id")
   /// Position in a carousel. Instagram and Threads honour this.
   position Int
 
@@ -353,7 +367,7 @@ model MediaAsset {
   id       String @id @default(uuid(7))
   tenantId String @map("tenant_id")
 
-  r2Key String @map("r2_key")
+  r2Key     String @map("r2_key")
   /// Must stay reachable for the whole publish window: Instagram and TikTok FETCH
   /// media from this URL rather than accepting an upload. Do not delete an asset
   /// until every target referencing it is in a terminal state.
@@ -387,6 +401,63 @@ model AuditLog {
 
   @@index([tenantId, createdAt])
   @@map("audit_log")
+}
+
+/// One row per MCP tool call: which tool, whether it worked, how long it took
+/// and which AI client sent it. This is what answers "which tool fails, for
+/// whom, with which error" (architecture/2026-10-08-plans-usage-analytics-hosting.md).
+///
+/// **Never** the call's arguments, its result, tokens or personal data: a call
+/// log that held post text or ad copy would be a second copy of customer
+/// content with none of the care the posts table gets.
+///
+/// Append-only, like the audit log.
+model ToolCall {
+  id            String   @id @default(uuid(7))
+  tenantId      String   @map("tenant_id")
+  /// Not a foreign key on purpose: the local stdio server has no user, and a
+  /// count of past calls should not block or vanish with a user's removal.
+  /// Removing the tenant removes the rows.
+  userId        String?  @map("user_id")
+  tool          String
+  ok            Boolean
+  /// The catalogue code when the result was a failure (resolutions.ts).
+  errorCode     String?  @map("error_code")
+  durationMs    Int      @map("duration_ms")
+  /// From the MCP initialize request's clientInfo: Claude Code, Cursor, ...
+  clientName    String?  @map("client_name")
+  clientVersion String?  @map("client_version")
+  /// 'stdio' or 'http'.
+  transport     String
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@map("tool_calls")
+}
+
+/// Counted MCP calls per tenant per calendar month (UTC), and which usage
+/// notices that month has already carried, so each is shown once.
+///
+/// A counter rather than COUNT(*) over tool_calls: the limit is checked before
+/// every call, and that check must stay one indexed row read however many
+/// calls a busy account makes. The key is the natural one; its leading column
+/// is the tenant, so the foreign key is indexed by it.
+model UsageMonth {
+  tenantId     String   @map("tenant_id")
+  /// 'YYYY-MM', UTC.
+  month        String
+  calls        Int      @default(0)
+  /// Thresholds (percent of the Free allowance) already shown this month.
+  noticesShown Int[]    @default([]) @map("notices_shown")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@id([tenantId, month])
+  @@map("usage_months")
 }
 
 /// Proof-of-life for each background component.
