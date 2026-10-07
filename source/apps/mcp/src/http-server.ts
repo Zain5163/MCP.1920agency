@@ -1,6 +1,5 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 
 import { identifyToken, type TokenIdentity } from '@social-publisher/auth'
@@ -8,9 +7,7 @@ import { optional } from '@social-publisher/config'
 import { disconnect, health } from '@social-publisher/db'
 import { createLogger } from '@social-publisher/telemetry'
 
-import { SERVER_INSTRUCTIONS, registerPlaybooks } from './playbooks.ts'
-import { registerSkillsLibrary } from './skills-library.ts'
-import { registerTools } from './tools.ts'
+import { buildHostedServer, rememberClient } from './hosted-server.ts'
 
 /**
  * Hosted MCP server.
@@ -23,6 +20,8 @@ import { registerTools } from './tools.ts'
  * tool.** Authentication happens once, at the door, and every tool is then built
  * around the resolved TenantScope. There is no code path where a tool runs without
  * a tenant, because the tools are constructed per request from the identity.
+ *
+ * Every tool is metered against that tenant's plan (metering.ts, decision 0009).
  */
 
 const logger = createLogger({
@@ -32,6 +31,7 @@ const logger = createLogger({
 })
 
 const PORT = Number(optional('MCP_PORT', '8080'))
+const UPGRADE_URL = optional('UPGRADE_URL')
 
 function json(res: ServerResponse, status: number, body: unknown): void {
   const payload = JSON.stringify(body)
@@ -110,11 +110,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
    * cannot see another tenant — there is no shared, long-lived server holding a
    * tenant that could be mismatched with an incoming request.
    */
-  const mcp = new McpServer({ name: 'adspilot', version: '0.3.0' }, { instructions: SERVER_INSTRUCTIONS })
-  registerTools(mcp, identity, scoped)
-  // Playbooks only: static text, no credentials. Ads tools stay local (decision 0005).
-  registerPlaybooks(mcp)
-  registerSkillsLibrary(mcp)
+  const mcp = buildHostedServer(identity, scoped, { upgradeUrl: UPGRADE_URL })
 
   const transport = new StreamableHTTPServerTransport({
     // Stateless: every request carries its own token, so there is no session to
@@ -123,6 +119,9 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   })
 
   res.on('close', () => {
+    // Set only on the request that carried initialize; remembered so this
+    // token's later tool calls, each on a fresh server, can record the client.
+    rememberClient(identity.tokenId, mcp.server.getClientVersion())
     void transport.close()
     void mcp.close()
   })
