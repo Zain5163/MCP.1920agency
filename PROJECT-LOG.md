@@ -1700,6 +1700,39 @@ the permission system, so the owner makes it.
 ("Filename too long"); delete it with the `\\?\` long-path prefix, then
 `git worktree prune`.
 
+## 2026-10-07 — 1920 Agency WhatsApp ad extended (owner-approved)
+
+Ad set `120213055708920366` "13-11-2024 | Video ad Set | WA Message" (campaign
+"13-11-2024 |Video Editing Services Campaign", 1920Agency 10) stopped at 22:20 PKT on
+6 Oct: it reached its end date and had spent its lifetime budget (PKR 14,992.89 of 14,993.33).
+With the owner's yes, its end date was moved to **2026-11-06 22:20 PKT** and its lifetime
+budget raised to **PKR 28,993.33** (+14,000, about PKR 467/day). Read back from Meta:
+ACTIVE, budget remaining PKR 14,000.44. Last 30 days before this: PKR 9,600, 172 WhatsApp
+conversations (about PKR 56 each), 3 orders.
+
+Same day, owner: "add another 14000". Lifetime budget raised to **PKR 42,993.33**; read back
+ACTIVE, budget remaining PKR 28,000.44 to 6 Nov (about PKR 933/day).
+
+**Gap:** AdsPilot has no tool for end dates or lifetime budgets (`change_budget` sets daily
+budgets only), so this was a direct Graph API call with the AdsPilot token.
+
+## 2026-10-07 — Several ad accounts, chosen by name (commit `2e0d45b`)
+
+**Owner:** "I don't want to do it in future" (switching the account in `.env` by hand
+before each client's work). Granted Claude edit access to `~/.social-publisher/` too.
+
+- Every ads tool takes an optional `account` (name, key or id); `list_ad_accounts` shows
+  them. The list is `~/.social-publisher/ad-accounts.json`: outside the repo, no secrets,
+  read on each call, so adding a client needs no restart. Omitting `account` uses the
+  `.env` default, unchanged.
+- Each account may carry its own spend ceiling (Muzaree: PKR 10,000/day, 300,000/month);
+  otherwise `.env`'s applies, against that account's own active spend.
+- Approvals print "Ad account: <name> (act_…)" first and sign the account id with the
+  request: a yes for one client cannot be replayed on another (tested).
+- Listed now: Muzaree, 1920 Agency. `.env` default restored to 1920 Agency
+  (backups `.env.backup-20261007221629-before-muzaree`, `.env.profile-*`).
+- 44 non-database MCP tests pass; typecheck clean. Live after the next `/mcp` reconnect.
+
 ## Verified live, not just tested
 
 | What | How it was proven |
