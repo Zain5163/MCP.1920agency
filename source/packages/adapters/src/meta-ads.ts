@@ -1310,8 +1310,11 @@ export class MetaAdsClient {
 
     const storySpec: Record<string, unknown> = {
       page_id: this.#account.pageId,
+      // instagram_user_id, not the older instagram_actor_id: Meta refused the old
+      // field for Muzaree's account on 2026-10-08 ("must be a valid Instagram
+      // account id") while its own live ads carry instagram_user_id.
       ...(this.#account.instagramId !== undefined
-        ? { instagram_actor_id: this.#account.instagramId }
+        ? { instagram_user_id: this.#account.instagramId }
         : {}),
     }
 

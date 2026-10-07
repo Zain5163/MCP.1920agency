@@ -155,7 +155,8 @@ describe('creating', () => {
     const story = JSON.parse(creative.body.object_story_spec!) as Record<string, unknown>
 
     assert.equal(story.page_id, '102223309294786')
-    assert.equal(story.instagram_actor_id, '17841452630711887')
+    assert.equal(story.instagram_user_id, '17841452630711887')
+    assert.equal(story.instagram_actor_id, undefined)
   })
 
   test('UTM placeholders reach Meta unexpanded', async () => {
