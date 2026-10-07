@@ -1,0 +1,189 @@
+# AdsPilot on one server, next to Raptor Downloader (Hetzner CX23, Helsinki).
+# The plan and every step: deploy/README.md. Always run compose through
+# deploy/scripts/dc.sh, which adds the settings file ($ADSPILOT_HOME/compose.env).
+#
+#   mcp      hosted MCP at https://mcp.1920agency.com/mcp (Caddy -> adspilot-mcp:8080)
+#   worker   publishes scheduled posts: a long-running loop, polling every 15 s
+#   postgres OPTIONAL (profile "db"): the database on this server, decision 0010.
+#            Phase A keeps Supabase and does not start it.
+#   migrate  one-shot (profile "tools"): prisma migrate deploy / status
+#   tasks    one-shot (profile "tools"): monitor, refresh, keepalive (systemd timers)
+#
+# Memory: the server has 3.8 GB and no swap, and Raptor uses about 0.1 GB idle
+# but much more while it converts a video. Limits below add up to at most
+# 1.4 GB for AdsPilot with the database, about 0.4 GB in normal use.
+#
+# Secrets: none here. The app reads them from $ADSPILOT_HOME/env/adspilot.env
+# (chmod 600, on the server only); the database password from
+# $ADSPILOT_HOME/env/postgres_password.
+
+name: adspilot
+
+x-logging: &logging
+  driver: json-file
+  options:
+    # Rotated by size: 5 files of 10 MB per container. At today's volume that is
+    # well over 30 days; the app's own events.jsonl is rotated daily and kept
+    # 30 days by deploy/logrotate/adspilot.
+    max-size: "10m"
+    max-file: "5"
+
+x-app: &app
+  image: adspilot:${ADSPILOT_TAG:-latest}
+  build:
+    context: ..
+    dockerfile: deploy/Dockerfile
+  init: true
+  restart: unless-stopped
+  env_file:
+    - ${ADSPILOT_HOME:-/opt/adspilot}/env/adspilot.env
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  logging: *logging
+  networks:
+    - adspilot
+  depends_on:
+    postgres:
+      condition: service_healthy
+      # Phase A runs without the postgres service; this keeps the dependency
+      # only when the "db" profile is on (Compose 2.20+; the server has 2.40).
+      required: false
+
+services:
+  mcp:
+    <<: *app
+    working_dir: /app/source/apps/mcp
+    command: ["node", "--experimental-strip-types", "src/http-server.ts"]
+    environment:
+      MCP_PORT: "8080"
+      NODE_OPTIONS: "--max-old-space-size=256"
+    volumes:
+      - ${ADSPILOT_HOME:-/opt/adspilot}/logs/mcp:/home/node/.social-publisher/logs
+    expose:
+      - "8080"
+    mem_limit: 384m
+    cpus: 1.0
+    # One replica only: approval tokens are signed with a per-process secret,
+    # so a second replica would refuse approvals issued by the first.
+    stop_grace_period: 15s
+    healthcheck:
+      # /health answers 503 when the database is unreachable, so "unhealthy"
+      # here means "cannot serve tool calls", not only "process down".
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/health').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      adspilot: {}
+      edge:
+        # Raptor's Caddy reaches the MCP by this name on Raptor's network.
+        aliases:
+          - adspilot-mcp
+
+  worker:
+    <<: *app
+    working_dir: /app/source/apps/worker
+    # Loop mode, the worker's own long-running design: it claims due jobs one at
+    # a time, sleeps 15 s when the queue is empty, refreshes its heartbeat every
+    # pass and finishes the job in flight on SIGTERM. The PC runs `--once` every
+    # 5 minutes only because Task Scheduler cannot keep a process alive.
+    command: ["node", "--experimental-strip-types", "src/worker.ts", "--interval", "15000"]
+    environment:
+      NODE_OPTIONS: "--max-old-space-size=384"
+    volumes:
+      - ${ADSPILOT_HOME:-/opt/adspilot}/logs/worker:/home/node/.social-publisher/logs
+    mem_limit: 512m
+    cpus: 1.0
+    # SIGTERM lets the current publish finish. A video upload can take minutes;
+    # cutting it off would restart it from the beginning 15 minutes later.
+    stop_grace_period: 5m
+    healthcheck:
+      test: ["CMD", "node", "healthcheck.mjs"]
+      interval: 2m
+      timeout: 30s
+      retries: 3
+      start_period: 60s
+
+  postgres:
+    profiles: ["db"]
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: adspilot
+      POSTGRES_DB: adspilot
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - postgres_password
+    command:
+      - postgres
+      - -c
+      - shared_buffers=128MB
+      - -c
+      - effective_cache_size=384MB
+      - -c
+      - work_mem=4MB
+      - -c
+      - maintenance_work_mem=64MB
+      - -c
+      - max_connections=40
+      - -c
+      - log_min_duration_statement=2000
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # Restores stage the dump here, in memory, never on disk.
+    tmpfs:
+      - /tmp:size=256m
+    # Loopback only: for the PC's SSH tunnel (Phase B). Never published publicly.
+    ports:
+      - "127.0.0.1:5432:5432"
+    shm_size: 128mb
+    mem_limit: 512m
+    cpus: 1.0
+    stop_grace_period: 60s
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U adspilot -d adspilot"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    logging: *logging
+    networks:
+      - adspilot
+
+  migrate:
+    <<: *app
+    profiles: ["tools"]
+    restart: "no"
+    working_dir: /app/source/packages/db
+    entrypoint: ["node", "node_modules/prisma/build/index.js"]
+    command: ["migrate", "deploy"]
+    mem_limit: 256m
+
+  tasks:
+    <<: *app
+    profiles: ["tools"]
+    restart: "no"
+    working_dir: /app/source/apps/worker
+    entrypoint: ["node", "--experimental-strip-types"]
+    command: ["src/monitor-cli.ts"]
+    volumes:
+      - ${ADSPILOT_HOME:-/opt/adspilot}/logs/tasks:/home/node/.social-publisher/logs
+    mem_limit: 256m
+
+secrets:
+  postgres_password:
+    file: ${ADSPILOT_HOME:-/opt/adspilot}/env/postgres_password
+
+networks:
+  adspilot: {}
+  edge:
+    # Raptor's compose network, where its Caddy runs (project "deploy").
+    external: true
+    name: ${EDGE_NETWORK:-deploy_internal}
+
+volumes:
+  pgdata:
+    name: adspilot_pgdata

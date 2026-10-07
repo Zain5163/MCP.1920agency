@@ -1,0 +1,9 @@
+[Unit]
+Description=AdsPilot: token refresh daily at 23:00 UTC (04:00 PKT, as the PC's AdsPilot-Refresh task)
+
+[Timer]
+OnCalendar=*-*-* 23:00:00 UTC
+Persistent=true
+
+[Install]
+WantedBy=timers.target

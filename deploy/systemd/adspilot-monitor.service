@@ -1,0 +1,12 @@
+[Unit]
+Description=AdsPilot: health monitor (worker heartbeat, queue, connections; alerts to Slack)
+After=docker.service network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+Environment=ADSPILOT_HOME=/opt/adspilot
+# exit 1 = warnings, 2 = critical; both are reported to Slack by the monitor itself
+SuccessExitStatus=1 2
+ExecStart=/bin/bash /opt/adspilot/app/deploy/scripts/dc.sh run --rm -T tasks src/monitor-cli.ts
+TimeoutStartSec=10min

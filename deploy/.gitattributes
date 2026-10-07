@@ -1,0 +1,2 @@
+# Shell scripts, units and configs run on Linux: always LF, also in git archive.
+* text=auto eol=lf

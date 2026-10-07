@@ -1,0 +1,15 @@
+# AdsPilot's own event logs (events.jsonl, written by the app's file sink in each
+# container). Rotated daily, kept 30 days, compressed. copytruncate because the
+# app keeps appending to the same file name. Container stdout is rotated by
+# Docker itself (docker-compose.yml: json-file, 10 MB x 5).
+/opt/adspilot/logs/*/events.jsonl {
+    daily
+    rotate 30
+    maxage 30
+    missingok
+    notifempty
+    compress
+    delaycompress
+    copytruncate
+    dateext
+}

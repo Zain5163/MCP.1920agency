@@ -1,0 +1,16 @@
+# Build context is the repository root (docker-compose.yml: context ..).
+# Let in only the source tree and the image's own helper files.
+**
+!source/**
+!deploy/docker/**
+
+# Never send these, even if they exist in a working copy.
+source/**/node_modules
+source/**/dist
+source/**/.next
+source/**/*.tsbuildinfo
+**/.env
+**/.env.*
+**/*.pem
+**/*.key
+**/logs

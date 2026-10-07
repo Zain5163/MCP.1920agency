@@ -1,0 +1,10 @@
+[Unit]
+Description=AdsPilot: monitor every 30 minutes (as the PC's AdsPilot-Monitor task)
+
+[Timer]
+OnCalendar=*:00,30
+RandomizedDelaySec=60
+Persistent=true
+
+[Install]
+WantedBy=timers.target
