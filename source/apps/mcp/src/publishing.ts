@@ -1,4 +1,5 @@
 import {
+  codeForFailure,
   decide,
   fieldsSentTo,
   formatApprovalRequest,
@@ -470,20 +471,8 @@ export function callFailure(code: ErrorCode, detail?: string): string {
   )
 }
 
-/**
- * The resolution to show for a failed target.
- *
- * The adapter's own diagnosis comes first: the class alone cannot tell a spent
- * YouTube quota from a revoked token, and guessing from it told the owner to
- * reconnect when he only had to wait. The class is the fallback for adapters
- * that name no code.
- */
-export function codeForFailure(error: { failureClass: string; code?: ErrorCode | undefined }): ErrorCode {
-  if (error.code !== undefined) return error.code
-  if (error.failureClass === 'credential') return 'TOKEN_EXPIRED'
-  if (error.failureClass === 'transient') return 'RATE_LIMITED'
-  return 'PLATFORM_REJECTED'
-}
+/** The resolution to show for a failed target; moved to core so the worker shares it. */
+export { codeForFailure }
 
 /** A post as list_posts reads it: the post and each target with its account. */
 export interface ListedPost {

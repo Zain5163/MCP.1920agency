@@ -455,3 +455,22 @@ export function formatResolution(resolution: Resolution, detail?: string): strin
   )
   return lines.join('\n')
 }
+
+/**
+ * The catalogue code for a failed publish target.
+ *
+ * The adapter's own diagnosis comes first: the class alone cannot tell a spent
+ * YouTube quota from a revoked token, and guessing from it told the owner to
+ * reconnect when he only had to wait. The class is the fallback for adapters
+ * that name no code.
+ *
+ * Lives here, not in the MCP server where it was written, because the worker
+ * needs the same answer to report a scheduled post's failure (analytics
+ * publish_failed): two copies of this mapping would drift.
+ */
+export function codeForFailure(error: { readonly failureClass: string; readonly code?: ErrorCode | undefined }): ErrorCode {
+  if (error.code !== undefined) return error.code
+  if (error.failureClass === 'credential') return 'TOKEN_EXPIRED'
+  if (error.failureClass === 'transient') return 'RATE_LIMITED'
+  return 'PLATFORM_REJECTED'
+}
