@@ -113,6 +113,18 @@ texts say checkout is not open yet).
 
 ### Phase 2 status: BUILT on branch `phase2-analytics`, NOT live (2026-10-08)
 
+**Industry (2026-10-08, branch `industry-column`): built, migration pending.**
+The owner approved the column on 2026-10-08. `tenants.industry` (nullable text,
+CHECK `tenants_industry_known` = `INDUSTRIES`, a core test keeps the SQL and TS
+lists equal) in migration `20261008160000_add_tenant_industry`, **not applied**;
+`TenantScope.usage()` returns it and `setIndustry(code)` writes it; the free
+tool `set_business_type` (enum of the codes; "ask the user, never guess") sets
+it; `check_usage` shows "Business type: …" or "not set"; one line in
+`SERVER_INSTRUCTIONS` tells the AI to ask once when it is not set. From the next
+counted call after it is set, `mcp_call` carries `industry` and `$set` holds it
+(fake-fetch test). The new Prisma client selects the column, so the migration
+must be applied **before** this code runs against the live database.
+
 Built and unit-tested (fakes only: no network, no database) on branch
 `phase2-analytics`, from master `965032f`, in a separate worktree. **Not
 merged, and nothing has been sent to PostHog.** It goes live only when the
@@ -178,13 +190,9 @@ Every event: `distinct_id` = tenant id, `$lib` = `adspilot-server`,
   client's event list; they belong in the one connect service Phase 4's
   accounts work should create, so they are emitted once, in one place.
 - **`signup`.** No signup flow exists yet (Phase 4). Declared, not emitted.
-- **`tenants.industry`.** Not added: a column is a migration and needs the
-  owner's approval. **It is the next migration**: `tenants.industry`, nullable
-  text limited to `INDUSTRIES` (core), set at signup or first use. Everything
-  downstream is ready: `UsageSnapshot.industry` is declared, metering and
-  `upgrade` already pass `industryOf(usage.industry)` to every event, and the
-  analytics client accepts only listed values. Once `TenantScope.usage()`
-  selects the column, industry starts flowing with no other change.
+- **`tenants.industry`.** Not added in this phase (a migration needs the
+  owner's approval). Since built on branch `industry-column`: see "Industry"
+  at the top of this status.
 - **Error-log collection on the server (30 days).** Belongs to Phase 3
   (hosting). The redacted logger is unchanged.
 

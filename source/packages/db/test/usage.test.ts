@@ -81,3 +81,33 @@ describe('usage metering in the database', () => {
     assert.equal(row?.ok, false)
   })
 })
+
+/**
+ * Needs migration 20261008160000_add_tenant_industry. Before it is applied,
+ * these fail on the missing column (as does every usage() above, since the
+ * client now selects it).
+ */
+describe('industry in the database', () => {
+  test('a new tenant has no industry', async () => {
+    assert.equal((await alice.usage(MONTH)).industry, null)
+  })
+
+  test('setIndustry stores a listed code, for this tenant only', async () => {
+    await alice.setIndustry('dentist')
+    assert.equal((await alice.usage(MONTH)).industry, 'dentist')
+    assert.equal((await bob.usage(MONTH)).industry, null)
+    await alice.setIndustry('real_estate')
+    assert.equal((await alice.usage(MONTH)).industry, 'real_estate')
+  })
+
+  test('the CHECK constraint refuses anything not on the list', async () => {
+    // Free text must never be stored, even by a caller that skips the enum.
+    await assert.rejects(alice.setIndustry('Dental clinic'))
+    await assert.rejects(alice.setIndustry('DENTIST'))
+    assert.equal((await alice.usage(MONTH)).industry, 'real_estate')
+  })
+
+  test('a tenant that no longer exists is a plain error', async () => {
+    await assert.rejects(new TenantScope(`missing-${tag}`).setIndustry('other'), /no longer exists/)
+  })
+})

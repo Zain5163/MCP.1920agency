@@ -13,10 +13,10 @@
  * process. 'other' catches everything else until the data shows a new category
  * is worth adding.
  *
- * Not stored yet. `tenants.industry` is the next migration and needs the
- * owner's approval; until it exists no tenant has an industry and events go out
- * without one. The analytics code already accepts it (packages/telemetry
- * analytics.ts), so it starts flowing as soon as the column is read.
+ * Stored in `tenants.industry` (migration 20261008160000_add_tenant_industry,
+ * whose CHECK constraint repeats this list; a test keeps the two in step). The
+ * user picks one through the free set_business_type tool; until then the
+ * tenant has none and events go out without one.
  */
 export const INDUSTRIES = ['dentist', 'education', 'real_estate', 'ecommerce', 'tool_website', 'agency', 'other'] as const
 export type Industry = (typeof INDUSTRIES)[number]
@@ -28,4 +28,26 @@ export type Industry = (typeof INDUSTRIES)[number]
  */
 export function industryOf(value: unknown): Industry | undefined {
   return typeof value === 'string' && (INDUSTRIES as readonly string[]).includes(value) ? (value as Industry) : undefined
+}
+
+/**
+ * How each industry is said to a person. A Record over Industry, so adding a
+ * code without a label fails the typecheck.
+ */
+export const INDUSTRY_LABELS: Readonly<Record<Industry, string>> = {
+  dentist: 'Dentist',
+  education: 'Education',
+  real_estate: 'Real estate',
+  ecommerce: 'E-commerce',
+  tool_website: 'Tool website',
+  agency: 'Agency',
+  other: 'Other',
+}
+
+/**
+ * The check_usage line. "not set" is said plainly, because the server
+ * instructions tell the AI to ask the user when it reads exactly that.
+ */
+export function businessTypeLine(industry: Industry | undefined): string {
+  return `Business type: ${industry === undefined ? 'not set' : INDUSTRY_LABELS[industry]}`
 }

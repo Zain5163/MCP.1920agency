@@ -6,11 +6,13 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 
+import { INDUSTRIES } from '@social-publisher/core'
 import type { CountedMonth, ToolCallInput, UsageSnapshot } from '@social-publisher/db'
 import { createAnalytics, type Analytics, type AnalyticsEvent } from '@social-publisher/telemetry'
 
 import { createAdsPilotServer } from '../src/mcp-server.ts'
 import { installMetering, outcomeOf, type MeterOptions, type UsageAccount } from '../src/metering.ts'
+import { SERVER_INSTRUCTIONS } from '../src/playbooks.ts'
 
 /**
  * The metering wrapper, against an in-memory account. No database: the SQL is
@@ -29,6 +31,7 @@ class FakeAccount implements UsageAccount {
   readonly recorded: Array<ToolCallInput & { counted: boolean; month: string }> = []
   failRead = false
   failWrite = false
+  failIndustry = false
   industry: string | undefined
 
   async usage(month: string): Promise<UsageSnapshot> {
@@ -53,6 +56,11 @@ class FakeAccount implements UsageAccount {
 
   async markNoticesShown(_month: string, thresholds: readonly number[]): Promise<void> {
     this.shown.push(...thresholds)
+  }
+
+  async setIndustry(code: string): Promise<void> {
+    if (this.failIndustry) throw new Error("Can't reach database server")
+    this.industry = code
   }
 }
 
@@ -193,6 +201,72 @@ describe('the Free limit', () => {
     const result = await call(server, 'list_posts')
     assert.match(result.content[0]!.text, /waitlist/)
     assert.doesNotMatch(result.content[0]!.text, /https?:/)
+  })
+})
+
+describe('business type (set_business_type, check_usage)', () => {
+  test('check_usage says "not set" until one is chosen', async () => {
+    const { server } = setup()
+    const usage = await call(server, 'check_usage')
+    assert.match(usage.content[0]!.text, /\nBusiness type: not set$/)
+  })
+
+  test('set_business_type stores the code and check_usage shows its label', async () => {
+    const { account, server } = setup()
+    const set = await call(server, 'set_business_type', { business_type: 'real_estate' })
+    assert.equal(set.content[0]!.text, 'Business type set: Real estate.')
+    assert.equal(account.industry, 'real_estate')
+    const usage = await call(server, 'check_usage')
+    assert.match(usage.content[0]!.text, /Business type: Real estate/)
+  })
+
+  test('a stored value off the list reads as not set', async () => {
+    const { account, server } = setup()
+    account.industry = 'Dental clinic'
+    assert.match((await call(server, 'check_usage')).content[0]!.text, /Business type: not set/)
+  })
+
+  test('is free: not counted, and works at the limit', async () => {
+    const { account, server } = setup()
+    account.calls = 200
+    const set = await call(server, 'set_business_type', { business_type: 'dentist' })
+    assert.match(set.content[0]!.text, /Dentist/)
+    assert.equal(account.calls, 200)
+    assert.deepEqual(account.recorded.map((r) => [r.tool, r.counted]), [['set_business_type', false]])
+  })
+
+  test('accepts only the listed codes, never free text', async () => {
+    const { server } = setup()
+    const tool = (server as unknown as { _registeredTools: Record<string, { inputSchema: z.ZodTypeAny }> })._registeredTools[
+      'set_business_type'
+    ]!
+    assert.equal(tool.inputSchema.safeParse({ business_type: 'ecommerce' }).success, true)
+    for (const value of ['Dental clinic', 'DENTIST', '', 7]) {
+      assert.equal(tool.inputSchema.safeParse({ business_type: value }).success, false, `accepted ${String(value)}`)
+    }
+  })
+
+  test('its description tells the AI to ask, not guess, and lists every code', async () => {
+    const { server } = setup()
+    const tool = (server as unknown as { _registeredTools: Record<string, { description?: string }> })._registeredTools[
+      'set_business_type'
+    ]!
+    assert.match(tool.description ?? '', /Ask the user/)
+    assert.match(tool.description ?? '', /never guess/)
+    for (const code of INDUSTRIES) assert.ok(tool.description?.includes(code), `description misses ${code}`)
+  })
+
+  test('a failed save is a catalogue failure, logged, not a throw', async () => {
+    const { account, logged, server } = setup()
+    account.failIndustry = true
+    const set = await call(server, 'set_business_type', { business_type: 'agency' })
+    assert.match(set.content[0]!.text, /^\[DB_UNREACHABLE\]/)
+    assert.ok(logged.includes('mcp.set_business_type.failed'))
+    assert.equal(account.recorded[0]!.errorCode, 'DB_UNREACHABLE')
+  })
+
+  test('the server instructions tell the AI to ask once and never guess', () => {
+    assert.match(SERVER_INSTRUCTIONS, /no business type, ask the user once .* call set_business_type; never guess it/)
   })
 })
 
@@ -342,7 +416,7 @@ describe('analytics: mcp_call next to every record', () => {
     assert.equal(p.client_version, '2.1.0')
     assert.equal(p.transport, 'http')
     assert.equal(p.plan, 'free')
-    assert.equal(p.industry, undefined, 'no industry until tenants.industry exists')
+    assert.equal(p.industry, undefined, 'no industry until the user has picked one')
   })
 
   test('a catalogue failure carries its code', async () => {
@@ -477,5 +551,28 @@ describe('analytics end to end, metering to the wire (fake fetch)', () => {
       ['client_name', 'client_version', 'duration_ms', 'ok', 'plan', 'tool', 'transport'],
     )
     assert.doesNotMatch(bodies[0]!, /secret launch copy/)
+  })
+})
+
+describe('industry end to end, account to the wire (fake fetch)', () => {
+  test('once set, the next counted call carries it as a property and in $set', async () => {
+    const bodies: string[] = []
+    const fetchImpl = (async (_url: unknown, init?: RequestInit) => {
+      bodies.push(String(init?.body))
+      return new Response('{}')
+    }) as unknown as typeof globalThis.fetch
+    const analytics = createAnalytics({ apiKey: 'phc_test', host: 'https://eu.i.posthog.com', fetch: fetchImpl })
+    const { server } = setup({ analytics, clientInfo: () => ({ name: 'cursor', version: '1.0' }) })
+    await call(server, 'set_business_type', { business_type: 'tool_website' })
+    await call(server, 'list_posts')
+    await analytics.shutdown()
+
+    const events = bodies.flatMap(
+      (body) => (JSON.parse(body) as { batch: Array<{ event: string; properties: Record<string, unknown> }> }).batch,
+    )
+    const counted = events.find((e) => e.event === 'mcp_call' && e.properties.tool === 'list_posts')
+    assert.ok(counted !== undefined)
+    assert.equal(counted.properties.industry, 'tool_website')
+    assert.deepEqual(counted.properties.$set, { plan: 'free', industry: 'tool_website' })
   })
 })

@@ -282,6 +282,7 @@ export class TenantScope {
       select: {
         plan: true,
         planRenewsAt: true,
+        industry: true,
         usageMonths: { where: { month }, select: { calls: true, noticesShown: true } },
       },
     })
@@ -293,7 +294,24 @@ export class TenantScope {
       month,
       calls: used?.calls ?? 0,
       noticesShown: used?.noticesShown ?? [],
+      industry: row.industry,
     }
+  }
+
+  /**
+   * Records what kind of business this account is: one code from core's
+   * INDUSTRIES. The caller passes only a listed code (the set_business_type
+   * tool's argument is that enum); the tenants_industry_known CHECK refuses
+   * anything else, so free text cannot be stored even by a future caller that
+   * forgets. This package does not depend on core, so the list is not repeated
+   * here as well.
+   *
+   * updateMany rather than update, so a tenant that no longer exists is the
+   * same plain error usage() gives rather than a Prisma "record not found".
+   */
+  async setIndustry(code: string): Promise<void> {
+    const { count } = await db().tenant.updateMany({ where: { id: this.tenantId }, data: { industry: code } })
+    if (count === 0) throw new TenantScopeError('This account no longer exists.')
   }
 
   /**
@@ -364,10 +382,10 @@ export interface UsageSnapshot {
   readonly calls: number
   readonly noticesShown: readonly number[]
   /**
-   * The tenant's industry (core INDUSTRIES), for analytics. Never set yet:
-   * `tenants.industry` is the next migration and needs the owner's approval.
-   * Declared now so metering already passes it on, and it starts flowing the
-   * day usage() selects the column.
+   * The tenant's industry (a code from core INDUSTRIES), or null until the
+   * user has picked one with set_business_type. Read through core
+   * industryOf() before use, so a stored value that is not on the list counts
+   * as unknown. Optional so test fakes can leave it out.
    */
   readonly industry?: string | null | undefined
 }

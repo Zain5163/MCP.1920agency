@@ -29,8 +29,12 @@ export const PREMIUM_PRICE = '$9/month'
  * Tools that are never counted and never blocked. A user at the limit must
  * still be able to ask where they stand and how to upgrade, or the limit
  * message would be the last thing the product could ever say to them.
+ *
+ * set_business_type is free for a different reason: the AI asks for it on our
+ * behalf (it serves our analytics, not the user's task), so it must not cost
+ * the user one of their calls.
  */
-export const FREE_TOOLS: readonly string[] = ['check_usage', 'upgrade']
+export const FREE_TOOLS: readonly string[] = ['check_usage', 'upgrade', 'set_business_type']
 
 export function isFreeTool(name: string): boolean {
   return FREE_TOOLS.includes(name)

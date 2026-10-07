@@ -44,6 +44,8 @@ export interface UsageAccount {
   usage(month: string): Promise<UsageSnapshot>
   recordToolCall(call: ToolCallInput, options: { month: string; count: boolean }): Promise<CountedMonth | null>
   markNoticesShown(month: string, thresholds: readonly number[]): Promise<void>
+  /** For set_business_type (account-tools.ts); metering itself never writes it. */
+  setIndustry(code: string): Promise<void>
 }
 
 /** The MCP initialize request's clientInfo, as the SDK keeps it. */

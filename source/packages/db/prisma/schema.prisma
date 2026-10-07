@@ -150,7 +150,16 @@ model Tenant {
   /// (the owner's own account) until checkout exists.
   planRenewsAt DateTime? @map("plan_renews_at")
 
-  users         User[]
+  /// What kind of business this is: one of core's INDUSTRIES (dentist,
+  /// education, real_estate, ecommerce, tool_website, agency, other), for
+  /// analytics and, later, per-industry playbooks. Null until the user picks
+  /// one (the set_business_type tool). Always a fixed code, never the
+  /// customer's own words. The CHECK constraint in migration
+  /// 20261008160000_add_tenant_industry refuses anything else, because Prisma
+  /// does not model CHECK constraints.
+  industry String?
+
+  users        User[]
   apiTokens     ApiToken[]
   providerAuths ProviderAuth[]
   connections   Connection[]

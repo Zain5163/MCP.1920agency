@@ -176,6 +176,7 @@ describe('check_usage and upgrade texts', () => {
   test('only the account tools are free', () => {
     assert.equal(isFreeTool('check_usage'), true)
     assert.equal(isFreeTool('upgrade'), true)
+    assert.equal(isFreeTool('set_business_type'), true)
     for (const name of ['publish_post', 'get_playbook', 'check_status', 'list_skills']) assert.equal(isFreeTool(name), false)
   })
 })
