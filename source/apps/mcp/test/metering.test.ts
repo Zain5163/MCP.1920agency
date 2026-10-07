@@ -7,6 +7,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 
 import type { CountedMonth, ToolCallInput, UsageSnapshot } from '@social-publisher/db'
+import { createAnalytics, type Analytics, type AnalyticsEvent } from '@social-publisher/telemetry'
 
 import { createAdsPilotServer } from '../src/mcp-server.ts'
 import { installMetering, outcomeOf, type MeterOptions, type UsageAccount } from '../src/metering.ts'
@@ -28,10 +29,18 @@ class FakeAccount implements UsageAccount {
   readonly recorded: Array<ToolCallInput & { counted: boolean; month: string }> = []
   failRead = false
   failWrite = false
+  industry: string | undefined
 
   async usage(month: string): Promise<UsageSnapshot> {
     if (this.failRead) throw new Error("Can't reach database server")
-    return { plan: this.plan, planRenewsAt: null, month, calls: this.calls, noticesShown: [...this.shown] }
+    return {
+      plan: this.plan,
+      planRenewsAt: null,
+      month,
+      calls: this.calls,
+      noticesShown: [...this.shown],
+      ...(this.industry !== undefined ? { industry: this.industry } : {}),
+    }
   }
 
   async recordToolCall(call: ToolCallInput, options: { month: string; count: boolean }): Promise<CountedMonth | null> {
@@ -295,5 +304,178 @@ describe('reading a result', () => {
     assert.deepEqual(outcomeOf(r('FAILED: something')), { ok: false, errorCode: 'UNKNOWN' })
     assert.deepEqual(outcomeOf(r('anything', true)), { ok: false, errorCode: 'UNKNOWN' })
     assert.deepEqual(outcomeOf(undefined), { ok: true })
+  })
+})
+
+/** Analytics held in memory: what metering asked to send, before the client's own filtering. */
+class FakeAnalytics implements Analytics {
+  readonly enabled = true
+  readonly events: AnalyticsEvent[] = []
+  capture(event: AnalyticsEvent): void {
+    this.events.push(event)
+  }
+  async flush(): Promise<void> {}
+  async shutdown(): Promise<void> {}
+  named(name: string): AnalyticsEvent[] {
+    return this.events.filter((e) => e.event === name)
+  }
+}
+
+function tracked(overrides: Partial<MeterOptions> = {}) {
+  const analytics = new FakeAnalytics()
+  return { analytics, ...setup({ analytics, clientInfo: () => ({ name: 'claude-code', version: '2.1.0' }), ...overrides }) }
+}
+
+describe('analytics: mcp_call next to every record', () => {
+  test('a successful call: tool, ok, duration, client, transport, plan, tenant as distinct id', async () => {
+    const { analytics, server } = tracked()
+    await call(server, 'list_posts')
+    const [event] = analytics.named('mcp_call')
+    assert.ok(event !== undefined)
+    assert.equal(event.tenantId, 'tenant-1')
+    const p = event.properties!
+    assert.equal(p.tool, 'list_posts')
+    assert.equal(p.ok, true)
+    assert.equal(p.error_code, undefined)
+    assert.equal(typeof p.duration_ms, 'number')
+    assert.equal(p.client_name, 'claude-code')
+    assert.equal(p.client_version, '2.1.0')
+    assert.equal(p.transport, 'http')
+    assert.equal(p.plan, 'free')
+    assert.equal(p.industry, undefined, 'no industry until tenants.industry exists')
+  })
+
+  test('a catalogue failure carries its code', async () => {
+    const { analytics, server } = tracked()
+    server.tool('check_status', 'test', {}, async () => ({ content: [{ type: 'text' as const, text: '[DB_UNREACHABLE] down' }] }))
+    await call(server, 'check_status')
+    assert.equal(analytics.named('mcp_call')[0]!.properties!.ok, false)
+    assert.equal(analytics.named('mcp_call')[0]!.properties!.error_code, 'DB_UNREACHABLE')
+  })
+
+  test('the industry flows as soon as the account has one', async () => {
+    const { analytics, account, server } = tracked()
+    account.industry = 'dentist'
+    await call(server, 'list_posts')
+    assert.equal(analytics.named('mcp_call')[0]!.properties!.industry, 'dentist')
+  })
+
+  test('no argument or result reaches analytics', async () => {
+    const { analytics, server } = tracked()
+    server.tool('validate_post', 'test', { body: z.string() }, async ({ body }) => ({
+      content: [{ type: 'text' as const, text: `checked ${body}` }],
+    }))
+    await call(server, 'validate_post', { body: 'secret launch copy' })
+    assert.doesNotMatch(JSON.stringify(analytics.events), /secret launch copy|checked/)
+  })
+
+  test('sent even when the database write fails', async () => {
+    const { analytics, account, server } = tracked()
+    account.failWrite = true
+    await call(server, 'list_posts')
+    assert.equal(analytics.named('mcp_call').length, 1)
+  })
+
+  test('free tools are sent too', async () => {
+    const { analytics, server } = tracked()
+    await call(server, 'check_usage')
+    assert.equal(analytics.named('mcp_call')[0]!.properties!.tool, 'check_usage')
+  })
+
+  test('an analytics client that throws cannot break a call', async () => {
+    const throwing: Analytics = {
+      enabled: true,
+      capture() {
+        throw new Error('analytics exploded')
+      },
+      flush: async () => {},
+      shutdown: async () => {},
+    }
+    const { server, ran } = setup({ analytics: throwing })
+    const result = await call(server, 'list_posts')
+    assert.equal(result.content[0]!.text, 'two posts')
+    assert.equal(ran(), 1)
+    const upgrade = await call(server, 'upgrade')
+    assert.match(upgrade.content[0]!.text, /Premium/)
+  })
+
+  test('no analytics configured: metering works exactly as before', async () => {
+    const { account, server } = setup()
+    await call(server, 'list_posts')
+    assert.equal(account.calls, 1)
+  })
+})
+
+describe('analytics: limits and upgrades', () => {
+  test('limit_reached when Free is refused, with an mcp_call for the refusal', async () => {
+    const { analytics, account, server } = tracked()
+    account.calls = 200
+    await call(server, 'list_posts')
+    const [reached] = analytics.named('limit_reached')
+    assert.deepEqual(reached!.properties, { tool: 'list_posts', transport: 'http', plan: 'free', industry: undefined })
+    assert.equal(analytics.named('mcp_call')[0]!.properties!.error_code, 'USAGE_LIMIT_REACHED')
+  })
+
+  test('limit_notice_shown with the threshold said, once', async () => {
+    const { analytics, account, server } = tracked()
+    account.calls = 179
+    account.shown = [25, 50, 75, 85]
+    await call(server, 'list_posts')
+    await call(server, 'list_posts')
+    const shown = analytics.named('limit_notice_shown')
+    assert.equal(shown.length, 1)
+    assert.equal(shown[0]!.properties!.threshold, 90)
+    assert.equal(shown[0]!.properties!.plan, 'free')
+  })
+
+  test('Premium never sends a notice or a limit event', async () => {
+    const { analytics, account, server } = tracked()
+    account.plan = 'premium'
+    account.calls = 5000
+    await call(server, 'list_posts')
+    assert.deepEqual(analytics.events.map((e) => e.event), ['mcp_call'])
+    assert.equal(analytics.events[0]!.properties!.plan, 'premium')
+  })
+
+  test('upgrade_clicked when the upgrade tool is called, with the plan and client', async () => {
+    const { analytics, server } = tracked()
+    await call(server, 'upgrade')
+    const [clicked] = analytics.named('upgrade_clicked')
+    assert.equal(clicked!.tenantId, 'tenant-1')
+    assert.equal(clicked!.properties!.plan, 'free')
+    assert.equal(clicked!.properties!.client_name, 'claude-code')
+  })
+
+  test('upgrade_clicked is still sent when the plan cannot be read', async () => {
+    const { analytics, account, server } = tracked()
+    account.failRead = true
+    await call(server, 'upgrade')
+    assert.equal(analytics.named('upgrade_clicked').length, 1)
+    assert.equal(analytics.named('upgrade_clicked')[0]!.properties!.plan, undefined)
+  })
+})
+
+describe('analytics end to end, metering to the wire (fake fetch)', () => {
+  test('one call produces one mcp_call batch with only allowed properties', async () => {
+    const bodies: string[] = []
+    const fetchImpl = (async (_url: unknown, init?: RequestInit) => {
+      bodies.push(String(init?.body))
+      return new Response('{}')
+    }) as unknown as typeof globalThis.fetch
+    const analytics = createAnalytics({ apiKey: 'phc_test', host: 'https://eu.i.posthog.com', fetch: fetchImpl })
+    const { server } = setup({ analytics, clientInfo: () => ({ name: 'cursor', version: '1.0' }) })
+    server.tool('validate_post', 'test', { body: z.string() }, async () => ({ content: [{ type: 'text' as const, text: 'ok' }] }))
+    await call(server, 'validate_post', { body: 'secret launch copy' })
+    await analytics.shutdown()
+
+    assert.equal(bodies.length, 1)
+    const sent = JSON.parse(bodies[0]!) as { batch: Array<{ event: string; distinct_id: string; properties: Record<string, unknown> }> }
+    assert.equal(sent.batch[0]!.event, 'mcp_call')
+    assert.equal(sent.batch[0]!.distinct_id, 'tenant-1')
+    assert.deepEqual(
+      Object.keys(sent.batch[0]!.properties).filter((k) => !k.startsWith('$')).sort(),
+      ['client_name', 'client_version', 'duration_ms', 'ok', 'plan', 'tool', 'transport'],
+    )
+    assert.doesNotMatch(bodies[0]!, /secret launch copy/)
   })
 })

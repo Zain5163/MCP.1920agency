@@ -1,8 +1,8 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 
-import { planOf, upgradeMessage, usageMonth, usageSummary, type Plan } from '@social-publisher/core'
+import { industryOf, planOf, upgradeMessage, usageMonth, usageSummary, type Industry, type Plan } from '@social-publisher/core'
 
-import type { MeterOptions } from './metering.ts'
+import { clientOf, track, type MeterOptions, type UsageAccount } from './metering.ts'
 import { callFailure } from './publishing.ts'
 
 /**
@@ -51,11 +51,28 @@ export function registerAccountTools(server: McpServer, options: MeterOptions): 
     async () => {
       // The link matters more than the plan: if the plan cannot be read, the
       // link is still given.
+      let account: UsageAccount | undefined
       let plan: Plan | undefined
+      let industry: Industry | undefined
       try {
-        plan = planOf((await (await options.account()).usage(usageMonth(now()))).plan)
+        account = await options.account()
+        const usage = await account.usage(usageMonth(now()))
+        plan = planOf(usage.plan)
+        industry = industryOf(usage.industry)
       } catch (error) {
         options.log('mcp.upgrade.plan_unread', 'plan could not be read; the link is given anyway', error)
+      }
+      // Asking for the link is the upgrade intent the usage notices exist to
+      // create, so it is the funnel's last step until checkout reports back.
+      if (account !== undefined) {
+        const client = clientOf(server, options)
+        track(options, account, 'upgrade_clicked', {
+          plan,
+          industry,
+          transport: options.transport,
+          client_name: client?.name,
+          client_version: client?.version,
+        })
       }
       return text(upgradeMessage(plan, options.upgradeUrl))
     },

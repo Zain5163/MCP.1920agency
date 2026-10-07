@@ -1,4 +1,5 @@
 import {
+  codeForFailure,
   decide,
   fieldsSentTo,
   formatApprovalRequest,
@@ -22,6 +23,7 @@ import {
   type TenantScope,
 } from '@social-publisher/db'
 import type { PublishReport, PublishService, TargetOutcome, TargetSpec } from '@social-publisher/publisher'
+import type { Analytics } from '@social-publisher/telemetry'
 
 import { APPROVALS, alreadyUsedText, repeatLine, type ApprovalLedger, type EarlierSends } from './approvals.ts'
 import { loadConnections } from './context.ts'
@@ -128,6 +130,8 @@ export interface PostingContext {
   readonly signal?: AbortSignal | undefined
   /** Which approvals were used; this process's own unless a test brings one. */
   readonly approvals?: ApprovalLedger
+  /** Product analytics: told about each failed target (publish_failed). Absent: nothing is sent. */
+  readonly analytics?: Analytics | undefined
 }
 
 export async function buildDraft(scope: TenantScope, args: DraftArgs) {
@@ -370,6 +374,15 @@ export async function publishPost(scope: TenantScope, args: PublishArgs, ctx: Po
     for (const outcome of [...report.succeeded, ...report.failed]) {
       await ctx.deps.rows.createTarget(targetRow(scope.tenantId, post.id, outcome, { attachmentsStored }))
     }
+    // Which platform failed and the catalogue code: never the post, the
+    // account name or the platform's own message, which can quote the post.
+    for (const bad of report.failed) {
+      ctx.analytics?.capture({
+        event: 'publish_failed',
+        tenantId: scope.tenantId,
+        properties: { platform: bad.platform, resolution_code: codeForFailure(bad.error!), source: 'publish_now', will_retry: false },
+      })
+    }
     await scope.record(ctx.actor, 'post.published', {
       postId: post.id,
       succeeded: report.succeeded.length,
@@ -470,20 +483,8 @@ export function callFailure(code: ErrorCode, detail?: string): string {
   )
 }
 
-/**
- * The resolution to show for a failed target.
- *
- * The adapter's own diagnosis comes first: the class alone cannot tell a spent
- * YouTube quota from a revoked token, and guessing from it told the owner to
- * reconnect when he only had to wait. The class is the fallback for adapters
- * that name no code.
- */
-export function codeForFailure(error: { failureClass: string; code?: ErrorCode | undefined }): ErrorCode {
-  if (error.code !== undefined) return error.code
-  if (error.failureClass === 'credential') return 'TOKEN_EXPIRED'
-  if (error.failureClass === 'transient') return 'RATE_LIMITED'
-  return 'PLATFORM_REJECTED'
-}
+/** The resolution to show for a failed target; moved to core so the worker shares it. */
+export { codeForFailure }
 
 /** A post as list_posts reads it: the post and each target with its account. */
 export interface ListedPost {

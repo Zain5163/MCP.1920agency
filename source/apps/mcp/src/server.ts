@@ -1,8 +1,8 @@
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 
-import { optional } from '@social-publisher/config'
+import { analyticsConfig, optional } from '@social-publisher/config'
 import { disconnect, type TenantScope } from '@social-publisher/db'
-import { createLogger } from '@social-publisher/telemetry'
+import { createAnalytics, createLogger, flushOnExit } from '@social-publisher/telemetry'
 
 import { currentScope } from './context.ts'
 import { buildLocalServer } from './local-server.ts'
@@ -24,6 +24,18 @@ import { buildLocalServer } from './local-server.ts'
 const logger = createLogger({ slackWebhookUrl: optional('SLACK_WEBHOOK_URL'), base: { event: 'mcp' } })
 
 /**
+ * Product analytics (PostHog), a no-op without POSTHOG_KEY. Its failures go to
+ * the log file and Slack once per kind, never to stdout, which is the protocol.
+ */
+const analyticsSettings = analyticsConfig()
+const analytics = createAnalytics({
+  apiKey: analyticsSettings.posthogKey,
+  host: analyticsSettings.posthogHost,
+  onError: (message) => void logger.warn('analytics.failed', message),
+})
+flushOnExit(analytics)
+
+/**
  * The tenant, resolved once and kept: it is the same for the life of a local
  * process, and resolving it again for every call would add a query to each.
  * A failed resolution is not kept, so the next call tries again.
@@ -41,6 +53,7 @@ const server = buildLocalServer({
   transport: 'stdio',
   account: localAccount,
   upgradeUrl: optional('UPGRADE_URL'),
+  analytics,
   log: (event, message, error) => {
     console.error(`[adspilot] ${message}: ${error instanceof Error ? error.message : String(error)}`)
     void logger.error(event, message, { data: { error } })
@@ -49,9 +62,13 @@ const server = buildLocalServer({
 
 const transport = new StdioServerTransport()
 await server.connect(transport)
+// The client went away (VS Code reloaded, the chat closed): send what is
+// queued now, since the process may be killed rather than exit on its own.
+server.server.onclose = () => void analytics.flush()
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.on(signal, () => {
-    void disconnect().finally(() => process.exit(0))
+    // Queued analytics go out first (bounded wait); beforeExit does not fire on exit().
+    void Promise.allSettled([analytics.shutdown(), disconnect()]).finally(() => process.exit(0))
   })
 }

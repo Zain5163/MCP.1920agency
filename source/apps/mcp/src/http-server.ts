@@ -3,9 +3,9 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 
 import { identifyToken, type TokenIdentity } from '@social-publisher/auth'
-import { optional } from '@social-publisher/config'
+import { analyticsConfig, optional } from '@social-publisher/config'
 import { disconnect, health } from '@social-publisher/db'
-import { createLogger } from '@social-publisher/telemetry'
+import { createAnalytics, createLogger, flushOnExit } from '@social-publisher/telemetry'
 
 import { buildHostedServer, rememberClient } from './hosted-server.ts'
 
@@ -29,6 +29,18 @@ const logger = createLogger({
   console: true,
   base: { event: 'mcp' },
 })
+
+/**
+ * Product analytics, one client for the process: it batches across requests,
+ * which a per-request client could not. A no-op without POSTHOG_KEY.
+ */
+const analyticsSettings = analyticsConfig()
+const analytics = createAnalytics({
+  apiKey: analyticsSettings.posthogKey,
+  host: analyticsSettings.posthogHost,
+  onError: (message) => void logger.warn('analytics.failed', message),
+})
+flushOnExit(analytics)
 
 const PORT = Number(optional('MCP_PORT', '8080'))
 const UPGRADE_URL = optional('UPGRADE_URL')
@@ -110,7 +122,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
    * cannot see another tenant — there is no shared, long-lived server holding a
    * tenant that could be mismatched with an incoming request.
    */
-  const mcp = buildHostedServer(identity, scoped, { upgradeUrl: UPGRADE_URL })
+  const mcp = buildHostedServer(identity, scoped, { upgradeUrl: UPGRADE_URL, analytics })
 
   const transport = new StreamableHTTPServerTransport({
     // Stateless: every request carries its own token, so there is no session to
@@ -138,7 +150,8 @@ server.listen(PORT, () => {
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.on(signal, () => {
     server.close(() => {
-      void disconnect().finally(() => process.exit(0))
+      // Queued analytics go out first (bounded wait); beforeExit does not fire on exit().
+      void Promise.allSettled([analytics.shutdown(), disconnect()]).finally(() => process.exit(0))
     })
   })
 }

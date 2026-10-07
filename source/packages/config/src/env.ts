@@ -163,3 +163,26 @@ export function mediaHostingReady(path: string = ENV_PATH): boolean {
     return v !== undefined && v.trim() !== ''
   })
 }
+
+/**
+ * Product analytics (PostHog Cloud EU, decision 0009 / Phase 2).
+ *
+ * Optional on purpose: without POSTHOG_KEY analytics is a silent no-op, so a
+ * fresh install, a test run or a customer's self-hosted copy sends nothing
+ * anywhere. POSTHOG_KEY is the project's *public* capture key (phc_…), the one
+ * PostHog puts in browser snippets; it can only send events, never read them.
+ * Validation (phc_ prefix, https host) is done by the analytics client itself,
+ * in packages/telemetry, so it is tested where it is used.
+ */
+export const DEFAULT_POSTHOG_HOST = 'https://eu.i.posthog.com'
+
+export interface AnalyticsConfig {
+  readonly posthogKey?: string
+  readonly posthogHost: string
+}
+
+export function analyticsConfig(path: string = ENV_PATH): AnalyticsConfig {
+  const key = optional('POSTHOG_KEY', undefined, path)
+  const host = optional('POSTHOG_HOST', DEFAULT_POSTHOG_HOST, path) ?? DEFAULT_POSTHOG_HOST
+  return key === undefined ? { posthogHost: host } : { posthogKey: key, posthogHost: host }
+}

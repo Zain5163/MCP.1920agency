@@ -363,6 +363,13 @@ export interface UsageSnapshot {
   readonly month: string
   readonly calls: number
   readonly noticesShown: readonly number[]
+  /**
+   * The tenant's industry (core INDUSTRIES), for analytics. Never set yet:
+   * `tenants.industry` is the next migration and needs the owner's approval.
+   * Declared now so metering already passes it on, and it starts flowing the
+   * day usage() selects the column.
+   */
+  readonly industry?: string | null | undefined
 }
 
 /** A month's count straight after a counted call. */
