@@ -10,6 +10,7 @@ This folder **is** served, so what goes in it matters more.
 
 | Folder | Source | Licence | Commit | Skills |
 |---|---|---|---|---|
+| `adspilot/` | **Our own**, written and maintained here | AdsPilot's | in-repo | 1 |
 | `marketingskills/` | github.com/coreyhaines31/marketingskills | MIT | `dda3841f0b294e01e93b1541486beefbfab0915e` | 50 |
 | `advertising-skills/` | github.com/realkimbarrett/advertising-skills | MIT (declared; see its NOTICE.md) | `45f4a4a1dabe24113193369b55b929b1de4ff04a` | 4 of 12 |
 
@@ -38,6 +39,19 @@ names returns the replacement (`COVERED_ELSEWHERE` in `src/skills-library.ts`):
 `headline-matrix` → copywriting and ad-creative · `objection-crusher` → offers and cro ·
 `generic-language-killer` → copy-editing · `performance-diagnosis` → the
 `meta-performance` playbook.
+
+## Our own skills (`adspilot/`)
+
+Written for this server's tools, served under their own framing note, and edited
+in place (unlike the vendored folders). They win over a third-party skill on the
+same ground; a `get_playbook` playbook still wins on a platform's own rules.
+
+- `meta-account-manager` (2026-10-08): daily management and scaling of a Meta
+  e-commerce account. `references/research-2026-10.md` is dated online research with
+  sources; `references/field-notes.md` collects lessons from real accounts, which the
+  daily account runs append to.
+- **Never name a client** in these files: they are served to every user. A test
+  fails if a known client name appears.
 
 ## Checked on arrival
 
