@@ -2,9 +2,18 @@ import { strict as assert } from 'node:assert'
 import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { test, describe, beforeEach } from 'node:test'
+import { after, test, describe, beforeEach } from 'node:test'
 
-import { checkConfig, ConfigError, mediaHostingReady, parseEnv, required, resetEnvCache } from '../src/env.ts'
+import {
+  DEFAULT_POSTHOG_HOST,
+  analyticsConfig,
+  checkConfig,
+  ConfigError,
+  mediaHostingReady,
+  parseEnv,
+  required,
+  resetEnvCache,
+} from '../src/env.ts'
 
 const tmpEnv = (contents: string): string => {
   const dir = mkdtempSync(join(tmpdir(), 'sp-config-'))
@@ -142,5 +151,36 @@ describe('checkConfig', () => {
     const result = checkConfig(join(tmpdir(), 'nope-not-here', '.env'))
     assert.equal(result.envFileExists, false)
     assert.equal(result.ok, false)
+  })
+})
+
+describe('analyticsConfig', () => {
+  // Real process env wins over the file; make sure a developer's own shell
+  // cannot decide these tests.
+  const saved = { key: process.env.POSTHOG_KEY, host: process.env.POSTHOG_HOST }
+  beforeEach(() => {
+    delete process.env.POSTHOG_KEY
+    delete process.env.POSTHOG_HOST
+  })
+  after(() => {
+    if (saved.key !== undefined) process.env.POSTHOG_KEY = saved.key
+    if (saved.host !== undefined) process.env.POSTHOG_HOST = saved.host
+  })
+
+  test('without a key there is no key, and the EU host is the default', () => {
+    const config = analyticsConfig(tmpEnv('DATABASE_URL=x'))
+    assert.equal(config.posthogKey, undefined)
+    assert.equal(config.posthogHost, DEFAULT_POSTHOG_HOST)
+    assert.equal(DEFAULT_POSTHOG_HOST, 'https://eu.i.posthog.com')
+  })
+
+  test('a blank key is no key', () => {
+    assert.equal(analyticsConfig(tmpEnv('POSTHOG_KEY=   ')).posthogKey, undefined)
+  })
+
+  test('reads the key and an explicit host', () => {
+    const config = analyticsConfig(tmpEnv('POSTHOG_KEY=phc_test\nPOSTHOG_HOST=https://ph.example'))
+    assert.equal(config.posthogKey, 'phc_test')
+    assert.equal(config.posthogHost, 'https://ph.example')
   })
 })
