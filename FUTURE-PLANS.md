@@ -16,6 +16,17 @@ Agency's own accounts.
 
 ---
 
+## Product foundations, agreed 2026-10-08 (build in this order)
+
+Full plan: `architecture/2026-10-08-plans-usage-analytics-hosting.md`; plans: `decisions/0009-free-and-premium-plans.md`.
+
+0. **Safety:** private GitHub backup (none exists yet); nothing kept only in temp folders.
+1. **Plans and usage:** Free 200 MCP calls a month, Premium $9; every call metered and logged; notices at 25/50/75/85/90/95/99% passed on by the user's AI; at 100% the upgrade message.
+2. **Analytics:** PostHog Cloud EU + a `tool_calls` table: which tools, which AI client, errors, where users get stuck, by industry.
+3. **Hosting on Hetzner** at a 1920agency.com subdomain: hosted MCP and the worker move to the server (posts stop depending on this PC; https OAuth callbacks).
+4. **Accounts, checkout and the website** (docs on the Raptor pattern, daily articles and SEO on the SEO-Ops pattern).
+5. **Self-improving expertise:** scheduled playbook refresh for every ad platform, tuned per industry from real usage.
+
 ## Next, in order
 
 | # | What | Why now | Detail |
