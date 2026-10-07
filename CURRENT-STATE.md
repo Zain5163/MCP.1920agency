@@ -1,6 +1,6 @@
 # What is built today
 
-**Updated 2026-10-03.** This file lists only what exists now. Everything planned
+**Updated 2026-10-08.** This file lists only what exists now. Everything planned
 is in `FUTURE-PLANS.md`. The history of how each piece was built and proven is in
 `PROJECT-LOG.md`.
 
@@ -93,6 +93,8 @@ Around the posting:
 | Error catalogue: every error says why and how to fix it | ✅ |
 | Audit log of every action | ✅ |
 | Database lockdown (RLS on all tables) | ✅ |
+| Free and Premium plans, usage metering on every MCP tool, `check_usage` and `upgrade` (decision 0009) | 🟡 2026-10-08 Built and unit-tested on branch `phase1-usage`, not merged. Its migration is written but **not applied** (needs the owner's approval, and must be applied before the merge). Not live; see `architecture/2026-10-08-plans-usage-analytics-hosting.md` "Phase 1 status" |
+| Call log (`tool_calls`: tool, ok/error code, duration, AI client, transport; never content) | 🟡 Same branch and migration as above |
 | Tests | ✅ 827 passing on 2026-10-03 in the eight suites that need no database (after the package-side review fixes); 13 workspaces typecheck clean. The auth and db suites (89 more at their last run, 2026-10-02) use the live database, so they are run only at quiet times until they have a test database (`FUTURE-PLANS.md`) |
 
 ## 6. Automations running on this PC
