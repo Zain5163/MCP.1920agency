@@ -35,7 +35,8 @@ import { redactText } from './redact.ts'
  *     they are dropped even if a caller passes them;
  *   - GeoIP is disabled on every event ($geoip_disable): from a server it
  *     would only record the data centre, and we have no need for a location.
- * Written up for the privacy policy in CURRENT-STATE.md ("Privacy notes").
+ * Written up for the privacy policy in architecture/2026-10-08-plans-usage-
+ * analytics-hosting.md, "Privacy notes (analytics)".
  */
 
 /** Every event this product sends. A name not on this list is not sent. */
