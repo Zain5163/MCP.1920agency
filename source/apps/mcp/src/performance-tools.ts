@@ -20,9 +20,9 @@ import {
   type Metrics,
   type MetaAdsClient,
 } from '@social-publisher/adapters'
-import { checkSpend, decide, formatApprovalRequest, formatMoney } from '@social-publisher/core'
+import { checkSpend, formatApprovalRequest, formatMoney } from '@social-publisher/core'
 
-import { audit, guarded, loadClient, loadLimit, type ToolResult } from './ads-tools.ts'
+import { accountArg, audit, decideOn, guarded, loadClient, loadLimit, type ToolResult } from './ads-tools.ts'
 
 /**
  * The Meta performance team: the data a senior media buyer reads, and the few
@@ -121,10 +121,11 @@ export function registerPerformanceTools(server: McpServer): void {
       targetCostPerResult: z.number().positive().optional().describe('What a result should cost, in the account currency.'),
       targetRoas: z.number().positive().optional().describe('Target return on ad spend, e.g. 3 for 3×.'),
       marginPercent: z.number().min(1).max(100).optional().describe('Product gross margin. Gives break-even ROAS (1 ÷ margin) when there is no ROAS target.'),
+      account: accountArg,
     },
-    async ({ campaignId, days, targetCostPerResult, targetRoas, marginPercent }) =>
+    async ({ campaignId, days, targetCostPerResult, targetRoas, marginPercent, account }) =>
       await guarded(async () => {
-        const loaded = loadClient()
+        const loaded = loadClient(account)
         if ('error' in loaded) return text(loaded.error)
         const ctx = await context(loaded.client, loaded.account.currency, campaignId)
         const fmt = money(ctx.currency)
@@ -215,10 +216,11 @@ export function registerPerformanceTools(server: McpServer): void {
       campaignId: z.string().optional(),
       days: z.number().int().min(7).max(90).default(30),
       targetCostPerResult: z.number().positive().optional().describe('Enables the learning-budget check (cost × 50 ÷ 7 per ad set).'),
+      account: accountArg,
     },
-    async ({ campaignId, days, targetCostPerResult }) =>
+    async ({ campaignId, days, targetCostPerResult, account }) =>
       await guarded(async () => {
-        const loaded = loadClient()
+        const loaded = loadClient(account)
         if ('error' in loaded) return text(loaded.error)
         const ctx = await context(loaded.client, loaded.account.currency, campaignId)
         const w = windows(days)
@@ -265,10 +267,10 @@ export function registerPerformanceTools(server: McpServer): void {
   server.tool(
     'get_ad_activity',
     'The ad account’s change history: who changed what and when (status, budgets, targeting, review results). Use it to answer "what changed before results moved?". Reads only.',
-    { days: z.number().int().min(1).max(90).default(14), limit: z.number().int().min(1).max(200).default(50) },
-    async ({ days, limit }) =>
+    { days: z.number().int().min(1).max(90).default(14), limit: z.number().int().min(1).max(200).default(50), account: accountArg },
+    async ({ days, limit, account }) =>
       await guarded(async () => {
-        const loaded = loadClient()
+        const loaded = loadClient(account)
         if ('error' in loaded) return text(loaded.error)
         const rows = await loaded.client.activity({ since: new Date(Date.now() - days * 86_400_000), limit })
         if (rows.length === 0) return text(`No changes recorded in the last ${days} days.`)
@@ -291,12 +293,12 @@ export function registerPerformanceTools(server: McpServer): void {
   server.tool(
     'change_budget',
     'The media buyer’s main lever: set the daily budget of a Meta ad set (or a campaign using campaign budget). Needs the user’s approval and stays inside the spend ceiling. Warns when the change is over 20%, which restarts Meta’s learning.',
-    { id: z.string().describe('Ad set id, or campaign id when the budget is set on the campaign.'), newDailyBudget: budgetArg, confirm: confirmArg },
-    async ({ id, newDailyBudget, confirm }) =>
+    { id: z.string().describe('Ad set id, or campaign id when the budget is set on the campaign.'), newDailyBudget: budgetArg, confirm: confirmArg, account: accountArg },
+    async ({ id, newDailyBudget, confirm, account }) =>
       await guarded(async () => {
-        const loaded = loadClient()
+        const loaded = loadClient(account)
         if ('error' in loaded) return text(loaded.error)
-        const limit = loadLimit(loaded.account.currency)
+        const limit = loadLimit(loaded.account.currency, loaded.limits)
         if ('error' in limit) return text(limit.error)
 
         const obj = await loaded.client.readObject(id, 'name,daily_budget,effective_status')
@@ -316,7 +318,7 @@ export function registerPerformanceTools(server: McpServer): void {
 
         const fmt = money(loaded.account.currency)
         const change = oldMinor > 0 ? (newMinor - oldMinor) / oldMinor : 1
-        const gate = decide({
+        const gate = decideOn(loaded, {
           action: 'change_budget',
           payload: { id, oldMinor, newMinor },
           ...(confirm !== undefined ? { confirmation: confirm } : {}),
@@ -341,10 +343,10 @@ export function registerPerformanceTools(server: McpServer): void {
   server.tool(
     'set_ad_delivery',
     'Switch one Meta ad, ad set or campaign on or off. OFF happens at once with no approval — stopping spend never waits. ON needs the user’s approval, and an ad set with its own budget must fit the spend ceiling.',
-    { id: z.string(), on: z.boolean(), confirm: confirmArg },
-    async ({ id, on, confirm }) =>
+    { id: z.string(), on: z.boolean(), confirm: confirmArg, account: accountArg },
+    async ({ id, on, confirm, account }) =>
       await guarded(async () => {
-        const loaded = loadClient()
+        const loaded = loadClient(account)
         if ('error' in loaded) return text(loaded.error)
         const obj = await loaded.client.readObject(id, 'name,effective_status,daily_budget')
         const name = String(obj.name ?? id)
@@ -352,10 +354,10 @@ export function registerPerformanceTools(server: McpServer): void {
         if (!on) {
           await loaded.client.setDelivery(id, false)
           await audit('ads.delivery.off', { id })
-          return text(`"${name}" is switched off. It stops spending now; nothing else was changed.`)
+          return text(`"${name}" in ${loaded.label} is switched off. It stops spending now; nothing else was changed.`)
         }
 
-        const limit = loadLimit(loaded.account.currency)
+        const limit = loadLimit(loaded.account.currency, loaded.limits)
         if ('error' in limit) return text(limit.error)
         if (obj.daily_budget !== undefined) {
           const spend = checkSpend(
@@ -366,7 +368,7 @@ export function registerPerformanceTools(server: McpServer): void {
           if (!spend.ok) return text(`Not switched on. ${spend.reason}`)
         }
         const fmt = money(loaded.account.currency)
-        const gate = decide({
+        const gate = decideOn(loaded, {
           action: 'set_ad_delivery',
           payload: { id, on: true },
           ...(confirm !== undefined ? { confirmation: confirm } : {}),
@@ -391,13 +393,14 @@ export function registerPerformanceTools(server: McpServer): void {
       adSetId: z.string(),
       exclude: z.array(z.enum(ALL_PUBLISHER_PLATFORMS)).min(1),
       confirm: confirmArg,
+      account: accountArg,
     },
-    async ({ adSetId, exclude, confirm }) =>
+    async ({ adSetId, exclude, confirm, account }) =>
       await guarded(async () => {
-        const loaded = loadClient()
+        const loaded = loadClient(account)
         if ('error' in loaded) return text(loaded.error)
         const obj = await loaded.client.readObject(adSetId, 'name,targeting')
-        const gate = decide({
+        const gate = decideOn(loaded, {
           action: 'exclude_placements',
           payload: { adSetId, exclude: [...exclude].sort() },
           ...(confirm !== undefined ? { confirmation: confirm } : {}),

@@ -13,6 +13,7 @@ import {
   type SpendLimit,
 } from '@social-publisher/core'
 
+import { findAdAccount, readAdAccounts, type RegisteredAdAccount } from './ad-accounts.ts'
 import { currentScope } from './context.ts'
 
 /**
@@ -40,15 +41,51 @@ import { currentScope } from './context.ts'
 export type ToolResult = { content: Array<{ type: 'text'; text: string }> }
 const text = (body: string): ToolResult => ({ content: [{ type: 'text' as const, text: body }] })
 
-/** Reads the account from the environment, or explains exactly what is missing. */
-export function loadClient(): { client: MetaAdsClient; account: MetaAdAccount } | { error: string } {
+export interface LoadedAccount {
+  client: MetaAdsClient
+  account: MetaAdAccount
+  /** How the account is named to the person approving, e.g. "Muzaree (act_144042365972084)". */
+  label: string
+  /** The account's own ceiling, when ad-accounts.json gives one; otherwise .env applies. */
+  limits?: { daily: number; monthly: number }
+}
+
+/** The optional input every ads tool takes. */
+export const accountArg = z
+  .string()
+  .optional()
+  .describe('Which ad account: a name, key or id from list_ad_accounts. Omit for the default account.')
+
+const labelOf = (name: string, id: string) => `${name} (act_${id})`
+
+/**
+ * Resolves the account to work on, or explains exactly what is missing.
+ *
+ * With no `selector`, the default account from `.env`, as before. With one, an
+ * entry from `ad-accounts.json`, using the same token.
+ */
+export function loadClient(selector?: string): LoadedAccount | { error: string } {
   const accessToken = optional('META_ADS_ACCESS_TOKEN')
+  if (accessToken === undefined) {
+    return {
+      error: 'Ads are not configured. Missing from ~/.social-publisher/.env: META_ADS_ACCESS_TOKEN.\nNothing was created.',
+    }
+  }
+
+  const registry = readAdAccounts()
+  if ('error' in registry) return { error: `${registry.error}\nNothing was done.` }
+
+  if (selector !== undefined && selector.trim() !== '') {
+    const found = findAdAccount(selector, registry)
+    if ('error' in found) return found
+    return fromRegistry(found, accessToken)
+  }
+
   const adAccountId = optional('META_AD_ACCOUNT_ID')
   const pageId = optional('META_ADS_PAGE_ID')
   const currency = optional('META_AD_ACCOUNT_CURRENCY')
 
   const missing = [
-    ['META_ADS_ACCESS_TOKEN', accessToken],
     ['META_AD_ACCOUNT_ID', adAccountId],
     ['META_ADS_PAGE_ID', pageId],
     ['META_AD_ACCOUNT_CURRENCY', currency],
@@ -60,7 +97,7 @@ export function loadClient(): { client: MetaAdsClient; account: MetaAdAccount } 
     return {
       error:
         `Ads are not configured. Missing from ~/.social-publisher/.env: ${missing.join(', ')}.\n` +
-        'Nothing was created.',
+        'Name an account from list_ad_accounts instead, or add these. Nothing was created.',
     }
   }
 
@@ -73,7 +110,49 @@ export function loadClient(): { client: MetaAdsClient; account: MetaAdAccount } 
     ...(instagramId !== undefined ? { instagramId } : {}),
     ...(pixelId !== undefined ? { pixelId } : {}),
   }
-  return { client: new MetaAdsClient({ account, accessToken: accessToken! }), account }
+  // The default account may also be listed; then it is shown by its name.
+  const known = registry.find((a) => a.adAccountId === adAccountId!.replace(/^act_/, ''))
+  return {
+    client: new MetaAdsClient({ account, accessToken }),
+    account,
+    label: `${labelOf(known?.name ?? 'Default account', adAccountId!.replace(/^act_/, ''))}`,
+    ...(known?.dailyLimit !== undefined && known.monthlyLimit !== undefined
+      ? { limits: { daily: known.dailyLimit, monthly: known.monthlyLimit } }
+      : {}),
+  }
+}
+
+function fromRegistry(entry: RegisteredAdAccount, accessToken: string): LoadedAccount {
+  const account: MetaAdAccount = {
+    adAccountId: entry.adAccountId,
+    pageId: entry.pageId,
+    currency: entry.currency,
+    ...(entry.instagramId !== undefined ? { instagramId: entry.instagramId } : {}),
+    ...(entry.pixelId !== undefined ? { pixelId: entry.pixelId } : {}),
+  }
+  return {
+    client: new MetaAdsClient({ account, accessToken }),
+    account,
+    label: labelOf(entry.name, entry.adAccountId),
+    ...(entry.dailyLimit !== undefined && entry.monthlyLimit !== undefined
+      ? { limits: { daily: entry.dailyLimit, monthly: entry.monthlyLimit } }
+      : {}),
+  }
+}
+
+/**
+ * An approval that names the account and is bound to it.
+ *
+ * With several accounts reachable, a yes given for one must never be usable on
+ * another: the account id is part of what the token signs, and the first line
+ * the person reads is which account (and so which card) will be charged.
+ */
+export function decideOn(loaded: LoadedAccount, options: Parameters<typeof decide>[0]): ReturnType<typeof decide> {
+  return decide({
+    ...options,
+    payload: { adAccountId: loaded.account.adAccountId, request: options.payload },
+    describe: () => `Ad account: ${loaded.label}\n\n${options.describe()}`,
+  })
 }
 
 /**
@@ -85,9 +164,12 @@ export function loadClient(): { client: MetaAdsClient; account: MetaAdAccount } 
  * budgets; converted to minor units immediately, so nothing downstream sees a
  * float.
  */
-export function loadLimit(currency: string): SpendLimit | { error: string } {
-  const daily = optional('META_ADS_DAILY_LIMIT')
-  const monthly = optional('META_ADS_MONTHLY_LIMIT')
+export function loadLimit(
+  currency: string,
+  override?: { daily: number; monthly: number },
+): SpendLimit | { error: string } {
+  const daily = override !== undefined ? String(override.daily) : optional('META_ADS_DAILY_LIMIT')
+  const monthly = override !== undefined ? String(override.monthly) : optional('META_ADS_MONTHLY_LIMIT')
 
   if (daily === undefined || monthly === undefined) {
     return {
@@ -164,6 +246,7 @@ const adShape = z.object({
 })
 
 const planShape = {
+  account: accountArg,
   campaignName: z.string(),
   objective: z.enum(META_OBJECTIVES),
   adSets: z
@@ -275,20 +358,44 @@ export async function guarded(fn: () => Promise<ToolResult>): Promise<ToolResult
 
 export function registerAdsTools(server: McpServer): void {
   server.tool(
+    'list_ad_accounts',
+    'List the ad accounts this server can run ads on, and which one is the default. Pass one as `account` to any ads tool to work on it. Reads only.',
+    {},
+    async () =>
+      await guarded(async () => {
+        const registry = readAdAccounts()
+        if ('error' in registry) return text(registry.error)
+        const fallback = loadClient()
+        const lines = [
+          `Default (used when no account is named): ${'error' in fallback ? 'none configured' : fallback.label}`,
+          '',
+          registry.length > 0 ? 'Named accounts:' : 'No named accounts yet. Add them to ~/.social-publisher/ad-accounts.json.',
+          ...registry.map(
+            (a) =>
+              `  ${a.name}  (account: "${a.key}")  act_${a.adAccountId}, ${a.currency}, Page ${a.pageId}` +
+              (a.pixelId !== undefined ? `, pixel ${a.pixelId}` : ', no pixel') +
+              (a.dailyLimit !== undefined ? `, ceiling ${a.dailyLimit}/day and ${a.monthlyLimit}/month` : ', ceiling from .env'),
+          ),
+        ]
+        return text(lines.join('\n'))
+      }),
+  )
+
+  server.tool(
     'review_ad_plan',
     'Check a Meta ad campaign plan WITHOUT creating anything: cost, errors, and best-practice warnings. Always run this before create_ad_plan and show the result to the user.',
     planShape,
     async (args) =>
       await guarded(async () => {
-        const loaded = loadClient()
+        const loaded = loadClient(args.account)
         if ('error' in loaded) return text(loaded.error)
 
         const plan = toPlan(args, loaded.account.currency)
         const review = loaded.client.review(plan)
-        const lines = [review.summary, '']
+        const lines = [`Ad account: ${loaded.label}`, '', review.summary, '']
         let budgetBlocked = false
 
-        const limit = loadLimit(loaded.account.currency)
+        const limit = loadLimit(loaded.account.currency, loaded.limits)
         const total = totalDailyBudget(plan)
         if (!('error' in limit) && total !== undefined) {
           const committed = await loaded.client.committedDailySpendMinor()
@@ -323,13 +430,13 @@ export function registerAdsTools(server: McpServer): void {
     { ...planShape, confirm: z.string().optional().describe('Approval token from the previous call.') },
     async (args) =>
       await guarded(async () => {
-        const loaded = loadClient()
+        const loaded = loadClient(args.account)
         if ('error' in loaded) return text(loaded.error)
 
-        const limit = loadLimit(loaded.account.currency)
+        const limit = loadLimit(loaded.account.currency, loaded.limits)
         if ('error' in limit) return text(limit.error)
 
-        const { confirm, ...planArgs } = args
+        const { confirm, account: _account, ...planArgs } = args
         const plan = toPlan(planArgs, loaded.account.currency)
 
         const review = loaded.client.review(plan)
@@ -375,7 +482,7 @@ export function registerAdsTools(server: McpServer): void {
           }
         }
 
-        const gate = decide({
+        const gate = decideOn(loaded, {
           action: 'create_ad_plan',
           payload: planArgs,
           ...(confirm !== undefined ? { confirmation: confirm } : {}),
@@ -401,7 +508,7 @@ export function registerAdsTools(server: McpServer): void {
 
         return text(
           [
-            'Created, everything PAUSED. Nothing is spending.',
+            `Created in ${loaded.label}, everything PAUSED. Nothing is spending.`,
             `  campaign  ${result.created.campaignId}`,
             `  ad sets   ${result.created.adSetIds.length}`,
             `  ads       ${result.created.adIds.length}`,
@@ -416,10 +523,10 @@ export function registerAdsTools(server: McpServer): void {
   server.tool(
     'get_campaign_status',
     "Read what a Meta campaign is actually doing, including ads rejected or still in Meta's policy review.",
-    { campaignId: z.string() },
-    async ({ campaignId }) =>
+    { campaignId: z.string(), account: accountArg },
+    async ({ campaignId, account }) =>
       await guarded(async () => {
-        const loaded = loadClient()
+        const loaded = loadClient(account)
         if ('error' in loaded) return text(loaded.error)
 
         const status = await loaded.client.status(campaignId)
@@ -445,13 +552,13 @@ export function registerAdsTools(server: McpServer): void {
   server.tool(
     'activate_campaign',
     'Start a paused Meta campaign. THIS SPENDS REAL MONEY until stopped. Call once WITHOUT a confirm token to get the approval summary, show it to the user, and only call again with the token once they approve.',
-    { campaignId: z.string(), confirm: z.string().optional() },
-    async ({ campaignId, confirm }) =>
+    { campaignId: z.string(), confirm: z.string().optional(), account: accountArg },
+    async ({ campaignId, confirm, account }) =>
       await guarded(async () => {
-        const loaded = loadClient()
+        const loaded = loadClient(account)
         if ('error' in loaded) return text(loaded.error)
 
-        const limit = loadLimit(loaded.account.currency)
+        const limit = loadLimit(loaded.account.currency, loaded.limits)
         if ('error' in limit) return text(limit.error)
 
         const status = await loaded.client.status(campaignId)
@@ -491,7 +598,7 @@ export function registerAdsTools(server: McpServer): void {
           daysLeft !== undefined
             ? `  ${formatMoney(daily)} per day for about ${daysLeft} day(s): roughly ${formatMoney({ minor: daily.minor * daysLeft, currency: daily.currency })} in total`
             : `  ${formatMoney(daily)} per day, roughly ${formatMoney({ minor: daily.minor * 30, currency: daily.currency })} per month, with no end date`
-        const gate = decide({
+        const gate = decideOn(loaded, {
           action: 'activate_campaign',
           // The budget is part of what is approved. If it changes between the
           // approval and the second call, the token no longer matches.
@@ -517,10 +624,10 @@ export function registerAdsTools(server: McpServer): void {
   server.tool(
     'preview_ad',
     'Show how one ad will look on Facebook and Instagram, rendered by Meta, before anything is created. Returns links to open in a browser.',
-    { ad: adShape },
-    async ({ ad }) =>
+    { ad: adShape, account: accountArg },
+    async ({ ad, account }) =>
       await guarded(async () => {
-        const loaded = loadClient()
+        const loaded = loadClient(account)
         if ('error' in loaded) return text(loaded.error)
         const [draft] = toPlan(
           { campaignName: 'preview', objective: 'OUTCOME_TRAFFIC', adSets: [{ name: 'p', dailyBudget: 1, countries: ['PK'], ads: [ad] }] },
@@ -558,10 +665,11 @@ export function registerAdsTools(server: McpServer): void {
         .positive()
         .optional()
         .describe('What a result should cost, in the account currency. Without it no cost verdict is given.'),
+      account: accountArg,
     },
-    async ({ campaignId, datePreset, targetCostPerResult }) =>
+    async ({ campaignId, datePreset, targetCostPerResult, account }) =>
       await guarded(async () => {
-        const loaded = loadClient()
+        const loaded = loadClient(account)
         if ('error' in loaded) return text(loaded.error)
         const rows = await loaded.client.performance(campaignId, {
           ...(datePreset !== undefined ? { datePreset } : {}),
@@ -607,10 +715,11 @@ export function registerAdsTools(server: McpServer): void {
       followUpUrl: z.string().describe('Where people can go after submitting.'),
       thankYouMessage: z.string().optional(),
       higherIntent: z.boolean().optional().describe('Adds a review step. On unless deliberately turned off.'),
+      account: accountArg,
     },
-    async (args) =>
+    async ({ account, ...args }) =>
       await guarded(async () => {
-        const loaded = loadClient()
+        const loaded = loadClient(account)
         if ('error' in loaded) return text(loaded.error)
         const id = await loaded.client.createLeadForm(args)
         await audit('ads.leadform.created', { formId: id })
@@ -623,10 +732,10 @@ export function registerAdsTools(server: McpServer): void {
   server.tool(
     'pause_campaign',
     'Stop a Meta campaign spending. Takes effect immediately and can be undone by activating again.',
-    { campaignId: z.string() },
-    async ({ campaignId }) =>
+    { campaignId: z.string(), account: accountArg },
+    async ({ campaignId, account }) =>
       await guarded(async () => {
-        const loaded = loadClient()
+        const loaded = loadClient(account)
         if ('error' in loaded) return text(loaded.error)
 
         // No approval gate, deliberately. Stopping spend is the one action that
@@ -634,7 +743,7 @@ export function registerAdsTools(server: McpServer): void {
         // delivery, a slow pause costs money.
         const after = await loaded.client.pause(campaignId)
         await audit('ads.campaign.paused', { campaignId })
-        return text(`Paused. Campaign is now ${after.campaign.effectiveStatus}. Nothing is spending.`)
+        return text(`Paused in ${loaded.label}. Campaign is now ${after.campaign.effectiveStatus}. Nothing is spending.`)
       }),
   )
 }
