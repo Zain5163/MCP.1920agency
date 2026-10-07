@@ -14,7 +14,9 @@ Before building or changing any campaign, follow `get_skill campaign-setup`: the
 must match the result the business pays for, and every campaign is checked three times
 (plan, read-back after creation, read-back before activation).
 
-Read `references/research-2026-10.md` for the evidence behind each rule and
+Read `references/structure-and-metrics.md` for CBO versus ABO, the metrics that decide
+whether an ad or campaign works (and which funnel step is broken), and how to mine the
+account's own history first. Read `references/research-2026-10.md` for the evidence behind each rule and
 `references/field-notes.md` for what real accounts have taught. Re-check anything
 older than about three months: Meta changes ranking, reporting and attribution often.
 
