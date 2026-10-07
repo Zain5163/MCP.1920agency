@@ -23,6 +23,7 @@ import {
   type TenantScope,
 } from '@social-publisher/db'
 import type { PublishReport, PublishService, TargetOutcome, TargetSpec } from '@social-publisher/publisher'
+import type { Analytics } from '@social-publisher/telemetry'
 
 import { APPROVALS, alreadyUsedText, repeatLine, type ApprovalLedger, type EarlierSends } from './approvals.ts'
 import { loadConnections } from './context.ts'
@@ -129,6 +130,8 @@ export interface PostingContext {
   readonly signal?: AbortSignal | undefined
   /** Which approvals were used; this process's own unless a test brings one. */
   readonly approvals?: ApprovalLedger
+  /** Product analytics: told about each failed target (publish_failed). Absent: nothing is sent. */
+  readonly analytics?: Analytics | undefined
 }
 
 export async function buildDraft(scope: TenantScope, args: DraftArgs) {
@@ -370,6 +373,15 @@ export async function publishPost(scope: TenantScope, args: PublishArgs, ctx: Po
 
     for (const outcome of [...report.succeeded, ...report.failed]) {
       await ctx.deps.rows.createTarget(targetRow(scope.tenantId, post.id, outcome, { attachmentsStored }))
+    }
+    // Which platform failed and the catalogue code: never the post, the
+    // account name or the platform's own message, which can quote the post.
+    for (const bad of report.failed) {
+      ctx.analytics?.capture({
+        event: 'publish_failed',
+        tenantId: scope.tenantId,
+        properties: { platform: bad.platform, resolution_code: codeForFailure(bad.error!), source: 'publish_now', will_retry: false },
+      })
     }
     await scope.record(ctx.actor, 'post.published', {
       postId: post.id,

@@ -1,7 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 
 import type { TokenIdentity } from '@social-publisher/auth'
-import type { Logger } from '@social-publisher/telemetry'
+import type { Analytics, Logger } from '@social-publisher/telemetry'
 
 import { createAdsPilotServer } from './mcp-server.ts'
 import type { ClientInfo, MeterOptions } from './metering.ts'
@@ -19,7 +19,13 @@ import { registerTools } from './tools.ts'
 export function buildHostedServer(
   identity: TokenIdentity,
   logger: Logger,
-  options: { upgradeUrl?: string | undefined; deps?: PostingDeps; meter?: Partial<MeterOptions> } = {},
+  options: {
+    upgradeUrl?: string | undefined
+    deps?: PostingDeps
+    meter?: Partial<MeterOptions>
+    /** One per process, shared by every request's server (http-server.ts). */
+    analytics?: Analytics
+  } = {},
 ): McpServer {
   const server = createAdsPilotServer('0.3.0', {
     transport: 'http',
@@ -28,12 +34,13 @@ export function buildHostedServer(
     userId: identity.userId,
     clientInfo: () => clientFor(identity.tokenId),
     upgradeUrl: options.upgradeUrl,
+    analytics: options.analytics,
     log: (event, message, error) => {
       void logger.error(event, message, { tenantId: identity.tenantId, data: { error } })
     },
     ...options.meter,
   })
-  registerTools(server, identity, logger, options.deps)
+  registerTools(server, identity, logger, options.deps, options.analytics)
   // Playbooks only: static text, no credentials. Ads tools stay local (decision 0005).
   registerPlaybooks(server)
   registerSkillsLibrary(server)

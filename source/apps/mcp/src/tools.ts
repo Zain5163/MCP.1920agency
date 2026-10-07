@@ -4,7 +4,7 @@ import { z } from 'zod'
 import type { TokenIdentity } from '@social-publisher/auth'
 import { PLATFORMS, overridesForStorage, type ErrorCode } from '@social-publisher/core'
 import { queueStats } from '@social-publisher/db'
-import type { Logger } from '@social-publisher/telemetry'
+import type { Analytics, Logger } from '@social-publisher/telemetry'
 
 import { loadConnections, postingDeps } from './context.ts'
 import {
@@ -123,6 +123,7 @@ export function registerTools(
   identity: TokenIdentity,
   logger: Logger,
   deps: PostingDeps = postingDeps(),
+  analytics?: Analytics,
 ): void {
   const { scope } = identity
 
@@ -201,6 +202,7 @@ export function registerTools(
         await publishPost(scope, args, {
           deps,
           actor: `mcp:${identity.userId}`,
+          analytics,
           // Fires when the client gives up on the call, so a long upload stops.
           signal: extra.signal,
           onApprovalRequested: async (accounts) => {

@@ -225,7 +225,7 @@ export function buildLocalServer(meter: MeterOptions): McpServer {
     // timeout, Esc, an idle limit), so a long upload stops instead of finishing
     // unseen and being sent again.
     async (args, extra) =>
-      await guard(async (scope) => await publishPost(scope, args, { deps, actor: 'mcp', signal: extra.signal })),
+      await guard(async (scope) => await publishPost(scope, args, { deps, actor: 'mcp', signal: extra.signal, analytics: meter.analytics })),
   )
 
   server.tool(

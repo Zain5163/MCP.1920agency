@@ -631,3 +631,36 @@ describe('a tool call that fails before publishing never promises a retry either
     assert.doesNotMatch(answer, /automatic/i)
   })
 })
+
+describe('analytics: publish_failed for a target that fails now', () => {
+  test('platform and catalogue code only, never the post or the platform message', async () => {
+    const { deps, scope } = harness([
+      adapter('facebook_page', async () => published('P1_1')),
+      adapter('linkedin', async () => {
+        throw new PublishError('Rejected: "Big launch" is a duplicate', { failureClass: 'permanent', platformCode: '422' })
+      }),
+    ])
+    const events: Array<{ event: string; tenantId: string; properties?: Record<string, unknown> }> = []
+    const analytics = {
+      enabled: true,
+      capture: (e: (typeof events)[number]) => void events.push(e),
+      flush: async () => {},
+      shutdown: async () => {},
+    }
+    const args = { body: 'Big launch', platforms: ['facebook_page', 'linkedin'] as Platform[] }
+    const ctx = { deps, actor: 'mcp', analytics: analytics as never }
+    const approval = reply(await publishPost(scope as never, args, ctx))
+    await publishPost(scope as never, { ...args, confirm: tokenIn(approval) }, ctx)
+
+    assert.equal(events.length, 1)
+    assert.equal(events[0]!.event, 'publish_failed')
+    assert.equal(events[0]!.tenantId, TENANT)
+    assert.deepEqual(events[0]!.properties, {
+      platform: 'linkedin',
+      resolution_code: 'PLATFORM_REJECTED',
+      source: 'publish_now',
+      will_retry: false,
+    })
+    assert.doesNotMatch(JSON.stringify(events), /Big launch|duplicate/)
+  })
+})

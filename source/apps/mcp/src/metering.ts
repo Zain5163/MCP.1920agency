@@ -1,7 +1,8 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 
-import { allCodes, isFreeTool, limitMessage, meterCall, planOf, usageMonth, type Plan } from '@social-publisher/core'
+import { allCodes, industryOf, isFreeTool, limitMessage, meterCall, planOf, usageMonth, type Industry, type Plan } from '@social-publisher/core'
 import type { CountedMonth, ToolCallInput, UsageSnapshot } from '@social-publisher/db'
+import type { Analytics } from '@social-publisher/telemetry'
 
 /**
  * Usage metering for every MCP tool, on both transports (decision 0009).
@@ -20,6 +21,12 @@ import type { CountedMonth, ToolCallInput, UsageSnapshot } from '@social-publish
  *   3. records the call (tool, ok or the catalogue code, duration, client,
  *      transport — never arguments or results) and adds it to the month;
  *   4. appends a usage notice to the result when this call crossed a threshold.
+ *
+ * Next to each record it sends the same facts to product analytics (Phase 2):
+ * `mcp_call` for every call, `limit_reached` when Free is refused,
+ * `limit_notice_shown` when a notice goes out. Analytics is fire-and-forget
+ * and never throws (packages/telemetry analytics.ts), so it cannot slow or
+ * break a call; without POSTHOG_KEY it does nothing.
  *
  * Metering must never be why a call fails. If the count cannot be read, the
  * call runs (fail open) and that is logged; if it cannot be written, the
@@ -61,6 +68,8 @@ export interface MeterOptions {
   /** Must not throw. Metering failures go here, never to the customer. */
   readonly log: (event: string, message: string, error: unknown) => void
   readonly now?: () => Date
+  /** Product analytics (PostHog). Absent or disabled: nothing is sent. */
+  readonly analytics?: Analytics | undefined
 }
 
 type Handler = (...args: unknown[]) => unknown
@@ -119,14 +128,18 @@ function metered(server: McpServer, name: string, handler: Handler, options: Met
 
     // 1. The limit. Free tools skip it: they must work at the limit.
     let plan: Plan | undefined
+    let industry: Industry | undefined
     if (!free && account !== undefined) {
       try {
         const usage = await account.usage(month)
         plan = planOf(usage.plan)
+        industry = industryOf(usage.industry)
         const decision = meterCall({ plan, callsBefore: usage.calls, callsAfter: usage.calls + 1, noticesShown: usage.noticesShown })
         if (!decision.allowed) {
           // Logged as refused but not counted: the month already shows the allowance used.
-          await record(server, account, options, name, month, false, { ok: false, errorCode: 'USAGE_LIMIT_REACHED' }, 0)
+          const facts = { plan, industry }
+          await record(server, account, options, name, month, false, { ok: false, errorCode: 'USAGE_LIMIT_REACHED' }, 0, facts)
+          track(options, account, 'limit_reached', { tool: name, transport: options.transport, ...facts })
           return { content: [{ type: 'text', text: limitMessage({ callsUsed: usage.calls, now, upgradeUrl: options.upgradeUrl }) }] }
         }
       } catch (error) {
@@ -149,7 +162,7 @@ function metered(server: McpServer, name: string, handler: Handler, options: Met
     // 3 and 4. Record, count, and say so when a threshold was crossed.
     let notice: string | undefined
     if (account !== undefined) {
-      const counted = await record(server, account, options, name, month, !free, outcome, durationMs)
+      const counted = await record(server, account, options, name, month, !free, outcome, durationMs, { plan, industry })
       // No plan means the read above failed: without it a notice could be wrong, so none is shown.
       if (counted !== null && plan !== undefined) {
         const decision = meterCall({
@@ -160,6 +173,9 @@ function metered(server: McpServer, name: string, handler: Handler, options: Met
           upgradeUrl: options.upgradeUrl,
         })
         notice = decision.notice
+        const shown = decision.newlyShown.at(-1)
+        // The threshold said, which is the highest crossed (plans.ts meterCall).
+        if (shown !== undefined) track(options, account, 'limit_notice_shown', { threshold: shown, plan, industry })
         if (decision.newlyShown.length > 0) {
           try {
             await account.markNoticesShown(month, decision.newlyShown)
@@ -188,7 +204,39 @@ async function resolve(options: MeterOptions): Promise<UsageAccount | undefined>
   }
 }
 
-/** Writes the call. Never throws: a lost record is logged, the call's result still goes back. */
+/** What metering knows about the account when it records a call, for analytics. */
+interface AccountFacts {
+  readonly plan: Plan | undefined
+  readonly industry: Industry | undefined
+}
+
+/** The AI client for this call: from initialize, or the stateless fallback. */
+export function clientOf(server: McpServer, options: Pick<MeterOptions, 'clientInfo'>): ClientInfo | undefined {
+  return server.server.getClientVersion() ?? options.clientInfo?.()
+}
+
+/**
+ * Sends one analytics event for this account. Never throws and never waits:
+ * capture only queues. The analytics client checks the names and values
+ * again (allow-list), so nothing here can leak an argument by mistake.
+ */
+export function track(
+  options: Pick<MeterOptions, 'analytics'>,
+  account: Pick<UsageAccount, 'tenantId'>,
+  event: Parameters<Analytics['capture']>[0]['event'],
+  properties: Parameters<Analytics['capture']>[0]['properties'],
+): void {
+  try {
+    options.analytics?.capture({ event, tenantId: account.tenantId, ...(properties !== undefined ? { properties } : {}) })
+  } catch {
+    // capture never throws; this is for an injected fake or a future client that might.
+  }
+}
+
+/**
+ * Writes the call, and sends it to analytics as mcp_call. Never throws: a lost
+ * record is logged, the call's result still goes back.
+ */
 async function record(
   server: McpServer,
   account: UsageAccount,
@@ -198,8 +246,23 @@ async function record(
   count: boolean,
   outcome: { ok: boolean; errorCode?: string | undefined },
   durationMs: number,
+  facts: AccountFacts,
 ): Promise<CountedMonth | null> {
-  const client = server.server.getClientVersion() ?? options.clientInfo?.()
+  const client = clientOf(server, options)
+  // Sent whether or not the database write below succeeds: analytics is a
+  // separate, lossy channel, and a database outage is exactly when knowing
+  // which calls failed matters.
+  track(options, account, 'mcp_call', {
+    tool,
+    ok: outcome.ok,
+    error_code: outcome.errorCode,
+    duration_ms: Math.round(durationMs),
+    client_name: client?.name?.slice(0, CLIENT_FIELD_MAX),
+    client_version: client?.version?.slice(0, CLIENT_FIELD_MAX),
+    transport: options.transport,
+    plan: facts.plan,
+    industry: facts.industry,
+  })
   const call: ToolCallInput = {
     tool,
     ok: outcome.ok,
