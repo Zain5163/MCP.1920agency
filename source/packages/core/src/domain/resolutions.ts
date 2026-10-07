@@ -53,6 +53,8 @@ export type ErrorCode =
   | 'YOUTUBE_CHANNEL_UPLOAD_LIMIT'
   | 'YOUTUBE_UPLOAD_UNCONFIRMED'
   | 'YOUTUBE_UPLOAD_TOKEN_EXPIRED'
+  // plans
+  | 'USAGE_LIMIT_REACHED'
   // internal
   | 'UNKNOWN'
 
@@ -392,6 +394,19 @@ const CATALOGUE: Readonly<Record<ErrorCode, Omit<Resolution, 'code'>>> = {
     needsHuman: true,
   },
 
+  USAGE_LIMIT_REACHED: {
+    what: "This month's free calls are used up, so the request was not carried out.",
+    why: 'The Free plan includes 200 MCP calls a month. Every tool call counts, except check_usage and upgrade, and this account has reached that allowance.',
+    fix: [
+      'Wait until the 1st of next month (UTC), when the free calls reset',
+      'Or upgrade to Premium for unlimited use: the upgrade tool gives the link',
+      'Run check_usage to see how many calls are used and when they reset',
+    ],
+    // Retrying before the reset gives the same answer; upgrading is the
+    // account holder's decision, so an AI must hand it to them, not loop.
+    retryable: false,
+    needsHuman: true,
+  },
   UNKNOWN: {
     what: 'Something failed in a way that is not yet catalogued.',
     why: 'This path has no specific diagnosis, which means the catalogue needs an entry for it.',
