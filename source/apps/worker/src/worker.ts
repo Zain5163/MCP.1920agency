@@ -30,8 +30,10 @@ import {
   touchJob,
 } from '@social-publisher/db'
 import { PublishService } from '@social-publisher/publisher'
+import { NoopAnalytics, type Analytics } from '@social-publisher/telemetry'
 import { TokenVault, parseKey } from '@social-publisher/vault'
 
+import { attachmentsRefusedEvent, publishFailedEvent, workerAnalytics } from './analytics.ts'
 import { credentialFor } from './credential.ts'
 import { draftFromStored } from './draft.ts'
 
@@ -116,7 +118,7 @@ function buildVault(): TokenVault {
 }
 
 /** Returns true if a job was processed, false when the queue was empty. */
-async function processOne(service: PublishService, vault: TokenVault): Promise<boolean> {
+async function processOne(service: PublishService, vault: TokenVault, analytics: Analytics): Promise<boolean> {
   const job = await claimNext()
   if (job === null) return false
 
@@ -159,6 +161,9 @@ async function processOne(service: PublishService, vault: TokenVault): Promise<b
       },
     })
     await failJob(job.jobId, ATTACHMENTS_NOT_STORED_MESSAGE)
+    analytics.capture(
+      attachmentsRefusedEvent({ tenantId: target.connection.tenantId, platform: target.connection.platform, code: ATTACHMENTS_NOT_STORED_CODE }),
+    )
     log(`job ${job.jobId}: REFUSED, nothing published — ${ATTACHMENTS_NOT_STORED_MESSAGE}`)
     return true
   }
@@ -234,6 +239,8 @@ async function processOne(service: PublishService, vault: TokenVault): Promise<b
 
   const error = outcome.error!
   const shouldRetry = error.retryable && job.attempts < MAX_ATTEMPTS
+  // Queued only, never awaited: analytics cannot hold up or fail the job.
+  analytics.capture(publishFailedEvent({ tenantId: connection.tenantId, platform: connection.platform, error, willRetry: shouldRetry }))
 
   if (shouldRetry) {
     const delay = error.retryAfterMs ?? backoffMs(job.attempts)
@@ -276,6 +283,7 @@ async function main(): Promise<void> {
   const intervalMs = Number(values.interval ?? 15_000)
   const service = buildService()
   const vault = buildVault()
+  analytics = workerAnalytics(log)
 
   const reclaimed = await reclaimStale()
   if (reclaimed > 0) log(`reclaimed ${reclaimed} stale job(s) from a previous run`)
@@ -292,9 +300,10 @@ async function main(): Promise<void> {
 
   if (values.once === true) {
     let processed = 0
-    while (await processOne(service, vault)) processed += 1
+    while (await processOne(service, vault, analytics)) processed += 1
     await recordHeartbeat('worker', { workerId: WORKER_ID, mode: 'once', processed })
     log(`drained queue, processed ${processed} job(s)`)
+    await analytics.shutdown()
     await disconnect()
     return
   }
@@ -312,7 +321,7 @@ async function main(): Promise<void> {
   while (!stopping) {
     try {
       let worked = false
-      while (!stopping && (await processOne(service, vault))) worked = true
+      while (!stopping && (await processOne(service, vault, analytics))) worked = true
       if (!worked) await reclaimStale()
     } catch (error) {
       // A loop that dies on one bad job stops every future post, so keep going.
@@ -324,12 +333,17 @@ async function main(): Promise<void> {
     if (!stopping) await new Promise((r) => setTimeout(r, intervalMs))
   }
 
+  await analytics.shutdown()
   await disconnect()
   log('stopped')
 }
 
+/** Set in main once configuration is read; the no-op until then, so a fatal start sends nothing. */
+let analytics: Analytics = new NoopAnalytics()
+
 main().catch(async (error: unknown) => {
   log(`fatal: ${error instanceof Error ? error.message : String(error)}`)
+  await analytics.shutdown()
   await disconnect().catch(() => {})
   process.exit(1)
 })
