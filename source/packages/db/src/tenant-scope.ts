@@ -267,6 +267,125 @@ export class TenantScope {
       },
     })
   }
+
+  // ---- plan and usage ------------------------------------------------------
+
+  /**
+   * This account's plan and one month's usage, in one indexed read.
+   *
+   * Runs before every metered MCP call, so it is a single query: the tenant row
+   * and, through the relation, the one usage row for the month.
+   */
+  async usage(month: string): Promise<UsageSnapshot> {
+    const row = await db().tenant.findUnique({
+      where: { id: this.tenantId },
+      select: {
+        plan: true,
+        planRenewsAt: true,
+        usageMonths: { where: { month }, select: { calls: true, noticesShown: true } },
+      },
+    })
+    if (row === null) throw new TenantScopeError('This account no longer exists.')
+    const used = row.usageMonths[0]
+    return {
+      plan: row.plan,
+      planRenewsAt: row.planRenewsAt,
+      month,
+      calls: used?.calls ?? 0,
+      noticesShown: used?.noticesShown ?? [],
+    }
+  }
+
+  /**
+   * Records one tool call and, when it counts, adds it to the month — in one
+   * transaction, so the log and the counter cannot disagree.
+   *
+   * The counter is an upsert with an increment, which Postgres runs as a single
+   * INSERT ... ON CONFLICT DO UPDATE: two calls at once each get their own
+   * count back, so exactly one of them is the call that crosses a threshold.
+   *
+   * Returns the month after this call, or null for a call that is not counted
+   * (the free account tools, and a call refused at the limit).
+   */
+  async recordToolCall(call: ToolCallInput, options: { month: string; count: boolean }): Promise<CountedMonth | null> {
+    // Built lazily by Prisma: nothing is sent until it is awaited or batched.
+    const log = db().toolCall.create({
+      data: {
+        tenantId: this.tenantId,
+        tool: call.tool,
+        ok: call.ok,
+        durationMs: Math.max(0, Math.round(call.durationMs)),
+        transport: call.transport,
+        ...(call.userId !== undefined ? { userId: call.userId } : {}),
+        ...(call.errorCode !== undefined ? { errorCode: call.errorCode } : {}),
+        ...(call.clientName !== undefined ? { clientName: call.clientName } : {}),
+        ...(call.clientVersion !== undefined ? { clientVersion: call.clientVersion } : {}),
+      },
+      select: { id: true },
+    })
+    if (!options.count) {
+      await log
+      return null
+    }
+
+    const [, month] = await db().$transaction([
+      log,
+      db().usageMonth.upsert({
+        where: { tenantId_month: { tenantId: this.tenantId, month: options.month } },
+        create: { tenantId: this.tenantId, month: options.month, calls: 1 },
+        update: { calls: { increment: 1 } },
+        select: { calls: true, noticesShown: true },
+      }),
+    ])
+    return { month: options.month, calls: month.calls, noticesShown: month.noticesShown }
+  }
+
+  /**
+   * Remembers that this month's notices at these thresholds have been shown.
+   *
+   * Separate from recordToolCall because which notice to show is decided from
+   * the count that call returns. If this write is lost the notice is still not
+   * repeated: only the call that crosses a threshold can show it.
+   */
+  async markNoticesShown(month: string, thresholds: readonly number[]): Promise<void> {
+    if (thresholds.length === 0) return
+    await db().usageMonth.updateMany({
+      where: { tenantId: this.tenantId, month },
+      data: { noticesShown: { push: [...thresholds] } },
+    })
+  }
+}
+
+/** An account's plan and one month's counted calls. */
+export interface UsageSnapshot {
+  readonly plan: 'free' | 'premium'
+  readonly planRenewsAt: Date | null
+  readonly month: string
+  readonly calls: number
+  readonly noticesShown: readonly number[]
+}
+
+/** A month's count straight after a counted call. */
+export interface CountedMonth {
+  readonly month: string
+  readonly calls: number
+  /** Thresholds shown before this call. */
+  readonly noticesShown: readonly number[]
+}
+
+/**
+ * What is recorded about one MCP call. Deliberately no arguments, no result and
+ * no content: see the ToolCall model.
+ */
+export interface ToolCallInput {
+  readonly tool: string
+  readonly ok: boolean
+  readonly errorCode?: string | undefined
+  readonly durationMs: number
+  readonly userId?: string | undefined
+  readonly clientName?: string | undefined
+  readonly clientVersion?: string | undefined
+  readonly transport: 'stdio' | 'http'
 }
 
 /** Resolves a tenant, or null. Used where a missing tenant is not an error. */
