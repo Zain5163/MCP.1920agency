@@ -32,6 +32,21 @@ Get these from the business, or say plainly that they are missing:
 | Return / non-delivery rate | Courier data (COD markets) | Cost per *delivered* order = cost per order ÷ (1 − rate) |
 | Average order value | Store data | Turns cost per purchase into return on ad spend |
 
+**Break-even cost per purchase, worked out per order** (do this before calling any
+cost good or bad):
+
+1. Net sale = average order ÷ (1 + sales tax), when prices include tax.
+2. Margin per delivered order = net sale − product cost − delivery the business absorbs
+   (courier charge − delivery the customer pays) − payment/COD fees − packaging.
+3. Break-even per purchase = (1 − return rate) × margin − return rate × cost of a
+   returned parcel (usually about two courier charges).
+4. Loss line = break-even minus a safety margin for overheads. Scale only well below
+   it; cut or fix anything above it after learning.
+
+Show the table to the owner with every assumption marked, and ask for the ones that
+are missing (product cost, return rate, tax treatment). A cheap-looking cost per
+purchase can still lose money in a cash-on-delivery market.
+
 Write them into the business's rules file. Without a target, compare only against
 the account's own average and say that "better than average" is not "profitable".
 

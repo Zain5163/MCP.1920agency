@@ -16,6 +16,20 @@ account's own history already proves**.
 | Risk | Money stays in a losing ad set until you move it | A new or weaker ad set gets starved, so it never shows what it can do |
 | Learning | Each ad set needs its own ~50 results/week | Same per ad set, but Meta concentrates spend so the winner gets there faster |
 
+Where these rules come from (say so when you use them; do not present practice as
+Meta policy):
+- **[Meta]** Meta's own Creative Testing tool splits spend evenly across 2–5 ads inside
+  a live ad set, for fair tests; Meta promotes Advantage+ campaign budget (CBO) as its
+  default (Meta for Developers, 3 Jun 2025).
+- **[Practice]** "ABO to test, CBO to scale" and "never test inside a scaling CBO" are
+  repeated by several independent agencies, not stated by Meta (Jetfuel, 21 Aug 2026;
+  Top Growth Marketing, 26 Jul 2026).
+- **[Data]** Haus, 640 incrementality tests (Jan 2024 to Jun 2025): Meta's automated
+  campaigns beat manual ones only 42% of the time. No structure wins everywhere, so test
+  per account.
+- **[Reasoning]** One ad set makes CBO and ABO identical: there is only one budget to split.
+Full citations: `research-2026-10.md`.
+
 Rules:
 1. **One ad set: CBO and ABO are the same.** Do not restructure just to change the label.
 2. **Test with ABO** (or Meta's built-in Creative Testing, which splits spend evenly
