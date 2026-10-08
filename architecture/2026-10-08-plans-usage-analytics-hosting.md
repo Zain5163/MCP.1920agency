@@ -221,6 +221,15 @@ Every event: `distinct_id` = tenant id, `$lib` = `adspilot-server`,
 
 ### Phase 2b — PostHog MCP Analytics (`$mcp_tool_call`)
 
+**Deployed 2026-10-08 ~11:45 PKT (owner asked for it), verification PENDING.**
+Merged into master (`10c829a`), installed and built on the PC (mcp tests 173/0),
+released to the server (`10c829a34833`, `BUILD_SHA` set in the container). One
+read-only `check_usage` call made through the hosted MCP at ~11:46 PKT; no send
+errors in the server log. Verified only when the owner sees that
+`$mcp_tool_call` (`$mcp_tool_name = check_usage`, person = tenant id) at
+https://eu.posthog.com/project/297949/mcp-analytics/activity. The local stdio MCP
+picks it up after a VS Code reload.
+
 **Status 2026-10-08: built and unit-tested on branch `posthog-mcp-analytics`
 (worktree), not merged, not deployed, no event sent.** The owner asked for
 PostHog's MCP Analytics (project 297949, EU) on top of our own `mcp_call`,
