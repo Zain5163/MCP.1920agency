@@ -8,6 +8,7 @@ import { disconnect, health } from '@social-publisher/db'
 import { createAnalytics, createLogger, flushOnExit } from '@social-publisher/telemetry'
 
 import { buildHostedServer, rememberClient } from './hosted-server.ts'
+import { createMcpAnalyticsClient, resolveServerBuild, type McpAnalyticsSetup } from './mcp-analytics.ts'
 import { handleShopifyCallback } from './shopify-hosted.ts'
 
 /**
@@ -42,6 +43,20 @@ const analytics = createAnalytics({
   onError: (message) => void logger.warn('analytics.failed', message),
 })
 flushOnExit(analytics)
+
+/**
+ * PostHog MCP Analytics ($mcp_tool_call), one posthog-node client for the
+ * process: it batches across requests (20 events or 10 s), and every request's
+ * fresh server is instrumented onto it. Undefined without POSTHOG_KEY, and then
+ * nothing is instrumented. BUILD_SHA comes from docker-compose.yml.
+ */
+const mcpAnalyticsClient = createMcpAnalyticsClient({
+  apiKey: analyticsSettings.posthogKey,
+  host: analyticsSettings.posthogHost,
+  onError: (message) => void logger.warn('mcp_analytics.failed', message),
+})
+const mcpAnalytics: McpAnalyticsSetup | undefined =
+  mcpAnalyticsClient === undefined ? undefined : { client: mcpAnalyticsClient, serverBuild: resolveServerBuild() }
 
 const PORT = Number(optional('MCP_PORT', '8080'))
 const UPGRADE_URL = optional('UPGRADE_URL')
@@ -147,7 +162,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
    * cannot see another tenant — there is no shared, long-lived server holding a
    * tenant that could be mismatched with an incoming request.
    */
-  const mcp = buildHostedServer(identity, scoped, { upgradeUrl: UPGRADE_URL, analytics })
+  const mcp = buildHostedServer(identity, scoped, { upgradeUrl: UPGRADE_URL, analytics, mcpAnalytics })
 
   const transport = new StreamableHTTPServerTransport({
     // Stateless: every request carries its own token, so there is no session to
@@ -176,7 +191,10 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.on(signal, () => {
     server.close(() => {
       // Queued analytics go out first (bounded wait); beforeExit does not fire on exit().
-      void Promise.allSettled([analytics.shutdown(), disconnect()]).finally(() => process.exit(0))
+      // Docker sends SIGTERM on stop and allows 15 s (stop_grace_period); both waits are 3 s.
+      void Promise.allSettled([analytics.shutdown(), mcpAnalyticsClient?.shutdown(3_000), disconnect()]).finally(() =>
+        process.exit(0),
+      )
     })
   })
 }

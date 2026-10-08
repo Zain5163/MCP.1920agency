@@ -4,6 +4,8 @@ import { allCodes, industryOf, isFreeTool, limitMessage, meterCall, planOf, usag
 import type { CountedMonth, ToolCallInput, UsageSnapshot } from '@social-publisher/db'
 import type { Analytics } from '@social-publisher/telemetry'
 
+import type { McpAnalyticsSetup } from './mcp-analytics.ts'
+
 /**
  * Usage metering for every MCP tool, on both transports (decision 0009).
  *
@@ -72,6 +74,11 @@ export interface MeterOptions {
   readonly now?: () => Date
   /** Product analytics (PostHog). Absent or disabled: nothing is sent. */
   readonly analytics?: Analytics | undefined
+  /**
+   * PostHog MCP Analytics ($mcp_tool_call), installed by createAdsPilotServer
+   * (mcp-analytics.ts). Absent (no POSTHOG_KEY): the server is not instrumented.
+   */
+  readonly mcpAnalytics?: McpAnalyticsSetup | undefined
 }
 
 type Handler = (...args: unknown[]) => unknown

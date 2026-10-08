@@ -3,6 +3,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import type { TokenIdentity } from '@social-publisher/auth'
 import type { Analytics, Logger } from '@social-publisher/telemetry'
 
+import type { McpAnalyticsSetup } from './mcp-analytics.ts'
 import { createAdsPilotServer } from './mcp-server.ts'
 import type { ClientInfo, MeterOptions } from './metering.ts'
 import { registerPlaybooks } from './playbooks.ts'
@@ -26,6 +27,8 @@ export function buildHostedServer(
     meter?: Partial<MeterOptions>
     /** One per process, shared by every request's server (http-server.ts). */
     analytics?: Analytics
+    /** PostHog MCP Analytics: one client per process too; each request's server is instrumented. */
+    mcpAnalytics?: McpAnalyticsSetup | undefined
   } = {},
 ): McpServer {
   const server = createAdsPilotServer('0.3.0', {
@@ -36,6 +39,7 @@ export function buildHostedServer(
     clientInfo: () => clientFor(identity.tokenId),
     upgradeUrl: options.upgradeUrl,
     analytics: options.analytics,
+    mcpAnalytics: options.mcpAnalytics,
     log: (event, message, error) => {
       void logger.error(event, message, { tenantId: identity.tenantId, data: { error } })
     },
