@@ -178,3 +178,10 @@ by introspection (collections now use `collection:` inputs and `collectionByIden
   `shopify_connect_store` from the chat links one). Today that page explains the step (commit
   4f972f5). For review, Shopify expects the app to take the merchant straight into the app after
   install: add a sign-in / sign-up step on that page that links the install to an AdsPilot account.
+- **2026-10-08, VERIFIED END TO END (hosted self-service).** App config v6 released (scopes +
+  read/write_publications, write_legal_policies). From Claude Code connected to
+  `https://mcp.1920agency.com/mcp` with a dashboard token (`adspilot-hosted`):
+  `shopify_connect_store` → owner approved in Shopify → callback page "connected" →
+  `list_shopify_stores` lists the practice store for that account; `shopify_store_overview` and
+  `shopify_store_audit` (including policies) work through the stored, encrypted per-account token.
+  Next: the store-building rehearsal on the practice store, then the public-app checklist.
