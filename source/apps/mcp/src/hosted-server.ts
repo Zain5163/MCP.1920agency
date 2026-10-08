@@ -7,6 +7,7 @@ import { createAdsPilotServer } from './mcp-server.ts'
 import type { ClientInfo, MeterOptions } from './metering.ts'
 import { registerPlaybooks } from './playbooks.ts'
 import type { PostingDeps } from './publishing.ts'
+import { registerHostedShopifyTools } from './shopify-hosted.ts'
 import { registerSkillsLibrary } from './skills-library.ts'
 import { registerTools } from './tools.ts'
 
@@ -42,6 +43,8 @@ export function buildHostedServer(
   })
   registerTools(server, identity, logger, options.deps, options.analytics)
   // Playbooks only: static text, no credentials. Ads tools stay local (decision 0005).
+  // Each user's own Shopify stores, with their own encrypted tokens (shopify-hosted.ts).
+  registerHostedShopifyTools(server, identity.tenantId)
   registerPlaybooks(server)
   registerSkillsLibrary(server)
   return server

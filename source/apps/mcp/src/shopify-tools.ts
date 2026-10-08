@@ -103,6 +103,26 @@ export function loadShopify(selector: string): { client: ShopifyAdminClient; sto
   }
 }
 
+/**
+ * Where the tools get their stores from.
+ *
+ * Local (the owner's PC): the store list file and the app's own credentials.
+ * Hosted (each AdsPilot user): the stores that user connected, with their own
+ * encrypted tokens (shopify-hosted.ts). The tools are the same; only this differs.
+ */
+export interface ShopifyAccess {
+  list(): Promise<ShopifyStoreEntry[] | { error: string }>
+  open(selector: string): Promise<{ client: ShopifyAdminClient; store: ShopifyStoreEntry } | { error: string }>
+  /** Where earlier versions of this store's products and pages are saved. */
+  backupDir(store: ShopifyStoreEntry): string
+}
+
+export const localShopifyAccess: ShopifyAccess = {
+  list: async () => readShopifyStores(),
+  open: async (selector) => loadShopify(selector),
+  backupDir: (store) => join(BACKUP_DIR, store.shop),
+}
+
 const storeArg = z.string().describe('Which store: a name, key or myshopify.com address from list_shopify_stores.')
 const fmt = (n: number, currency = '') => `${currency ? `${currency} ` : ''}${Math.round(n).toLocaleString('en-US')}`
 const pct = (n: number) => `${Math.round(n * 100)}%`
@@ -112,9 +132,13 @@ const counts = (m: Record<string, number>) =>
     .map(([k, v]) => `${k} ${v}`)
     .join(', ') || 'none'
 
-async function withStore(selector: string, fn: (client: ShopifyAdminClient, store: ShopifyStoreEntry) => Promise<string>): Promise<ToolResult> {
+async function withStore(
+  access: ShopifyAccess,
+  selector: string,
+  fn: (client: ShopifyAdminClient, store: ShopifyStoreEntry) => Promise<string>,
+): Promise<ToolResult> {
   return await guarded(async () => {
-    const loaded = loadShopify(selector)
+    const loaded = await access.open(selector)
     if ('error' in loaded) return text(loaded.error)
     try {
       return text(`Store: ${loaded.store.name} (${loaded.store.shop})\n\n${await fn(loaded.client, loaded.store)}`)
@@ -125,16 +149,16 @@ async function withStore(selector: string, fn: (client: ShopifyAdminClient, stor
   })
 }
 
-export function registerShopifyTools(server: McpServer): void {
+export function registerShopifyTools(server: McpServer, access: ShopifyAccess = localShopifyAccess): void {
   server.tool(
     'list_shopify_stores',
     'List the Shopify stores AdsPilot can read. Pass one as `store` to the other shopify_ tools. Reads only.',
     {},
     async () =>
       await guarded(async () => {
-        const stores = readShopifyStores()
+        const stores = await access.list()
         if ('error' in stores) return text(stores.error)
-        if (stores.length === 0) return text(`No Shopify stores connected yet. Add them to ${STORES_PATH}.`)
+        if (stores.length === 0) return text(access === localShopifyAccess ? `No Shopify stores connected yet. Add them to ${STORES_PATH}.` : 'No Shopify store connected yet. Use shopify_connect_store with your store address.')
         return text(['Connected Shopify stores:', ...stores.map((s) => `  ${s.name}  (store: "${s.key}")  ${s.shop}`)].join('\n'))
       }),
   )
@@ -144,7 +168,7 @@ export function registerShopifyTools(server: McpServer): void {
     'A Shopify store at a glance: name, currency, plan, product and order counts, live theme. Reads only.',
     { store: storeArg },
     async ({ store }) =>
-      await withStore(store, async (client) => {
+      await withStore(access, store, async (client) => {
         const o = await client.overview()
         return [
           `${o.name} — ${o.url} (${o.currency}, plan: ${o.plan || 'unknown'})`,
@@ -163,7 +187,7 @@ export function registerShopifyTools(server: McpServer): void {
       search: z.string().optional().describe('Shopify product search, e.g. "chelsea" or "status:active".'),
     },
     async ({ store, limit, search }) =>
-      await withStore(store, async (client) => {
+      await withStore(access, store, async (client) => {
         const rows = await client.products({ limit, ...(search !== undefined ? { query: search } : {}) })
         if (rows.length === 0) return 'No products match.'
         return [
@@ -187,7 +211,7 @@ export function registerShopifyTools(server: McpServer): void {
     "Real sales from the store for the last N days (up to 60): orders, revenue, average order, items per order, cancellations, refunds, discount codes used, and where each order's visit came from (UTM source/medium). Compare it with the ad platform's purchases to see true cost per order. Reads only; no customer personal data.",
     { store: storeArg, days: z.number().int().min(1).max(60).default(30) },
     async ({ store, days }) =>
-      await withStore(store, async (client) => {
+      await withStore(access, store, async (client) => {
         const s = await client.sales(days)
         if (s.orders === 0 && s.cancelled === 0) return `No orders in the last ${s.days} days (since ${s.since}).`
         const fb = Object.entries(s.sources)
@@ -215,7 +239,7 @@ export function registerShopifyTools(server: McpServer): void {
     'Conversion audit facts for a Shopify store: thin product pages (few photos, short descriptions), sold-out items still listed, low margins, missing refund/shipping policies, missing FAQ/size guide/contact pages, active discount codes. Then read get_skill cro and copywriting to turn the findings into fixes. Reads only.',
     { store: storeArg },
     async ({ store }) =>
-      await withStore(store, async (client) => {
+      await withStore(access, store, async (client) => {
         const a = await client.auditFacts()
         const order: Record<AuditFinding['severity'], number> = { high: 0, medium: 1, low: 2 }
         const findings = [...a.findings].sort((x, y) => order[x.severity] - order[y.severity])
@@ -252,8 +276,7 @@ const plain = (html: string, max = 280) => {
 }
 const hash = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex').slice(0, 16)
 
-function saveBackup(shop: string, kind: 'product' | 'page', handle: string, content: unknown): string {
-  const dir = join(BACKUP_DIR, shop)
+function saveBackup(dir: string, shop: string, kind: 'product' | 'page', handle: string, content: unknown): string {
   mkdirSync(dir, { recursive: true })
   const file = `${new Date().toISOString().replace(/[:.]/g, '-')}-${kind}-${handle.replace(/[^a-z0-9-]/gi, '_')}.json`
   writeFileSync(join(dir, file), JSON.stringify({ kind, handle, shop, savedAt: new Date().toISOString(), content }, null, 2))
@@ -262,7 +285,7 @@ function saveBackup(shop: string, kind: 'product' | 'page', handle: string, cont
 
 const confirmArg = z.string().optional().describe('The approval token from the summary, once the owner has said yes.')
 
-export function registerShopifyWriteTools(server: McpServer): void {
+export function registerShopifyWriteTools(server: McpServer, access: ShopifyAccess = localShopifyAccess): void {
   server.tool(
     'shopify_update_product',
     'Change a product page: title, description (HTML) or SEO title/description. Shows a before/after summary for the owner’s approval, saves the current version first, then reads the change back. Visible to customers immediately.',
@@ -276,7 +299,7 @@ export function registerShopifyWriteTools(server: McpServer): void {
       confirm: confirmArg,
     },
     async ({ store, handle, confirm, ...changes }) =>
-      await withStore(store, async (client, entry) => {
+      await withStore(access, store, async (client, entry) => {
         const wanted = Object.fromEntries(Object.entries(changes).filter(([, v]) => v !== undefined))
         if (Object.keys(wanted).length === 0) return 'Nothing to change: give a title, descriptionHtml, seoTitle or seoDescription.'
         const before = await client.productContent(handle)
@@ -295,7 +318,7 @@ export function registerShopifyWriteTools(server: McpServer): void {
         })
         if (!gate.allowed) return formatApprovalRequest(gate)
 
-        const backup = saveBackup(entry.shop, 'product', handle, before)
+        const backup = saveBackup(access.backupDir(entry), entry.shop, 'product', handle, before)
         await client.updateProduct(before.id, wanted)
         const after = await client.productContent(handle)
         const ok =
@@ -324,7 +347,7 @@ export function registerShopifyWriteTools(server: McpServer): void {
       confirm: confirmArg,
     },
     async ({ store, handle, title, bodyHtml, publish, confirm }) =>
-      await withStore(store, async (client, entry) => {
+      await withStore(access, store, async (client, entry) => {
         const before = await client.pageContent(handle)
         const lines = [
           before === undefined ? `Create page "${title}" (/pages/${handle}) on ${entry.name}` : `Update page "${before.title}" (/pages/${handle}) on ${entry.name}`,
@@ -343,7 +366,7 @@ export function registerShopifyWriteTools(server: McpServer): void {
 
         let backup: string | undefined
         if (before !== undefined) {
-          backup = saveBackup(entry.shop, 'page', handle, before)
+          backup = saveBackup(access.backupDir(entry), entry.shop, 'page', handle, before)
           await client.updatePage(before.id, { title, body: bodyHtml, isPublished: publish })
         } else {
           await client.createPage({ title, handle, body: bodyHtml, isPublished: publish })
@@ -376,7 +399,7 @@ export function registerShopifyWriteTools(server: McpServer): void {
       confirm: confirmArg,
     },
     async ({ store, confirm, ...spec }) =>
-      await withStore(store, async (client, entry) => {
+      await withStore(access, store, async (client, entry) => {
         if (spec.kind === 'percentage' && (spec.value <= 0 || spec.value > 90)) return 'A percentage must be between 1 and 90.'
         if (spec.kind === 'fixed_amount' && spec.value <= 0) return 'A fixed amount must be above zero.'
         if (spec.minimumQuantity !== undefined && spec.minimumSubtotal !== undefined) return 'Use a minimum quantity or a minimum order value, not both.'
@@ -422,7 +445,7 @@ export function registerShopifyWriteTools(server: McpServer): void {
     'End a discount code now. Like pausing an ad, stopping an offer never waits for approval. The discount stays on record because orders reference it.',
     { store: storeArg, code: z.string() },
     async ({ store, code }) =>
-      await withStore(store, async (client, entry) => {
+      await withStore(access, store, async (client, entry) => {
         const found = await client.graphql<{ codeDiscountNodeByCode: { id: string } | null }>(
           'query($code: String!) { codeDiscountNodeByCode(code: $code) { id } }',
           { code },
@@ -439,8 +462,8 @@ export function registerShopifyWriteTools(server: McpServer): void {
     'List the saved earlier versions of products and pages that AdsPilot changed on a store, newest first. Reads only.',
     { store: storeArg },
     async ({ store }) =>
-      await withStore(store, async (_client, entry) => {
-        const dir = join(BACKUP_DIR, entry.shop)
+      await withStore(access, store, async (_client, entry) => {
+        const dir = access.backupDir(entry)
         if (!existsSync(dir)) return 'No backups yet: AdsPilot has not changed this store.'
         const files = readdirSync(dir).filter((f) => f.endsWith('.json')).sort().reverse()
         return files.length === 0 ? 'No backups yet.' : ['Backups (newest first):', ...files.slice(0, 50).map((f) => `  ${f}`)].join('\n')
@@ -452,8 +475,8 @@ export function registerShopifyWriteTools(server: McpServer): void {
     'Put a saved earlier version of a product or page back (from shopify_list_backups). Shows what will be restored for the owner’s approval, saves the current version first, then reads it back.',
     { store: storeArg, file: z.string().regex(/^[\w.-]+\.json$/), confirm: confirmArg },
     async ({ store, file, confirm }) =>
-      await withStore(store, async (client, entry) => {
-        const path = join(BACKUP_DIR, entry.shop, file)
+      await withStore(access, store, async (client, entry) => {
+        const path = join(access.backupDir(entry), file)
         if (!existsSync(path)) return `No backup "${file}" for this store. Use shopify_list_backups.`
         const saved = JSON.parse(readFileSync(path, 'utf8')) as {
           kind: 'product' | 'page'
@@ -476,7 +499,7 @@ export function registerShopifyWriteTools(server: McpServer): void {
         if (saved.kind === 'product') {
           const now = await client.productContent(saved.handle)
           if (now === undefined) return `The product "${saved.handle}" no longer exists.`
-          const backup = saveBackup(entry.shop, 'product', saved.handle, now)
+          const backup = saveBackup(access.backupDir(entry), entry.shop, 'product', saved.handle, now)
           await client.updateProduct(now.id, {
             title: saved.content.title,
             descriptionHtml: saved.content.descriptionHtml ?? '',
@@ -488,7 +511,7 @@ export function registerShopifyWriteTools(server: McpServer): void {
         }
         const now = await client.pageContent(saved.handle)
         if (now === undefined) return `The page "${saved.handle}" no longer exists.`
-        const backup = saveBackup(entry.shop, 'page', saved.handle, now)
+        const backup = saveBackup(access.backupDir(entry), entry.shop, 'page', saved.handle, now)
         await client.updatePage(now.id, { title: saved.content.title, body: saved.content.body ?? '', isPublished: saved.content.isPublished ?? false })
         await audit('shopify.page.restored', { shop: entry.shop, handle: saved.handle, from: file })
         return `Restored page "${saved.content.title}". The version it replaced is saved as ${backup}.`

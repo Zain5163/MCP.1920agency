@@ -87,10 +87,20 @@ export interface ShopifyCredentials {
   readonly clientSecret: string
 }
 
+/**
+ * Supplies an access token from elsewhere (hosted AdsPilot: the vault, refreshing
+ * the store owner's expiring token). `forceRefresh` is set after Shopify has
+ * rejected the previous token.
+ */
+export type ShopifyTokenProvider = (options: { forceRefresh: boolean }) => Promise<string>
+
 export interface ShopifyClientOptions {
   /** The store's myshopify domain, e.g. "example.myshopify.com". */
   readonly shop: string
-  readonly credentials: ShopifyCredentials
+  /** App id and secret, for the client-credentials grant (stores owned by the app's organisation). */
+  readonly credentials?: ShopifyCredentials
+  /** Or a token supplied per call (stores connected by their owners). One of the two is required. */
+  readonly tokenProvider?: ShopifyTokenProvider
   readonly transport?: ShopifyTransport
   readonly apiVersion?: string
   readonly now?: () => number
@@ -104,7 +114,9 @@ const money = (v: unknown): number => {
 
 export class ShopifyAdminClient {
   readonly shop: string
-  readonly #credentials: ShopifyCredentials
+  readonly #credentials: ShopifyCredentials | undefined
+  readonly #tokenProvider: ShopifyTokenProvider | undefined
+  #forceRefresh = false
   readonly #transport: ShopifyTransport
   readonly #version: string
   readonly #now: () => number
@@ -117,7 +129,11 @@ export class ShopifyAdminClient {
       throw new ShopifyError(`"${options.shop}" is not a store's myshopify.com address.`, 'query')
     }
     this.shop = shop
+    if (options.credentials === undefined && options.tokenProvider === undefined) {
+      throw new ShopifyError('A Shopify client needs app credentials or a token provider.', 'auth')
+    }
     this.#credentials = options.credentials
+    this.#tokenProvider = options.tokenProvider
     this.#transport = options.transport ?? httpsTransport()
     this.#version = options.apiVersion ?? SHOPIFY_API_VERSION
     this.#now = options.now ?? Date.now
@@ -142,11 +158,16 @@ export class ShopifyAdminClient {
   }
 
   async #accessToken(): Promise<string> {
+    if (this.#tokenProvider !== undefined) {
+      const forceRefresh = this.#forceRefresh
+      this.#forceRefresh = false
+      return await this.#tokenProvider({ forceRefresh })
+    }
     if (this.#token !== undefined && this.#token.expiresAt > this.#now()) return this.#token.value
     const res = await this.#send('/admin/oauth/access_token', {
       grant_type: 'client_credentials',
-      client_id: this.#credentials.clientId,
-      client_secret: this.#credentials.clientSecret,
+      client_id: this.#credentials!.clientId,
+      client_secret: this.#credentials!.clientSecret,
     })
     let parsed: { access_token?: string; expires_in?: number; error_description?: string; errors?: unknown } = {}
     try {
@@ -175,6 +196,7 @@ export class ShopifyAdminClient {
       const res = await this.#send(`/admin/api/${this.#version}/graphql.json`, { query, variables }, { 'X-Shopify-Access-Token': token })
       if (res.status === 401) {
         this.#token = undefined
+        this.#forceRefresh = true
         if (attempt === 0) continue
         throw new ShopifyError(`Shopify rejected the access token for ${this.shop}.`, 'auth')
       }

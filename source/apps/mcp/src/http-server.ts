@@ -8,6 +8,7 @@ import { disconnect, health } from '@social-publisher/db'
 import { createAnalytics, createLogger, flushOnExit } from '@social-publisher/telemetry'
 
 import { buildHostedServer, rememberClient } from './hosted-server.ts'
+import { handleShopifyCallback } from './shopify-hosted.ts'
 
 /**
  * Hosted MCP server.
@@ -90,6 +91,27 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       ok: state.reachable,
       database: state.reachable ? 'reachable' : 'unreachable',
       latencyMs: state.latencyMs ?? null,
+    })
+    return
+  }
+
+  // Shopify sends the store owner's browser here after they approve the app.
+  // Unauthenticated by design; trust comes from Shopify's signature and AdsPilot's
+  // signed state (shopify-hosted.ts).
+  if (url.pathname === '/shopify' && req.method === 'GET') {
+    const body =
+      '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
+      '<title>AdsPilot store connector</title><body style="font-family:system-ui;max-width:32rem;margin:4rem auto;padding:0 1rem">' +
+      '<h1 style="font-size:1.3rem">This store is connected to AdsPilot</h1>' +
+      '<p>AdsPilot works from your AI chat (Claude, ChatGPT or another assistant). Ask it to audit your store, check sales, or improve a page. ' +
+      'Nothing changes on your store without your approval in the chat.</p></body>'
+    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'content-length': Buffer.byteLength(body) })
+    res.end(body)
+    return
+  }
+  if (url.pathname === '/shopify/callback' && req.method === 'GET') {
+    await handleShopifyCallback(url, res, {
+      log: (event, data) => void logger.info(event, 'shopify connect', { data }),
     })
     return
   }

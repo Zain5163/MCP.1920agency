@@ -68,6 +68,19 @@ mcp.1920agency.com {
 	# source/apps/cli/test/callback-address.test.ts against .env.example).
 	# GET only: providers redirect the browser with GET. Anything else falls
 	# through to the 404 below.
+	# Shopify: the store OWNER's browser arrives here after approving the app
+	# (source/apps/mcp/src/shopify-hosted.ts). Unlike the bounce below it is NOT
+	# sent to the owner's PC: the user is a customer, so the MCP on this server
+	# checks Shopify's signature and AdsPilot's signed state and stores the token.
+	# GET only; no caching. /shopify is a small info page for the app's URL.
+	@shopify {
+		method GET
+		path /shopify /shopify/callback
+	}
+	handle @shopify {
+		header Cache-Control "no-store"
+		reverse_proxy adspilot-mcp:8080
+	}
 	@oauth {
 		method GET
 		path /callback /instagram/callback /threads/callback /pinterest/callback /linkedin/callback /linkedin-page/callback /google/callback

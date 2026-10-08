@@ -61,6 +61,9 @@ services:
       NODE_OPTIONS: "--max-old-space-size=256"
     volumes:
       - ${ADSPILOT_HOME:-/opt/adspilot}/logs/mcp:/home/node/.social-publisher/logs
+      # Earlier versions of products and pages AdsPilot changed on users' Shopify
+      # stores (shopify_restore_backup). Must survive container restarts.
+      - ${ADSPILOT_HOME:-/opt/adspilot}/data/shopify-backups:/home/node/.social-publisher/shopify-backups
     expose:
       - "8080"
     mem_limit: 384m
