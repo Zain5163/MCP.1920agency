@@ -1,4 +1,4 @@
-# Shopify connector for AdsPilot — build plan (awaiting the owner's yes)
+# Shopify connector for AdsPilot — build plan
 
 _2026-10-08. Research: `research/2026-10-08-shopify-integration.md`._
 
@@ -53,3 +53,20 @@ or a named Cloudflare tunnel. The same address also fixes Facebook reconnects in
 Muzaree. Its earlier theme work is in `Websites/Muzaree-Shopify` (an optimised theme
 package, never uploaded); its rules: preview the full purchase flow before publishing,
 never publish without explicit approval.
+
+## Progress
+
+- **2026-10-08, phase 0 done.** Owner created a developer account (org 239616792) and the
+  development store `1920-agency-test-store` (17 test products, no orders). The app
+  "1920 Agency Store Connector" was created with the Shopify CLI, configured (not embedded,
+  read + approved-write scopes, no customer data) and deployed as version 2; config in
+  `integrations/shopify-app`. Secret in `~/.social-publisher/.env` (SHOPIFY_CONNECTOR_*).
+  Installed on the dev store by the owner. **Verified:** client-credentials token (24 h),
+  GraphQL Admin 2026-10 read of shop, products, orders and themes.
+- **Network note:** this PC's ISP route to Shopify edge `23.227.38.74` is dead (traceroute
+  stops after the ISP hop), and every `*.myshopify.com` name resolves there; the
+  neighbouring edge `23.227.38.69` works. The test used it. Do not hard-code an IP in
+  AdsPilot: recheck, report to the ISP if it persists, and the hosted server avoids it.
+- **Client credentials** works only for stores owned by the app's organisation (dev
+  stores). Client stores (Muzaree) need the install link and OAuth, which needs the public
+  https callback (open decision above).
