@@ -220,7 +220,7 @@ export function registerSkillsLibrary(server: McpServer, root: string = LIBRARY_
 
   server.tool(
     'list_skills',
-    `List the ${library.size} built-in marketing and advertising skills (SEO, AI search visibility, copywriting, CRO, email, pricing, launch, social, ads, offers, buyer awareness and funnels). Read one with get_skill before doing that kind of work.`,
+    `List the ${library.size} built-in marketing, advertising and website skills (SEO, AI search visibility, copywriting, CRO, email, pricing, launch, social, ads, offers, buyer awareness and funnels; building and improving Shopify stores, landing pages and WordPress sites, web design, page speed and accessibility). Read one with get_skill before doing that kind of work.`,
     {},
     async () => ({
       content: [

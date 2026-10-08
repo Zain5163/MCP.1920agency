@@ -23,7 +23,7 @@ describe('the skills library', () => {
   const library = loadLibrary()
 
   test('loads every skill in the pinned copies', () => {
-    assert.equal(library.size, 58)
+    assert.equal(library.size, 59)
     for (const name of ['seo-audit', 'ai-seo', 'copywriting', 'ads', 'social', 'cro']) {
       assert.ok(library.has(name), `${name} is missing`)
     }
@@ -37,7 +37,7 @@ describe('the skills library', () => {
     const server = new McpServer({ name: 't', version: '1' })
     registerSkillsLibrary(server)
     const text = await callTool(server, 'list_skills', {})
-    assert.match(text, /^58 skills/)
+    assert.match(text, /^59 skills/)
     assert.match(text, /seo-audit/)
   })
 
@@ -156,6 +156,32 @@ describe('the skills library', () => {
         for (const client of ['Muzaree', 'GradCollective', 'Knightsbridge', 'PSX', 'Syndra']) {
           assert.doesNotMatch(text, new RegExp(client, 'i'), `${skill.name}/${file} names ${client}`)
         }
+      }
+    }
+  })
+
+  /**
+   * Our own skills tell the AI which tool to call. A tool name that does not
+   * exist sends it looking for something it cannot do, or worse, makes it
+   * claim it did. Every shopify_ name in our skills must be a registered tool.
+   */
+  test('our own skills name only Shopify tools that really exist', async () => {
+    const { readFileSync, readdirSync } = await import('node:fs')
+    const { join } = await import('node:path')
+    const srcDir = new URL('../src/', import.meta.url)
+    const registered = new Set<string>()
+    for (const file of readdirSync(srcDir).filter((f) => f.endsWith('.ts'))) {
+      const code = readFileSync(new URL(file, srcDir), 'utf8')
+      for (const [, name] of code.matchAll(/server\.tool\(\s*'([a-z_]+)'/g)) registered.add(name!)
+    }
+    assert.ok(registered.has('shopify_theme_publish') && registered.has('list_skills'), 'tool scan found nothing')
+    for (const skill of [...library.values()].filter((s) => s.library.own === true)) {
+      for (const file of ['SKILL.md', ...skill.references]) {
+        const text = readFileSync(join(skill.dir, ...file.split('/')), 'utf8')
+        for (const [name] of text.matchAll(/(?<![.\w])shopify_[a-z_]+/g)) {
+          assert.ok(registered.has(name), `${skill.name}/${file} names ${name}, which is not a tool`)
+        }
+        assert.doesNotMatch(text, /`(wp|wordpress|woocommerce)_[a-z_]+`/i, `${skill.name}/${file} names a WordPress tool AdsPilot does not have`)
       }
     }
   })
