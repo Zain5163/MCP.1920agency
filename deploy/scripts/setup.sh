@@ -78,6 +78,11 @@ chmod 700 "$ADSPILOT_HOME/env" "$BACKUP_DIR"
 # the containers run as uid 1000 (user "node" in the image)
 chown -R 1000:1000 "$ADSPILOT_HOME/logs"
 chmod 750 "$ADSPILOT_HOME/logs" "$ADSPILOT_HOME/logs/"*
+# Shopify: earlier versions of users' products and pages (shopify-hosted.ts).
+# Made here, owned by node: otherwise Docker creates it as root and saves fail.
+mkdir -p "$ADSPILOT_HOME/data/shopify-backups"
+chown 1000:1000 "$ADSPILOT_HOME/data/shopify-backups"
+chmod 700 "$ADSPILOT_HOME/data/shopify-backups"
 
 [ -f "$APP_ENV" ] || die "$APP_ENV does not exist. Copy it from the PC first (deploy/README.md, step A3). Names: deploy/.env.example."
 chown root:root "$APP_ENV" 2>/dev/null || true

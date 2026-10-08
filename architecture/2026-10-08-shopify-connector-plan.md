@@ -132,3 +132,17 @@ the custom-distribution app in his own browser, and the existing redirect bounce
   PUBLIC_BASE_URL), `/opt/adspilot/data/shopify-backups`, release, Caddy reload. Until the app is
   public (Shopify review), only development stores of the organisation can install it this way.
 
+- **2026-10-08, deploy prepared (not run).** Step-by-step commands for another chat:
+  `deploy/README.md`, section "Shopify self-service: deploy steps". Raptor's Caddyfile has the
+  `@shopify` route committed (Raptor repo cffbb2e); setup.sh now creates the backups folder.
+  Owner's question answered: the callback address is already set in the Shopify app (toml v5,
+  deployed); the owner's PC `.env` has the keys, the server needs its own copy (step 1).
+
+## Public app or not (recommendation, 2026-10-08)
+
+Stay a development/custom app for now. Self-service from Claude/ChatGPT for any merchant needs
+a public app, but apply only after: the hosted flow is proven on the dev store; the mandatory
+privacy webhooks and `app/uninstalled` are built; a privacy policy page exists; and Shopify has
+answered in writing whether AdsPilot (sold mainly outside Shopify) must bill Shopify merchants
+through Shopify Billing. Listing choice when applying: unlisted public app first (install by
+link, no App Store page), App Store listing later.

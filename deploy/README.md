@@ -625,3 +625,78 @@ this change.
   exchanges the code on the server and writes the offline token to the vault.
   The bounce is at most a stopgap for an install the owner performs himself on
   this PC with staff access to the store.
+
+### Shopify self-service: deploy steps (built, NOT yet deployed)
+
+Code: commit d313b9e (`source/apps/mcp/src/shopify-hosted.ts`), plan in
+`architecture/2026-10-08-shopify-connector-plan.md`. The Shopify app (config
+version 5, `integrations/shopify-app/shopify.app.toml`) already sends users to
+`https://mcp.1920agency.com/shopify/callback`; nothing to set in Shopify. Until
+this deploy, that address answers 404, which only matters to a user who tries
+to connect: the owner's PC tools do not use it.
+
+**Approvals needed** (owner): the server env change, the release, and recreating
+Raptor's Caddy (a few seconds of raptordownloader.com downtime).
+
+All in Git Bash on the PC, with `S` and `ENVPC` as above.
+
+1. **Server env**: add the app's two keys, copied without showing them. Not
+   `SHOPIFY_CONNECT_ADDRESS` (a workaround for this PC's ISP only).
+   `PUBLIC_BASE_URL` is not needed: it defaults to `https://mcp.1920agency.com`.
+
+   ```bash
+   $S 'grep -c "^SHOPIFY_CONNECTOR_" /opt/adspilot/env/adspilot.env || true'     # expect 0
+   grep -E '^SHOPIFY_CONNECTOR_CLIENT_(ID|SECRET)=' "$ENVPC" | tr -d '\r' \
+     | $S 'umask 077; cat >> /opt/adspilot/env/adspilot.env'
+   $S 'cut -d= -f1 /opt/adspilot/env/adspilot.env | grep SHOPIFY'               # names only
+   ```
+
+2. **Backups folder** (the container runs as uid 1000; setup.sh now makes it
+   too, but release.sh does not run setup.sh):
+
+   ```bash
+   $S 'install -d -o 1000 -g 1000 -m 700 /opt/adspilot/data/shopify-backups'
+   ```
+
+3. **Release** (refuses only if `source/` or `deploy/` has uncommitted changes;
+   PROJECT-LOG.md and WAITING-LIST.md do not block it):
+
+   ```bash
+   deploy/scripts/release.sh
+   ```
+
+4. **Caddy**: the `@shopify` block is committed in Raptor's repo (cffbb2e,
+   identical to `deploy/caddy/mcp.1920agency.com.caddy`). Check the server's
+   copy is still the previous commit's, then upload, validate, recreate:
+
+   ```bash
+   cd "/d/My AI Works/Websites/FreeVideoDownloaderOnline/site"
+   git show cffbb2e~1:deploy/Caddyfile | sha256sum; $S 'sha256sum /opt/raptor/site/deploy/Caddyfile'   # must match
+   git -c core.autocrlf=false archive HEAD deploy/Caddyfile | $S 'tar -x -C /opt/raptor/site'
+   $S 'cd /opt/raptor/site/deploy \
+     && docker run --rm -v "$PWD/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2 caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile \
+     && docker compose up -d --force-recreate caddy'
+   for u in https://mcp.1920agency.com/health https://raptordownloader.com/ https://api.raptordownloader.com/health; do
+     echo "$(curl -s -o /dev/null -w '%{http_code}' -m 20 "$u") $u"; done
+   ```
+
+5. **Checks**:
+
+   ```bash
+   curl -s -o /dev/null -w '%{http_code}\n' https://mcp.1920agency.com/shopify            # 200 (info page)
+   curl -s -o /dev/null -w '%{http_code}\n' https://mcp.1920agency.com/shopify/callback   # 400 (unsigned)
+   ```
+
+   Then end to end, from an AI app connected to the hosted AdsPilot:
+   `shopify_connect_store` with `1920-agency-test-store.myshopify.com` → open the
+   link → Install → the page says "connected" → `list_shopify_stores` and
+   `shopify_store_audit` work. `shopify_disconnect_store` afterwards if wanted.
+
+**Rollback**: `deploy/scripts/release.sh --rollback`; for Caddy, re-upload
+`git show cffbb2e~1:deploy/Caddyfile` the same way. The two env lines can stay
+(unused by the older release).
+
+**Not covered yet**: `backup.sh` dumps the database only, so
+`/opt/adspilot/data/shopify-backups` (earlier versions of users' products and
+pages) is not in the encrypted backups. Fine for the test store; add it before
+real customers connect.
