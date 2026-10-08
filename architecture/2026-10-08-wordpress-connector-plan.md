@@ -1,5 +1,7 @@
 # WordPress and WooCommerce connector for AdsPilot — plan and state
 
+**Status 2026-10-08 ~11:50 PKT: DEPLOYED, not yet verified against a real site.** Merged (`ed0a294`, together with PostHog MCP Analytics and the hosted Shopify activity-log fix), `/opt/adspilot/data/wordpress-backups` created (uid 1000), released `ed0a2941302a`; gate 1,214+3 tests green. Next: the go-live test on a throwaway HTTPS WordPress with WooCommerce (section "What the owner or parent must do"), then add the WordPress and Shopify backup folders to `backup.sh`.
+
 _2026-10-08. Owner approved building it the same day; users are worldwide. Research:
 `research/2026-10-08-wordpress-connector.md`. Pattern followed: the Shopify connector
 (`architecture/2026-10-08-shopify-connector-plan.md`)._
