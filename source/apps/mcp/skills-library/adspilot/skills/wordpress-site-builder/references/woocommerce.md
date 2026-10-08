@@ -1,0 +1,69 @@
+# WooCommerce store checklist (for ad traffic)
+
+**Updated 2026-10-08** (WooCommerce 11.2). Page-level conversion advice is shared with
+Shopify stores and lives in one place: `get_skill store-builder`, references
+`conversion-checklists.md` and `cash-on-delivery.md`. This file adds only what is specific
+to WooCommerce. AdsPilot cannot change a WooCommerce store; every step below is done by
+the owner or developer, on staging first.
+
+## Settings that decide whether ad traffic buys
+
+| Area | Where (WooCommerce admin) | Good setting |
+|---|---|---|
+| Guest checkout | Settings > Accounts & Privacy | Allow checkout without an account |
+| Checkout type | Pages > Checkout (block or `[woocommerce_checkout]` shortcode) | Checkout block for new stores; keep classic only if a needed plugin requires it |
+| Checkout fields | Block checkout settings in the Site Editor; extra fields through the Additional Checkout Fields API (8.9+) | Only what delivery needs; phone required if couriers call |
+| Payments | Settings > Payments | Methods buyers expect: cash on delivery (built in, with any fee stated), local gateways, cards |
+| Shipping | Settings > Shipping > zones | Rates and times by zone, matching the product page and the shipping policy |
+| Free shipping threshold | A "Free shipping" method with a minimum order amount | Above one item's price, shown on the cart |
+| Coupons | Marketing > Coupons | Always with an expiry date; not listed publicly unless meant for everyone |
+| Stock | Products > Inventory | Out-of-stock variations hidden or clearly marked (Settings > Products > Inventory) |
+| Store notice | Site Editor or Customizer, depending on theme | Today's offer only; remove when it ends |
+| Order storage | Settings > Advanced > Features | High-Performance Order Storage on, all plugins compatible |
+
+## Product pages
+
+- Variable products: one attribute per choice buyers make (Size, Colour); a variation per
+  combination with its own price, stock and image.
+- Gallery: 4–6 photos including scale and detail; the main image not lazy-loaded.
+- Short description (next to the price) carries the delivery, payment and exchange line;
+  the long description carries materials, fit and care.
+- Size guide: a page linked next to the variation selector.
+- Reviews: WooCommerce's built-in product reviews, "verified owner" label on; real only.
+- Related products and cross-sells set by hand for best sellers.
+
+## Speed, store-specific
+
+- Cart, checkout and My Account must never be page-cached; most caching plugins and hosts
+  exclude them automatically, check anyway.
+- Cart fragments (the mini-cart refresh script) can slow every page; block themes and
+  current WooCommerce versions handle this better, so check before adding a plugin to
+  disable it.
+- Product image sizes set in the theme or Settings to the sizes actually shown.
+- A persistent object cache (Redis or Memcached) helps admin and checkout speed on larger stores.
+
+## Tracking
+
+- "Meta for WooCommerce" (by Meta): pixel, Conversions API and catalogue sync. Test in
+  Events Manager's test events: ViewContent on product, AddToCart, InitiateCheckout,
+  Purchase on the order-received page with value and currency, each once.
+- Google: Google's official "Google for WooCommerce" listing or Site Kit, one tag only.
+- UTM parameters on every ad link, and WooCommerce's order attribution (Orders list, "Origin")
+  to compare orders with what the ad platforms report.
+
+## Cash-on-delivery stores
+
+- Enable Cash on delivery in Settings > Payments, choose the shipping methods it applies to,
+  and write the instructions buyers see (for example "Pay the courier in cash. We will call
+  or WhatsApp to confirm before dispatch.").
+- Order status: COD orders arrive as "Processing"; the owner marks them "Completed" on
+  delivery. Refused parcels should be marked cancelled or refunded so sales reports are honest.
+- Everything else (delivery promise, WhatsApp, confirmation, cost per delivered order):
+  `store-builder` reference `cash-on-delivery.md`.
+
+## Sources (checked 2026-10-08; cited, not copied)
+
+- WooCommerce 11.0 release: https://developer.woocommerce.com/2026/08/04/woocommerce-11-0/
+- Cart and Checkout blocks default since 8.3, HPOS default since 8.2: https://developer.woocommerce.com/2023/10/10/woocommerce-8-2-0-released/
+- Additional checkout fields API: https://developer.woocommerce.com/docs/block-development/cart-and-checkout-blocks/how-to-additional-checkout-fields-guide/
+- Meta for WooCommerce on wordpress.org: https://wordpress.org/plugins/facebook-for-woocommerce/

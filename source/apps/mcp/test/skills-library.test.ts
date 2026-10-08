@@ -23,7 +23,7 @@ describe('the skills library', () => {
   const library = loadLibrary()
 
   test('loads every skill in the pinned copies', () => {
-    assert.equal(library.size, 65)
+    assert.equal(library.size, 66)
     for (const name of ['seo-audit', 'ai-seo', 'copywriting', 'ads', 'social', 'cro']) {
       assert.ok(library.has(name), `${name} is missing`)
     }
@@ -37,7 +37,7 @@ describe('the skills library', () => {
     const server = new McpServer({ name: 't', version: '1' })
     registerSkillsLibrary(server)
     const text = await callTool(server, 'list_skills', {})
-    assert.match(text, /^65 skills/)
+    assert.match(text, /^66 skills/)
     assert.match(text, /seo-audit/)
   })
 
@@ -212,9 +212,16 @@ describe('the skills library', () => {
         for (const [name] of text.matchAll(/(?<![.\w])shopify_[a-z_]+/g)) {
           assert.ok(registered.has(name), `${skill.name}/${file} names ${name}, which is not a tool`)
         }
-        assert.doesNotMatch(text, /`(wp|wordpress|woocommerce)_[a-z_]+`/i, `${skill.name}/${file} names a WordPress tool AdsPilot does not have`)
       }
     }
+  })
+
+  /** AdsPilot has no WordPress tools; the skill must say so before anything else. */
+  test('the WordPress skill says AdsPilot cannot change a WordPress site', async () => {
+    const server = new McpServer({ name: 't', version: '1' })
+    registerSkillsLibrary(server)
+    const text = await callTool(server, 'get_skill', { name: 'wordpress-site-builder' })
+    assert.match(text.slice(0, 3000), /AdsPilot has \*\*no WordPress or WooCommerce tools\*\*/)
   })
 
   test('the framing tells the AI our playbooks win where both apply', () => {
