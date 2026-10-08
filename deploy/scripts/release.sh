@@ -72,7 +72,14 @@ rs "set -e
     $H/app/deploy/scripts/dc.sh up -d --wait mcp
     $H/app/deploy/scripts/dc.sh up -d worker
     # keep the newest 3 releases
-    cd $H/releases && ls -1dt */ | tail -n +4 | xargs -r rm -rf"
+    cd $H/releases && ls -1dt */ | tail -n +4 | xargs -r rm -rf
+    # and only their images: each release adds a ~0.7 GB image (2026-10-08 the
+    # disk went from 27% to 59% in one day of releases). Old build cache too.
+    keep=\$(ls -1 $H/releases)
+    for t in \$(docker images adspilot --format '{{.Tag}}'); do
+      echo \"\$keep\" | grep -qx \"\$t\" || docker rmi \"adspilot:\$t\" >/dev/null 2>&1 || true
+    done
+    docker builder prune -f --filter until=72h >/dev/null 2>&1 || true"
 
 echo "== checking the live MCP =="
 code=000
