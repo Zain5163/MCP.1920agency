@@ -1,0 +1,61 @@
+---
+name: store-platform-choice
+description: "Help a business choose where to sell online before building anything: Shopify, WooCommerce (WordPress), a simpler site builder (Wix, Squarespace), a marketplace, or social selling with WhatsApp and Instagram, judged on their products, budget, skills, payment methods (including cash on delivery), growth plans and how AdsPilot can help on each. Use when someone asks which platform to use, whether to move from one platform to another, or wants a store but has nothing yet."
+---
+
+# Choosing a store platform
+
+**Updated 2026-10-08.** Platform prices and features change often: check the platform's
+own pricing page before quoting a number, and never quote one from memory.
+
+## 1. Questions to answer first
+
+1. What is sold, how many products and variants (sizes, colours), and how often they change?
+2. Who will run the store day to day, and how comfortable are they with technology?
+3. Monthly budget for the platform, apps or plugins, hosting and a developer.
+4. How buyers pay: cash on delivery, bank transfer, wallets, cards. Which gateways work in
+   the business's country?
+5. Where buyers come from: ads to a website, Instagram or TikTok, WhatsApp, marketplaces?
+6. Plans for the next 12 months: more products, other countries, wholesale, subscriptions?
+7. Is there an existing site, domain, product data, customers and search traffic to keep?
+
+## 2. The options
+
+| Option | Fits when | Watch out for | AdsPilot today |
+|---|---|---|---|
+| **Shopify** | Most product businesses that want a store working quickly, with little maintenance; good themes, checkout and apps; scales well | Monthly plan plus app costs; Shopify Payments is not available in every country (not in Pakistan), and Shopify charges an extra transaction fee on orders paid through third-party gateways when Shopify Payments is not used (not on cash on delivery or other manual methods); theme code changes need care | **Connected**: store audit, sales, products, pages, collections, menus, policies, discounts, and theme drafts with preview and approved publish (theme tools in the local app). Skills: store-builder, shopify-theme-developer |
+| **WooCommerce on WordPress** | A business that already has a WordPress site or content; wants full control and ownership; has a developer or a good managed host | Hosting, updates, backups and security are the owner's job; plugin quality varies (most WordPress vulnerabilities are in plugins); speed depends on hosting and theme | **Guidance only**: no WordPress tools. Skill: wordpress-site-builder |
+| **Wix, Squarespace and similar** | Small catalogue, a brochure site with a few products, an owner who wants to do everything visually | Fewer e-commerce features and integrations; harder to move away later | Guidance only (landing-page-builder, web-ui-design) |
+| **Marketplace** (for example Daraz in Pakistan, Amazon) | Testing demand without a store; reaching buyers who search marketplaces | Commission per sale, marketplace rules, no customer list, price competition next to rivals | Ads and content only |
+| **Social selling** (Instagram or Facebook shop, WhatsApp Business catalogue, orders by chat) | Very small catalogue, made-to-order items, or the first weeks of a business | Manual order handling, no checkout, hard to measure sales from ads | Social posting and messaging-objective ads (campaign-setup) |
+
+A common path: start with social selling or a marketplace to prove demand, move to Shopify
+(or WooCommerce if there is already a WordPress site and a developer) when orders become
+regular, and keep the marketplace as an extra channel.
+
+## 3. Recommendation rules
+
+- **No site yet, product business, runs ads:** Shopify, unless a clear reason points elsewhere.
+  It is the platform AdsPilot can build and improve directly.
+- **Existing WordPress site with traffic and a developer:** add WooCommerce rather than
+  starting over, and keep the content and search rankings.
+- **Existing store that works:** do not switch platforms to fix conversion; fix the pages,
+  offer and speed first (store-builder, landing-page-builder). Switching costs months.
+- **Cash-on-delivery market:** any of the above handles cash on delivery; the choice
+  depends more on courier and payment-app integrations available in that country. Check
+  the platform's app or plugin directory for the local couriers and gateways before deciding.
+- **Moving platforms:** plan redirects from every old product and page URL to the new one,
+  move reviews and customer data where allowed, and run both until the new store has had
+  a test order and the ad pixels fire correctly.
+
+Write the recommendation as: the option, the two or three reasons from the answers above,
+the first-month cost range the owner should check on the official pricing pages, and what
+AdsPilot will do next on that platform.
+
+## Sources (checked 2026-10-08)
+
+- Shopify Payments supported countries: https://help.shopify.com/en/manual/payments/shopify-payments/supported-countries
+- Shopify manual payment methods (cash on delivery): https://help.shopify.com/en/manual/payments/manual-payments
+- Shopify pricing (check current plans and fees): https://www.shopify.com/pricing
+- WooCommerce: https://woocommerce.com/ and https://wordpress.org/plugins/woocommerce/
+- Patchstack, State of WordPress Security in 2026: https://patchstack.com/whitepaper/state-of-wordpress-security-in-2026/
