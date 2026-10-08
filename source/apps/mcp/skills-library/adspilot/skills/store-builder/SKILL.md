@@ -1,6 +1,6 @@
 ---
 name: store-builder
-description: "Build, fix and improve a Shopify store so more visitors buy: audit it with real data, fix what costs the most sales first (trust, delivery and returns, product pages, sizes, offers, banners, speed), make the changes with AdsPilot's Shopify tools (product pages, store pages, discounts, theme drafts with preview and approved publish), check them three times, and measure the result against sales and ads. Use when asked to improve a store's conversion rate, set up or redesign a Shopify store, fix a product page, add an FAQ or size guide, change a banner, create a bundle or free-delivery offer, or when ads get clicks but the store does not sell."
+description: "Build, fix and improve a Shopify store so more visitors buy: audit it with real data, fix what costs the most sales first (trust, delivery and returns, product pages, sizes, offers, banners, speed), make the changes with AdsPilot's Shopify tools (product pages, store pages, discounts, theme drafts with preview and approved publish), check them three times, and measure the result against sales and ads. Use when asked to improve a store's conversion rate, set up or redesign a Shopify store, fix a product page, add an FAQ or size guide, change a banner, create a bundle or free-delivery offer, or when ads get clicks but the store does not sell. References: page-by-page conversion checklists with sources, and cash-on-delivery stores (Pakistan and similar markets)."
 ---
 
 # Store builder: a store that turns ad clicks into orders
@@ -11,7 +11,14 @@ order of work and the safe way to change a live store with AdsPilot.
 
 Also read: `get_skill cro` (page conversion principles), `copywriting` and
 `copy-editing` (the words), `offers` (bundles and guarantees), `event-calendar`
-(seasonal offers and banners), and `meta-account-manager` (the ads side).
+(seasonal offers and banners), and `meta-account-manager` (the ads side). For theme
+code and speed: `shopify-theme-developer`; for a page built for one ad or offer:
+`landing-page-builder`; for the look: `web-ui-design`.
+
+Reference files: `references/conversion-checklists.md` (home, collection, product page,
+cart, checkout, trust and mobile checklists, with the evidence and its sources) and
+`references/cash-on-delivery.md` (cash-on-delivery markets such as Pakistan: delivery
+promise, WhatsApp, payments, refused parcels, cost per delivered order).
 
 ## 1. Measure before touching anything
 
@@ -55,20 +62,17 @@ in the store owner's Shopify admin, not in AdsPilot's tools: say so and give the
 - **Content** (products, pages, collections, menus, policies, discounts): the tool shows a before/after summary; nothing
   happens without the owner's approval; the current version is backed up; the result is read
   back. Pages are saved as hidden drafts unless publishing is approved.
-- **Theme**: never edit the live theme.
+- **Theme**: never edit the live theme. The theme tools work only in the AdsPilot app on
+  the owner's computer; on the hosted connector, give the owner theme-editor steps instead
+  (details in `shopify-theme-developer`).
   1. `shopify_theme_start_draft` (downloads the live theme as a backup, makes a copy);
   2. `shopify_theme_read`, then `shopify_theme_edit` with an exact find-and-replace;
   3. `shopify_theme_preview` → send the owner the preview link;
   4. `shopify_theme_publish` only after the owner has looked and approved;
   5. `shopify_theme_rollback` if anything goes wrong.
-- **Where things live in a modern Shopify theme** (Online Store 2.0 themes such as Dawn and
-  Horizon; names vary by theme, so read before editing):
-  - announcement bar and header: `sections/header-group.json` (settings and block text), `sections/announcement-bar.liquid`, `sections/header.liquid`
-  - product page layout and blocks: `templates/product.json`, `sections/main-product.liquid`
-  - home page: `templates/index.json`
-  - colours, fonts, global settings: `config/settings_data.json`
-  - storefront words and labels: `locales/*.json`
-  - new reusable pieces (trust badges, size-guide link): a new file in `snippets/`, rendered from a section
+- **Where things live in the theme** (announcement bar, product page, home page, colours,
+  words, new snippets), how to build a landing-page template, and speed fixes:
+  `get_skill shopify-theme-developer`.
 - Prefer changing settings and block text in `.json` files over editing Liquid code.
   Small, reversible edits beat a redesign.
 
