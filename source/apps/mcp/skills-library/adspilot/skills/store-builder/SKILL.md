@@ -1,0 +1,108 @@
+---
+name: store-builder
+description: "Build, fix and improve a Shopify store so more visitors buy: audit it with real data, fix what costs the most sales first (trust, delivery and returns, product pages, sizes, offers, banners, speed), make the changes with AdsPilot's Shopify tools (product pages, store pages, discounts, theme drafts with preview and approved publish), check them three times, and measure the result against sales and ads. Use when asked to improve a store's conversion rate, set up or redesign a Shopify store, fix a product page, add an FAQ or size guide, change a banner, create a bundle or free-delivery offer, or when ads get clicks but the store does not sell."
+---
+
+# Store builder: a store that turns ad clicks into orders
+
+Ads bring visitors; the store decides whether they buy. When cost per purchase rises
+while the ads' click-through holds, the store is usually the cause. This skill is the
+order of work and the safe way to change a live store with AdsPilot.
+
+Also read: `get_skill cro` (page conversion principles), `copywriting` and
+`copy-editing` (the words), `offers` (bundles and guarantees), `event-calendar`
+(seasonal offers and banners), and `meta-account-manager` (the ads side).
+
+## 1. Measure before touching anything
+
+1. `shopify_store_overview` and `shopify_store_audit`: thin product pages, sold-out
+   items still listed, low margins, missing policies, missing FAQ / size guide / contact,
+   active discount codes.
+2. `shopify_sales` (up to 60 days): orders, average order, items per order, refunds,
+   which source each order came from. Compare it with the ad platform's purchases.
+3. The ad platform's funnel for the same period: landing page views, add to cart,
+   checkout started, purchases (see `meta-account-manager/references/structure-and-metrics.md`).
+   **The worst step tells you where to work:** few add-to-carts = the product page and
+   offer; carts but few checkouts = surprise costs or delivery terms; checkouts but few
+   purchases = the checkout and payment options.
+4. Look at the live store yourself, on a phone first: banners and their dates, the
+   delivery promise, the size selector, photos, how fast it loads.
+
+Write the findings as a short list ranked by **expected effect on sales ÷ effort**, and
+show it to the owner before changing anything.
+
+## 2. What usually costs the most sales (fix in roughly this order)
+
+| Area | What good looks like | AdsPilot tool |
+|---|---|---|
+| **Delivery and returns clarity** | One delivery promise everywhere (time, cost, free-delivery threshold); returns or exchange terms in plain words; cash on delivery stated where it applies. Contradicting terms (two different free-delivery limits) cost trust | `shopify_save_page` (policies/FAQ page), theme draft (announcement bar, product page text) |
+| **Out-of-date banners** | Banners match today's offer; an expired sale banner says "this store is not looked after" | theme draft: usually `sections/header-group.json` or `sections/announcement-bar.liquid` |
+| **Product page photos** | Several photos per product: angles, detail, on-body/on-foot, scale. Clothing and footwear buyers judge fit and finish from photos | the store owner uploads; the audit lists products with fewer than 3 |
+| **Size help** | A size guide next to the size selector, in every system the buyers use (for footwear: cm, EU, UK, US, local), and how the item fits | `shopify_save_page` (size guide) + theme draft (link near the selector in `templates/product.json` / the product section) |
+| **Sold-out sizes** | Hidden or clearly marked; never advertised | the audit lists them; fix in Shopify or stop the ads that show them |
+| **Product descriptions** | What it is made of, how it fits, how to wear it, what makes it worth the price, care; in the buyer's words | `shopify_update_product` (with `copywriting`) |
+| **Offer and basket size** | A reason to buy more than one (two-item price, free delivery above a threshold that sits above one item's price) | `shopify_create_discount` (minimum quantity or subtotal, always with an end date) |
+| **Trust signals** | Real reviews and customer photos (only real ones), payment and delivery icons, contact details, a reachable WhatsApp or phone | theme draft (a snippet near the add-to-cart button) |
+| **FAQ** | Delivery time, cash on delivery, exchanges, sizes, care: answered in one place | `shopify_save_page` |
+| **Speed and mobile layout** | Fast on a mid-range phone on mobile data; the add-to-cart button visible without hunting | theme draft (large images, unused apps' scripts); measure before and after |
+| **Public discount codes** | Codes meant for some customers are not listed where everyone can see them | theme draft or app settings; `shopify_end_discount` for codes that leaked |
+
+Payment methods (including cash on delivery), shipping rates and checkout settings are
+in the store owner's Shopify admin, not in AdsPilot's tools: say so and give the steps.
+
+## 3. Making changes safely (every change, every store)
+
+- **Content** (products, pages, discounts): the tool shows a before/after summary; nothing
+  happens without the owner's approval; the current version is backed up; the result is read
+  back. Pages are saved as hidden drafts unless publishing is approved.
+- **Theme**: never edit the live theme.
+  1. `shopify_theme_start_draft` (downloads the live theme as a backup, makes a copy);
+  2. `shopify_theme_read`, then `shopify_theme_edit` with an exact find-and-replace;
+  3. `shopify_theme_preview` → send the owner the preview link;
+  4. `shopify_theme_publish` only after the owner has looked and approved;
+  5. `shopify_theme_rollback` if anything goes wrong.
+- **Where things live in a modern Shopify theme** (Online Store 2.0 themes such as Dawn and
+  Horizon; names vary by theme, so read before editing):
+  - announcement bar and header: `sections/header-group.json` (settings and block text), `sections/announcement-bar.liquid`, `sections/header.liquid`
+  - product page layout and blocks: `templates/product.json`, `sections/main-product.liquid`
+  - home page: `templates/index.json`
+  - colours, fonts, global settings: `config/settings_data.json`
+  - storefront words and labels: `locales/*.json`
+  - new reusable pieces (trust badges, size-guide link): a new file in `snippets/`, rendered from a section
+- Prefer changing settings and block text in `.json` files over editing Liquid code.
+  Small, reversible edits beat a redesign.
+
+## 4. Check three times before anything goes live
+
+1. **Plan:** each change tied to a finding and to what the owner asked; prices, claims and
+   terms checked against the live store and the business's real policies.
+2. **Preview:** the preview link checked on a phone and a computer: the changed page, a
+   product page, the cart, and the path to checkout. On a development store, place a test order.
+3. **After publishing:** read back (the tools do), open the live page, and confirm the
+   change is there and nothing else moved.
+
+Never call a change done without reading it back.
+
+## 5. Measure the result
+
+Compare 7 and 14 days before and after, with the same ad spend where possible: add to
+cart ÷ landing page views, checkout ÷ add to cart, purchases, average order, refunds and
+refused deliveries. One change at a time where you can, so the effect is attributable.
+Keep what helps; roll back what hurts. Add a field note to the meta-account-manager skill
+(`references/field-notes.md`) when the numbers prove something, without naming the business.
+
+## 6. Building a new store
+
+Same tools, in this order: theme (start from Shopify's free themes, e.g. Horizon or Dawn,
+unless the business has a good reason); navigation and collections; product pages with
+proper photos, descriptions and size help; delivery, returns, FAQ, contact and about pages;
+the owner sets payments (including cash on delivery where relevant), shipping rates, taxes
+and the domain in the admin; a test order on a development store; then ads. Launch with a
+clear first offer and an end date.
+
+## Never
+
+- Publish a theme, page or discount without the owner's approval of the exact change.
+- Invent reviews, customer photos, ratings, stock levels or delivery promises.
+- Edit the live theme directly, or leave a store with two different delivery terms.
+- Leave a discount without an end date.
