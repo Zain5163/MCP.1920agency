@@ -43,3 +43,15 @@ describe('the Shopify store list', () => {
     assert.ok('error' in miss && /Practice store/.test(miss.error))
   })
 })
+
+describe('store changes need the owner’s approval', () => {
+  test('every Shopify write action has its own high-risk policy, not the fallback', async () => {
+    const { policyFor } = await import('@social-publisher/core')
+    for (const action of ['shopify_update_product', 'shopify_save_page', 'shopify_create_discount', 'shopify_restore_backup']) {
+      const policy = policyFor(action)
+      assert.equal(policy.risk, 'high', action)
+      assert.doesNotMatch(policy.rationale, /no policy entry/, action)
+    }
+    assert.equal(policyFor('shopify_create_discount').spendsMoney, true)
+  })
+})

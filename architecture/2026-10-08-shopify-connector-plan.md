@@ -76,4 +76,14 @@ never publish without explicit approval.
   Scope `read_legal_policies` added (app version 3); the dev store must approve the update
   before policies can be read (the audit says so meanwhile). Next: phase 2 writes behind
   approvals; for Muzaree, the OAuth install path once a public https address exists.
+- **2026-10-08: read_legal_policies granted** by the owner; the audit now reads policies.
+- **2026-10-08, phase 2a (content and offers) built and verified live** on the dev store:
+  `shopify_update_product`, `shopify_save_page` (hidden draft by default),
+  `shopify_create_discount` (end date required; quantity or subtotal minimums, e.g. a
+  two-pair offer), `shopify_end_discount` (no approval: stopping an offer never waits),
+  `shopify_list_backups`, `shopify_restore_backup`. Each write: summary → owner's approval
+  token (covers the change and the current content) → backup in
+  `~/.social-publisher/shopify-backups/<shop>/` → change → read-back. The live test caught a
+  bug (an implicit "start now" broke the approval token) that was fixed and re-verified.
+  Next, phase 2b: theme changes on a duplicate theme with a preview link and approved publish.
 

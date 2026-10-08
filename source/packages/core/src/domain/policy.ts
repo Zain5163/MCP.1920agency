@@ -101,6 +101,43 @@ export const ACTION_POLICY: Readonly<Record<string, ActionPolicy>> = {
   },
 
   /**
+   * Shopify store changes (phase 2 of the connector plan). Public the moment they
+   * are saved: customers see them. Each keeps the previous version so it can be
+   * put back, but a customer may already have seen or used the change.
+   */
+  shopify_update_product: {
+    rationale:
+      'Changes a live product page (title, description, SEO text). Customers see it at once. ' +
+      'The previous version is saved first so it can be restored.',
+    risk: 'high',
+    reversible: true,
+    spendsMoney: false,
+  },
+  shopify_save_page: {
+    rationale:
+      'Creates or changes a store page (FAQ, size guide, delivery and returns). Visible to ' +
+      'customers once published. The previous version is saved first.',
+    risk: 'high',
+    reversible: true,
+    spendsMoney: false,
+  },
+  shopify_create_discount: {
+    rationale:
+      'Creates a discount customers can use. Every order that uses it earns less, and a code ' +
+      'can spread beyond the people it was meant for. It can be ended, but not taken back from ' +
+      'orders already placed.',
+    risk: 'high',
+    reversible: false,
+    spendsMoney: true,
+  },
+  shopify_restore_backup: {
+    rationale: 'Puts a saved earlier version of a product or page back. Public at once.',
+    risk: 'high',
+    reversible: true,
+    spendsMoney: false,
+  },
+
+  /**
    * Ads. Every one of these can cost money, which is why they are listed rather
    * than left to the high-risk default — the default protects, but says nothing
    * useful about why.

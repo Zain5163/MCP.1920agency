@@ -1,4 +1,5 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
@@ -6,8 +7,9 @@ import { z } from 'zod'
 
 import { ShopifyAdminClient, ShopifyError, httpsTransport, type AuditFinding } from '@social-publisher/adapters'
 import { CONFIG_DIR, optional } from '@social-publisher/config'
+import { decide, formatApprovalRequest } from '@social-publisher/core'
 
-import { guarded, type ToolResult } from './ads-tools.ts'
+import { audit, guarded, type ToolResult } from './ads-tools.ts'
 
 /**
  * Shopify tools, read-only (phase 1 of architecture/2026-10-08-shopify-connector-plan.md).
@@ -227,6 +229,269 @@ export function registerShopifyTools(server: McpServer): void {
           '',
           'Not checked by this audit (look at the live pages): banners and their dates, page speed, the size selector, trust badges, delivery messaging on the product page. Read get_skill cro and copywriting before proposing fixes; changes to a store need the owner’s approval.',
         ].join('\n')
+      }),
+  )
+}
+
+// ---------------------------------------------------------------- phase 2: writes
+//
+// Every change follows the same five steps, in code, whatever the AI asks:
+//   1. read what is there now;
+//   2. show the owner a before/after summary and wait for the approval token
+//      (the token covers the exact change AND what was there, so if the store
+//      changed in between, the approval no longer matches);
+//   3. save the current version to ~/.social-publisher/shopify-backups/;
+//   4. make the change;
+//   5. read it back and report whether the store now holds exactly what was approved.
+
+export const BACKUP_DIR = join(CONFIG_DIR, 'shopify-backups')
+
+const plain = (html: string, max = 280) => {
+  const t = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+  return t.length > max ? `${t.slice(0, max)}…` : t || '(empty)'
+}
+const hash = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex').slice(0, 16)
+
+function saveBackup(shop: string, kind: 'product' | 'page', handle: string, content: unknown): string {
+  const dir = join(BACKUP_DIR, shop)
+  mkdirSync(dir, { recursive: true })
+  const file = `${new Date().toISOString().replace(/[:.]/g, '-')}-${kind}-${handle.replace(/[^a-z0-9-]/gi, '_')}.json`
+  writeFileSync(join(dir, file), JSON.stringify({ kind, handle, shop, savedAt: new Date().toISOString(), content }, null, 2))
+  return file
+}
+
+const confirmArg = z.string().optional().describe('The approval token from the summary, once the owner has said yes.')
+
+export function registerShopifyWriteTools(server: McpServer): void {
+  server.tool(
+    'shopify_update_product',
+    'Change a product page: title, description (HTML) or SEO title/description. Shows a before/after summary for the owner’s approval, saves the current version first, then reads the change back. Visible to customers immediately.',
+    {
+      store: storeArg,
+      handle: z.string().describe('The product handle, from shopify_products.'),
+      title: z.string().optional(),
+      descriptionHtml: z.string().optional(),
+      seoTitle: z.string().max(70).optional(),
+      seoDescription: z.string().max(320).optional(),
+      confirm: confirmArg,
+    },
+    async ({ store, handle, confirm, ...changes }) =>
+      await withStore(store, async (client, entry) => {
+        const wanted = Object.fromEntries(Object.entries(changes).filter(([, v]) => v !== undefined))
+        if (Object.keys(wanted).length === 0) return 'Nothing to change: give a title, descriptionHtml, seoTitle or seoDescription.'
+        const before = await client.productContent(handle)
+        if (before === undefined) return `No product with the handle "${handle}". Use shopify_products to find it.`
+        const lines = [`Change product "${before.title}" (${handle}) on ${entry.name}:`]
+        if (changes.title !== undefined) lines.push(`  title: "${before.title}" → "${changes.title}"`)
+        if (changes.descriptionHtml !== undefined) lines.push(`  description now: ${plain(before.descriptionHtml)}`, `  description new: ${plain(changes.descriptionHtml)}`)
+        if (changes.seoTitle !== undefined) lines.push(`  SEO title: "${before.seo.title ?? ''}" → "${changes.seoTitle}"`)
+        if (changes.seoDescription !== undefined) lines.push(`  SEO description: "${before.seo.description ?? ''}" → "${changes.seoDescription}"`)
+        lines.push('', 'Customers see this as soon as it is saved. The current version is saved first and can be restored.')
+        const gate = decide({
+          action: 'shopify_update_product',
+          payload: { shop: entry.shop, handle, wanted, current: hash(before) },
+          ...(confirm !== undefined ? { confirmation: confirm } : {}),
+          describe: () => lines.join('\n'),
+        })
+        if (!gate.allowed) return formatApprovalRequest(gate)
+
+        const backup = saveBackup(entry.shop, 'product', handle, before)
+        await client.updateProduct(before.id, wanted)
+        const after = await client.productContent(handle)
+        const ok =
+          after !== undefined &&
+          (changes.title === undefined || after.title === changes.title) &&
+          (changes.seoTitle === undefined || after.seo.title === changes.seoTitle) &&
+          (changes.seoDescription === undefined || after.seo.description === changes.seoDescription) &&
+          (changes.descriptionHtml === undefined || plain(after.descriptionHtml, 10_000) === plain(changes.descriptionHtml, 10_000))
+        await audit('shopify.product.updated', { shop: entry.shop, handle, backup })
+        return [
+          ok ? `Done, and read back from Shopify: "${after!.title}" now holds the approved text.` : 'Saved, but the read-back does not match what was approved. Check the product page now.',
+          `Previous version saved: ${backup} (restore with shopify_restore_backup).`,
+        ].join('\n')
+      }),
+  )
+
+  server.tool(
+    'shopify_save_page',
+    'Create or update a store page (FAQ, size guide, delivery and returns, about). Saved as a hidden draft unless publish is true. Shows a summary for the owner’s approval, saves the current version first, then reads it back.',
+    {
+      store: storeArg,
+      handle: z.string().regex(/^[a-z0-9-]+$/).describe('URL handle, e.g. "faq" or "size-guide".'),
+      title: z.string().min(1),
+      bodyHtml: z.string().min(1),
+      publish: z.boolean().default(false).describe('Visible to customers. Default false: saved as a hidden draft.'),
+      confirm: confirmArg,
+    },
+    async ({ store, handle, title, bodyHtml, publish, confirm }) =>
+      await withStore(store, async (client, entry) => {
+        const before = await client.pageContent(handle)
+        const lines = [
+          before === undefined ? `Create page "${title}" (/pages/${handle}) on ${entry.name}` : `Update page "${before.title}" (/pages/${handle}) on ${entry.name}`,
+          ...(before !== undefined ? [`  content now: ${plain(before.body)}`] : []),
+          `  content new: ${plain(bodyHtml)}`,
+          `  ${publish ? 'PUBLISHED: visible to customers at once' : 'hidden draft: not visible to customers until published'}`,
+          ...(before !== undefined ? ['', 'The current version is saved first and can be restored.'] : []),
+        ]
+        const gate = decide({
+          action: 'shopify_save_page',
+          payload: { shop: entry.shop, handle, title, body: hash(bodyHtml), publish, current: before === undefined ? null : hash(before) },
+          ...(confirm !== undefined ? { confirmation: confirm } : {}),
+          describe: () => lines.join('\n'),
+        })
+        if (!gate.allowed) return formatApprovalRequest(gate)
+
+        let backup: string | undefined
+        if (before !== undefined) {
+          backup = saveBackup(entry.shop, 'page', handle, before)
+          await client.updatePage(before.id, { title, body: bodyHtml, isPublished: publish })
+        } else {
+          await client.createPage({ title, handle, body: bodyHtml, isPublished: publish })
+        }
+        const after = await client.pageContent(handle)
+        const ok = after !== undefined && after.title === title && after.isPublished === publish && plain(after.body, 10_000) === plain(bodyHtml, 10_000)
+        await audit('shopify.page.saved', { shop: entry.shop, handle, created: before === undefined, publish })
+        return [
+          ok ? `Done, and read back from Shopify: /pages/${handle} holds the approved content (${publish ? 'published' : 'hidden draft'}).` : 'Saved, but the read-back does not match what was approved. Check the page now.',
+          ...(backup !== undefined ? [`Previous version saved: ${backup}.`] : []),
+        ].join('\n')
+      }),
+  )
+
+  server.tool(
+    'shopify_create_discount',
+    'Create a discount code: a percentage or fixed amount off (optionally only when buying N items, e.g. a two-pair bundle, or above a minimum order), or free shipping above a minimum. Always with an end date. Needs the owner’s approval: every order that uses it earns less.',
+    {
+      store: storeArg,
+      kind: z.enum(['percentage', 'fixed_amount', 'free_shipping']),
+      value: z.number().min(0).describe('Percent (10 = 10% off) or an amount in the store currency. Ignored for free_shipping.'),
+      code: z.string().regex(/^[A-Z0-9_-]{3,40}$/).describe('Upper-case code customers type, e.g. "PAIR2".'),
+      title: z.string().optional().describe('Internal name; defaults to the code.'),
+      startsAt: z.string().optional().describe('ISO date-time; default now.'),
+      endsAt: z.string().describe('ISO date-time. Required: an open-ended discount is how codes leak for months.'),
+      minimumQuantity: z.number().int().min(2).optional().describe('Items in the cart, e.g. 2 for a two-pair offer.'),
+      minimumSubtotal: z.number().positive().optional().describe('Minimum order value in the store currency.'),
+      usageLimit: z.number().int().positive().optional(),
+      oncePerCustomer: z.boolean().optional(),
+      confirm: confirmArg,
+    },
+    async ({ store, confirm, ...spec }) =>
+      await withStore(store, async (client, entry) => {
+        if (spec.kind === 'percentage' && (spec.value <= 0 || spec.value > 90)) return 'A percentage must be between 1 and 90.'
+        if (spec.kind === 'fixed_amount' && spec.value <= 0) return 'A fixed amount must be above zero.'
+        if (spec.minimumQuantity !== undefined && spec.minimumSubtotal !== undefined) return 'Use a minimum quantity or a minimum order value, not both.'
+        const startsAt = spec.startsAt ?? new Date().toISOString()
+        if (!(new Date(spec.endsAt).getTime() > new Date(startsAt).getTime())) return 'endsAt must be after startsAt.'
+        const o = await client.overview()
+        const what =
+          spec.kind === 'free_shipping' ? 'free shipping' : spec.kind === 'percentage' ? `${spec.value}% off` : `${o.currency} ${spec.value} off the order`
+        const when =
+          spec.minimumQuantity !== undefined
+            ? ` when buying ${spec.minimumQuantity} or more items`
+            : spec.minimumSubtotal !== undefined
+              ? ` on orders of ${o.currency} ${spec.minimumSubtotal} or more`
+              : ' on any order'
+        const lines = [
+          `Create discount code ${spec.code} on ${entry.name}: ${what}${when}.`,
+          `  from ${startsAt} to ${spec.endsAt}${spec.usageLimit !== undefined ? `, at most ${spec.usageLimit} uses` : ''}${spec.oncePerCustomer ? ', once per customer' : ''}`,
+          '',
+          'Every order that uses it earns less. It can be ended early with shopify_end_discount, but not taken back from orders already placed.',
+        ]
+        const gate = decide({
+          action: 'shopify_create_discount',
+          // "Start now" is approved as "now", not as a timestamp: a timestamp taken on each
+          // call changed between the summary and the approval, so the token never matched
+          // (found in the live test, 2026-10-08).
+          payload: { shop: entry.shop, ...spec, startsAt: spec.startsAt ?? 'now' },
+          ...(confirm !== undefined ? { confirmation: confirm } : {}),
+          describe: () => lines.join('\n'),
+        })
+        if (!gate.allowed) return formatApprovalRequest(gate)
+
+        const created = await client.createDiscount({ ...spec, startsAt, title: spec.title ?? spec.code })
+        await audit('shopify.discount.created', { shop: entry.shop, code: created.code, id: created.id })
+        const ok = created.code === spec.code && ['ACTIVE', 'SCHEDULED'].includes(created.status.toUpperCase())
+        return ok
+          ? `Done, and read back from Shopify: code ${created.code} is ${created.status.toLowerCase()} until ${created.endsAt ?? 'no end date'}.`
+          : `Created, but Shopify reports code "${created.code}" with status "${created.status}". Check it in the store admin.`
+      }),
+  )
+
+  server.tool(
+    'shopify_end_discount',
+    'End a discount code now. Like pausing an ad, stopping an offer never waits for approval. The discount stays on record because orders reference it.',
+    { store: storeArg, code: z.string() },
+    async ({ store, code }) =>
+      await withStore(store, async (client, entry) => {
+        const found = await client.graphql<{ codeDiscountNodeByCode: { id: string } | null }>(
+          'query($code: String!) { codeDiscountNodeByCode(code: $code) { id } }',
+          { code },
+        )
+        if (found.codeDiscountNodeByCode === null) return `No discount with the code "${code}".`
+        await client.deactivateDiscount(found.codeDiscountNodeByCode.id)
+        await audit('shopify.discount.ended', { shop: entry.shop, code })
+        return `Code ${code} is ended on ${entry.name}. Orders already placed with it are unaffected.`
+      }),
+  )
+
+  server.tool(
+    'shopify_list_backups',
+    'List the saved earlier versions of products and pages that AdsPilot changed on a store, newest first. Reads only.',
+    { store: storeArg },
+    async ({ store }) =>
+      await withStore(store, async (_client, entry) => {
+        const dir = join(BACKUP_DIR, entry.shop)
+        if (!existsSync(dir)) return 'No backups yet: AdsPilot has not changed this store.'
+        const files = readdirSync(dir).filter((f) => f.endsWith('.json')).sort().reverse()
+        return files.length === 0 ? 'No backups yet.' : ['Backups (newest first):', ...files.slice(0, 50).map((f) => `  ${f}`)].join('\n')
+      }),
+  )
+
+  server.tool(
+    'shopify_restore_backup',
+    'Put a saved earlier version of a product or page back (from shopify_list_backups). Shows what will be restored for the owner’s approval, saves the current version first, then reads it back.',
+    { store: storeArg, file: z.string().regex(/^[\w.-]+\.json$/), confirm: confirmArg },
+    async ({ store, file, confirm }) =>
+      await withStore(store, async (client, entry) => {
+        const path = join(BACKUP_DIR, entry.shop, file)
+        if (!existsSync(path)) return `No backup "${file}" for this store. Use shopify_list_backups.`
+        const saved = JSON.parse(readFileSync(path, 'utf8')) as {
+          kind: 'product' | 'page'
+          handle: string
+          content: { title: string; descriptionHtml?: string; seo?: { title: string | null; description: string | null }; body?: string; isPublished?: boolean }
+        }
+        const gate = decide({
+          action: 'shopify_restore_backup',
+          payload: { shop: entry.shop, file },
+          ...(confirm !== undefined ? { confirmation: confirm } : {}),
+          describe: () =>
+            [
+              `Restore the ${saved.kind} "${saved.content.title}" (${saved.handle}) on ${entry.name} to the version saved in ${file}:`,
+              `  ${plain(saved.content.descriptionHtml ?? saved.content.body ?? '')}`,
+              '',
+              'The current version is saved first, so this restore can be undone too.',
+            ].join('\n'),
+        })
+        if (!gate.allowed) return formatApprovalRequest(gate)
+        if (saved.kind === 'product') {
+          const now = await client.productContent(saved.handle)
+          if (now === undefined) return `The product "${saved.handle}" no longer exists.`
+          const backup = saveBackup(entry.shop, 'product', saved.handle, now)
+          await client.updateProduct(now.id, {
+            title: saved.content.title,
+            descriptionHtml: saved.content.descriptionHtml ?? '',
+            seoTitle: saved.content.seo?.title ?? '',
+            seoDescription: saved.content.seo?.description ?? '',
+          })
+          await audit('shopify.product.restored', { shop: entry.shop, handle: saved.handle, from: file })
+          return `Restored "${saved.content.title}". The version it replaced is saved as ${backup}.`
+        }
+        const now = await client.pageContent(saved.handle)
+        if (now === undefined) return `The page "${saved.handle}" no longer exists.`
+        const backup = saveBackup(entry.shop, 'page', saved.handle, now)
+        await client.updatePage(now.id, { title: saved.content.title, body: saved.content.body ?? '', isPublished: saved.content.isPublished ?? false })
+        await audit('shopify.page.restored', { shop: entry.shop, handle: saved.handle, from: file })
+        return `Restored page "${saved.content.title}". The version it replaced is saved as ${backup}.`
       }),
   )
 }

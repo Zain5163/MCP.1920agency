@@ -328,7 +328,189 @@ export class ShopifyAdminClient {
     }
     return buildAuditFacts(overview, products, { ...extra, policies })
   }
+  // ------------------------------------------------------------------ writes
+  //
+  // Phase 2. Every write is preceded, in the MCP tool, by the owner's approval and
+  // a saved copy of what it replaces, and followed by a read-back. These methods
+  // only talk to Shopify; the safety lives in shopify-tools.ts.
+
+  async #mutate<T>(query: string, variables: Record<string, unknown>, field: string): Promise<T> {
+    const data = await this.graphql<Record<string, { userErrors?: Array<{ field?: string[] | null; message: string }> } & Record<string, unknown>>>(query, variables)
+    const result = data[field]
+    const errors = result?.userErrors ?? []
+    if (errors.length > 0) {
+      throw new ShopifyError(`Shopify refused the change: ${errors.map((e) => `${(e.field ?? []).join('.') || 'input'}: ${e.message}`).join('; ')}`, 'query')
+    }
+    return result as unknown as T
+  }
+
+  async productContent(handle: string): Promise<ProductContent | undefined> {
+    const d = await this.graphql<{ products: { nodes: ProductContent[] } }>(
+      `query($q: String) { products(first: 1, query: $q) { nodes { id handle title descriptionHtml seo { title description } } } }`,
+      { q: `handle:${JSON.stringify(handle)}` },
+    )
+    return d.products.nodes.find((p) => p.handle === handle)
+  }
+
+  async updateProduct(id: string, changes: ProductChanges): Promise<ProductContent> {
+    const product: Record<string, unknown> = { id }
+    if (changes.title !== undefined) product.title = changes.title
+    if (changes.descriptionHtml !== undefined) product.descriptionHtml = changes.descriptionHtml
+    if (changes.seoTitle !== undefined || changes.seoDescription !== undefined) {
+      product.seo = {
+        ...(changes.seoTitle !== undefined ? { title: changes.seoTitle } : {}),
+        ...(changes.seoDescription !== undefined ? { description: changes.seoDescription } : {}),
+      }
+    }
+    const r = await this.#mutate<{ product: ProductContent }>(
+      `mutation($product: ProductUpdateInput!) { productUpdate(product: $product) {
+        product { id handle title descriptionHtml seo { title description } }
+        userErrors { field message } } }`,
+      { product },
+      'productUpdate',
+    )
+    return r.product
+  }
+
+  async pageContent(handle: string): Promise<PageContent | undefined> {
+    const d = await this.graphql<{ pages: { nodes: PageContent[] } }>(
+      `query($q: String) { pages(first: 5, query: $q) { nodes { id handle title body isPublished } } }`,
+      { q: `handle:${JSON.stringify(handle)}` },
+    )
+    return d.pages.nodes.find((p) => p.handle === handle)
+  }
+
+  async createPage(page: { title: string; handle: string; body: string; isPublished: boolean }): Promise<PageContent> {
+    const r = await this.#mutate<{ page: PageContent }>(
+      `mutation($page: PageCreateInput!) { pageCreate(page: $page) {
+        page { id handle title body isPublished } userErrors { field message } } }`,
+      { page },
+      'pageCreate',
+    )
+    return r.page
+  }
+
+  async updatePage(id: string, page: { title?: string; body?: string; isPublished?: boolean }): Promise<PageContent> {
+    const r = await this.#mutate<{ page: PageContent }>(
+      `mutation($id: ID!, $page: PageUpdateInput!) { pageUpdate(id: $id, page: $page) {
+        page { id handle title body isPublished } userErrors { field message } } }`,
+      { id, page },
+      'pageUpdate',
+    )
+    return r.page
+  }
+
+  /** For test clean-up, and for undoing a page this connector created. */
+  async deletePage(id: string): Promise<void> {
+    await this.#mutate(`mutation($id: ID!) { pageDelete(id: $id) { deletedPageId userErrors { field message } } }`, { id }, 'pageDelete')
+  }
+
+  async createDiscount(spec: DiscountSpec): Promise<CreatedDiscount> {
+    const minimum =
+      spec.minimumQuantity !== undefined
+        ? { quantity: { greaterThanOrEqualToQuantity: String(spec.minimumQuantity) } }
+        : spec.minimumSubtotal !== undefined
+          ? { subtotal: { greaterThanOrEqualToSubtotal: String(spec.minimumSubtotal) } }
+          : undefined
+    const common = {
+      title: spec.title,
+      code: spec.code,
+      startsAt: spec.startsAt,
+      ...(spec.endsAt !== undefined ? { endsAt: spec.endsAt } : {}),
+      context: { all: 'ALL' },
+      ...(minimum !== undefined ? { minimumRequirement: minimum } : {}),
+      ...(spec.usageLimit !== undefined ? { usageLimit: spec.usageLimit } : {}),
+      appliesOncePerCustomer: spec.oncePerCustomer ?? false,
+    }
+    const read = `codeDiscountNode { id codeDiscount { __typename
+      ... on DiscountCodeBasic { title status startsAt endsAt codes(first: 1) { nodes { code } } }
+      ... on DiscountCodeFreeShipping { title status startsAt endsAt codes(first: 1) { nodes { code } } } } }`
+    if (spec.kind === 'free_shipping') {
+      const r = await this.#mutate<{ codeDiscountNode: DiscountNode }>(
+        `mutation($d: DiscountCodeFreeShippingInput!) { discountCodeFreeShippingCreate(freeShippingCodeDiscount: $d) { ${read} userErrors { field message } } }`,
+        { d: { ...common, destination: { all: true } } },
+        'discountCodeFreeShippingCreate',
+      )
+      return toCreatedDiscount(r.codeDiscountNode)
+    }
+    const value =
+      spec.kind === 'percentage'
+        ? { percentage: spec.value / 100 }
+        : { discountAmount: { amount: String(spec.value), appliesOnEachItem: false } }
+    const r = await this.#mutate<{ codeDiscountNode: DiscountNode }>(
+      `mutation($d: DiscountCodeBasicInput!) { discountCodeBasicCreate(basicCodeDiscount: $d) { ${read} userErrors { field message } } }`,
+      { d: { ...common, customerGets: { value, items: { all: true } } } },
+      'discountCodeBasicCreate',
+    )
+    return toCreatedDiscount(r.codeDiscountNode)
+  }
+
+  /** Ends a discount now. It stays on record, because orders reference it. */
+  async deactivateDiscount(id: string): Promise<void> {
+    await this.#mutate(
+      `mutation($id: ID!) { discountCodeDeactivate(id: $id) { codeDiscountNode { id } userErrors { field message } } }`,
+      { id },
+      'discountCodeDeactivate',
+    )
+  }
 }
+
+export interface ProductContent {
+  id: string
+  handle: string
+  title: string
+  descriptionHtml: string
+  seo: { title: string | null; description: string | null }
+}
+export interface ProductChanges {
+  title?: string
+  descriptionHtml?: string
+  seoTitle?: string
+  seoDescription?: string
+}
+export interface PageContent {
+  id: string
+  handle: string
+  title: string
+  body: string
+  isPublished: boolean
+}
+export interface DiscountSpec {
+  kind: 'percentage' | 'fixed_amount' | 'free_shipping'
+  /** Percent (10 = 10%) or an amount in the store currency. Ignored for free shipping. */
+  value: number
+  title: string
+  code: string
+  startsAt: string
+  endsAt?: string
+  minimumQuantity?: number
+  minimumSubtotal?: number
+  usageLimit?: number
+  oncePerCustomer?: boolean
+}
+interface DiscountNode {
+  id: string
+  codeDiscount: { __typename: string; title?: string; status?: string; startsAt?: string; endsAt?: string | null; codes?: { nodes: Array<{ code: string }> } }
+}
+export interface CreatedDiscount {
+  id: string
+  title: string
+  code: string
+  status: string
+  startsAt: string
+  endsAt: string | null
+}
+function toCreatedDiscount(n: DiscountNode): CreatedDiscount {
+  return {
+    id: n.id,
+    title: n.codeDiscount.title ?? '',
+    code: n.codeDiscount.codes?.nodes[0]?.code ?? '',
+    status: n.codeDiscount.status ?? '',
+    startsAt: n.codeDiscount.startsAt ?? '',
+    endsAt: n.codeDiscount.endsAt ?? null,
+  }
+}
+
 
 // ------------------------------------------------------------------ shapes
 

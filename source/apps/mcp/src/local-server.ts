@@ -10,7 +10,7 @@ import { registerImageTools } from './image-tools.ts'
 import { registerPageTools } from './page-tools.ts'
 import { registerPerformanceTools } from './performance-tools.ts'
 import { registerSetupTools } from './setup-tools.ts'
-import { registerShopifyTools } from './shopify-tools.ts'
+import { registerShopifyTools, registerShopifyWriteTools } from './shopify-tools.ts'
 import { registerPlaybooks } from './playbooks.ts'
 import { registerSkillsLibrary } from './skills-library.ts'
 import { currentScope, loadConnections, postingDeps } from './context.ts'
@@ -262,6 +262,8 @@ export function buildLocalServer(meter: MeterOptions): McpServer {
   registerImageTools(server)
   // Local only: the Shopify app's secret is the owner's (phase 1, read-only).
   registerShopifyTools(server)
+  // Phase 2: store changes, each behind the owner's approval, backed up and read back.
+  registerShopifyWriteTools(server)
 
   // Expertise is served on both transports; it is static text and holds no secrets.
   registerPlaybooks(server)
