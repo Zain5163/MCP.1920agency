@@ -734,14 +734,19 @@ export class MetaAdsClient {
    */
   async committedDailySpendMinor(): Promise<number> {
     const account = `act_${this.#account.adAccountId}`
+    // Right after any edit (a budget change, an ad switched off) Meta reports the object
+    // as IN_PROCESS for a short while; counting only ACTIVE then missed a live budget
+    // (seen 2026-10-09: PKR 2,000 reported while 5,000 was committed). Count every state
+    // that can spend, so the ceiling never undercounts.
+    const spending = JSON.stringify(['ACTIVE', 'IN_PROCESS', 'WITH_ISSUES'])
     const campaigns = await this.#get(`${account}/campaigns`, {
       fields: 'id,daily_budget,effective_status',
-      effective_status: JSON.stringify(['ACTIVE']),
+      effective_status: spending,
       limit: '200',
     })
     const adSets = await this.#get(`${account}/adsets`, {
       fields: 'id,daily_budget,effective_status',
-      effective_status: JSON.stringify(['ACTIVE']),
+      effective_status: spending,
       limit: '500',
     })
 

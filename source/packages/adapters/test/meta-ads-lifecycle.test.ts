@@ -113,8 +113,11 @@ describe('what the account already spends', () => {
     ])
     assert.equal(await client(fetchImpl).committedDailySpendMinor(), 500_000)
 
-    // Only running objects count. A paused campaign is not spending.
-    assert.ok(calls.every((c) => c.url.includes('effective_status=%5B%22ACTIVE%22%5D')))
+    // Everything that can spend counts, including objects Meta briefly shows as
+    // IN_PROCESS right after an edit; paused ones do not.
+    const wanted = encodeURIComponent(JSON.stringify(['ACTIVE', 'IN_PROCESS', 'WITH_ISSUES']))
+    assert.ok(calls.every((c) => c.url.includes(`effective_status=${wanted}`)), calls.map((c) => c.url).join('\n'))
+    assert.ok(calls.every((c) => !/PAUSED/.test(decodeURIComponent(c.url))))
   })
 })
 
