@@ -1,0 +1,9 @@
+[Unit]
+Description=AdsPilot: keep-alive Sundays 04:00 UTC (09:00 PKT, as Social-Publisher-Keepalive)
+
+[Timer]
+OnCalendar=Sun *-*-* 04:00:00 UTC
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,11 @@
+[Unit]
+Description=AdsPilot: nightly backup at 02:30 UTC (07:30 PKT)
+
+[Timer]
+OnCalendar=*-*-* 02:30:00 UTC
+RandomizedDelaySec=10min
+# a run missed while the server was off happens at the next boot
+Persistent=true
+
+[Install]
+WantedBy=timers.target

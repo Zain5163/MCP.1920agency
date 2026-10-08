@@ -32,6 +32,12 @@ tool call makes several. A database next to the MCP on the server removes that.
 2. **Make the migrations run on any Postgres:** the Supabase role statements are
    guarded (`IF EXISTS` on the role), so `migrate deploy` builds the full schema
    on an empty Postgres 16/17.
+   *Amended 2026-10-08 (Phase 3 kit):* migrations already applied to Supabase
+   (`20260925010000_lock_down_data_api`, `20261008120000_add_plans_and_usage`)
+   are not edited, because Prisma checksums them. Instead `deploy/scripts/setup.sh`
+   and `restore.sh` create `anon` and `authenticated` as NOLOGIN roles with no
+   grants before `migrate deploy`. New migrations use the guard
+   (as `20261008140000_lock_down_provider_auths` does).
 3. **Daily backup with a local copy:** a `pg_dump` every night, compressed and
    **encrypted**, kept on the server for 14 days and copied to this PC under
    `%USERPROFILE%\.social-publisher\backups\`. That folder is outside the workspace

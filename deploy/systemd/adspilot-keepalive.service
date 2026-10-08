@@ -1,0 +1,10 @@
+[Unit]
+Description=AdsPilot: database keep-alive row (stops the free Supabase project pausing)
+After=docker.service network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+Environment=ADSPILOT_HOME=/opt/adspilot
+ExecStart=/bin/bash /opt/adspilot/app/deploy/scripts/dc.sh run --rm -T tasks ../../packages/db/src/keepalive-cli.ts
+TimeoutStartSec=5min

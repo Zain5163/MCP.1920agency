@@ -1,0 +1,12 @@
+[Unit]
+Description=AdsPilot: nightly encrypted database backup (deploy/scripts/backup.sh)
+After=docker.service network-online.target
+Requires=docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+Environment=ADSPILOT_HOME=/opt/adspilot
+ExecStart=/bin/bash /opt/adspilot/app/deploy/scripts/backup.sh
+TimeoutStartSec=30min
+Nice=10

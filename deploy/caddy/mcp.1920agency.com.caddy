@@ -1,0 +1,57 @@
+# AdsPilot hosted MCP: the site block to ADD to Raptor's Caddyfile.
+#
+# Where it goes: append this block to
+#   Websites/FreeVideoDownloaderOnline/site/deploy/Caddyfile   (Raptor's repo, committed)
+# NOT only to the copy on the server: Raptor's release.sh uploads its committed
+# deploy/ folder with every API release, which would silently remove a block
+# that exists only on the server. Raptor's own blocks stay exactly as they are.
+#
+# Prerequisites: DNS mcp.1920agency.com -> 37.27.148.217 (live, 2026-10-08),
+# the AdsPilot "mcp" container on the edge network adspilot_edge under the alias
+# adspilot-mcp (deploy/docker-compose.yml), and Raptor's Caddy attached to that
+# network too (Raptor's deploy/docker-compose.yml: caddy networks + the external
+# network declaration). Caddy
+# obtains and renews the certificate itself, as it does for Raptor's domains.
+
+mcp.1920agency.com {
+	header {
+		-Server
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+	}
+	# No access log (Caddy's default): requests carry customers' API tokens in
+	# the Authorization header, and OAuth codes in callback query strings.
+
+	# The MCP endpoint (streamable HTTP). No compression and no buffering, so a
+	# streamed (SSE) reply reaches the AI client as it is written.
+	handle /mcp {
+		reverse_proxy adspilot-mcp:8080 {
+			flush_interval -1
+			transport http {
+				read_timeout 5m
+				write_timeout 5m
+			}
+		}
+	}
+
+	# Uptime check; needs no token and shows only "database reachable or not".
+	handle /health {
+		reverse_proxy adspilot-mcp:8080
+	}
+
+	# OAuth callbacks (Meta, Instagram, Threads, Google, ...). NOT ACTIVE.
+	# Today no server app serves them: the redirect is caught by the one-shot
+	# listener of `pnpm connect` / `pnpm connect:provider` on the owner's PC
+	# (source/apps/cli/src/callback-server.ts, http://localhost:8787/<path>).
+	# With a small CLI change (deploy/README.md, "OAuth callbacks"), this
+	# bounce lets Meta use an https address while the PC still catches the code:
+	# the browser is sent on to the PC's listener with the same query string.
+	#
+	# @oauth path /callback /instagram/callback /threads/callback /pinterest/callback /linkedin/callback /linkedin-page/callback /google/callback
+	# redir @oauth http://localhost:8787{uri} 302
+
+	handle {
+		respond "Not found. The MCP endpoint is /mcp." 404
+	}
+}

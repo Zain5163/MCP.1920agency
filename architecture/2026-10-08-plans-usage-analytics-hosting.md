@@ -252,6 +252,23 @@ deleted in PostHog (by the account id) along with its rows in our database.
 
 ## Phase 3 — Hosting on Hetzner
 
+**Status 2026-10-08: deployment kit built on branch `phase3-deploy` (`deploy/`),
+awaiting the owner's approval. Nothing is deployed; the server was only
+inspected read-only.** The plan, costs, risks and every step are in
+`deploy/README.md`: Stage A moves the MCP, the worker (as a loop) and the
+timers to the server with Supabase kept as the database; Stage B moves the data
+to Postgres on the server (decision 0010) after a tested restore. Findings that
+change the picture below: (1) no app on the server serves the OAuth callbacks;
+they are caught only by the PC's connect command on localhost:8787, so the
+https redirect also needs a small CLI change (`OAUTH_CALLBACK_PORT`) before Meta
+can be reconnected while Live; (2) the Caddyfile lives in Raptor's repo and must
+get the `mcp.` block there, or Raptor's next release removes it; (3) the
+Supabase roles are created NOLOGIN before `migrate deploy` on plain Postgres
+instead of editing the applied migrations; (4) the PC and server workers may run
+together while they share one database (`FOR UPDATE SKIP LOCKED`), never during
+the Stage B move. Only compiled and smoke-started locally (no Docker on this
+PC): the image has not been built yet.
+
 - Server: Hetzner Cloud CX23, Helsinki, `37.27.148.217`, Docker Compose behind
   Caddy, already running Raptor Downloader (`Websites/FreeVideoDownloaderOnline/site/deploy/README.md`).
 - Add the hosted MCP (`apps/mcp/src/http-server.ts`) and the worker as two more
