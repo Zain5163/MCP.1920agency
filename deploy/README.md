@@ -626,7 +626,16 @@ this change.
   The bounce is at most a stopgap for an install the owner performs himself on
   this PC with staff access to the store.
 
-### Shopify self-service: deploy steps (built, NOT yet deployed)
+### Shopify self-service: deploy steps (DEPLOYED 2026-10-08)
+
+**Deployed 2026-10-08 ~09:45 PKT** (owner approved): server env gained the two
+`SHOPIFY_CONNECTOR_CLIENT_*` names, `/opt/adspilot/data/shopify-backups` created
+(uid 1000), `release.sh` released `0b0afef62b86`. The `@shopify` Caddy block was
+already live: Raptor's `cffbb2e` was HEAD when the OAuth bounce was uploaded in
+place and reloaded (no recreate needed). Checked: `/shopify` 200, `/shopify/callback`
+400 (unsigned), `/health` 200, `/mcp` 401, Raptor 200. **Not yet verified end
+to end:** `shopify_connect_store` from an AI app on the hosted URL (needs a
+dashboard token and a client pointed at https://mcp.1920agency.com/mcp).
 
 Code: commit d313b9e (`source/apps/mcp/src/shopify-hosted.ts`), plan in
 `architecture/2026-10-08-shopify-connector-plan.md`. The Shopify app (config

@@ -123,7 +123,7 @@ summary and wait for the user's "yes" in the chat.
 today-style: the client gives the agency staff or collaborator access, the owner installs
 the custom-distribution app in his own browser, and the existing redirect bounce through
 `mcp.1920agency.com` delivers the code to his PC. One custom app is needed per client store.
-- **2026-10-08, hosted self-service connection built (commit d313b9e), NOT deployed.**
+- **2026-10-08, hosted self-service connection built (commit d313b9e); DEPLOYED ~09:45 PKT, release 0b0afef62b86 (see deploy/README.md, "Shopify self-service"). End-to-end connect from a hosted AI client not yet verified.** (Original note:)
   `shopify_connect_store` → Shopify consent → `/shopify/callback` on the server (Shopify HMAC +
   AdsPilot-signed state, code exchanged with the server-only secret for an expiring offline
   token, stored encrypted per account in provider_auths/vault) → all read and change tools on the
