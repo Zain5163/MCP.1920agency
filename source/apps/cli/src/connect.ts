@@ -11,6 +11,7 @@ import {
 } from '@social-publisher/db'
 import { TokenVault, parseKey } from '@social-publisher/vault'
 
+import { bounceNotice, listenAddress } from './callback-address.ts'
 import { waitForCallback } from './callback-server.ts'
 
 /**
@@ -47,17 +48,21 @@ async function main(): Promise<void> {
     apiVersion: optional('META_API_VERSION', 'v25.0')!,
   }
 
-  const redirect = new URL(oauthConfig.redirectUri)
+  // Port and path from the redirect address; an https one comes back to this PC
+  // through the hosted server's bounce (callback-address.ts).
+  const address = listenAddress(oauthConfig.redirectUri, optional('OAUTH_CALLBACK_PORT'))
   const csrfState = createState()
   const authUrl = buildAuthUrl(oauthConfig, csrfState)
 
   const listener = waitForCallback({
-    port: Number(redirect.port === '' ? 80 : redirect.port),
-    path: redirect.pathname,
+    port: address.port,
+    path: address.path,
     expectedState: csrfState,
   })
 
   console.log('\n  Opening Facebook in your browser…')
+  const notice = bounceNotice(oauthConfig.redirectUri, address)
+  if (notice !== undefined) console.log(notice)
   console.log(`  If nothing opens, paste this in yourself:\n\n  ${authUrl}\n`)
   openBrowser(authUrl)
 

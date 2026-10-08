@@ -37,8 +37,12 @@ people accidentally discard work they have already done.
    `http://localhost:8787/callback` — the address the connect command listens on
    (`META_REDIRECT_URI` overrides it) — and add `localhost` under **App settings →
    Basic → App domains**. While the app is **Live**, Meta enforces HTTPS and refuses
-   this localhost address: switch the app to Development to connect, then back to
-   Live (WAITING-LIST #17). A public https callback is the lasting fix.
+   this localhost address. The fix (2026-10-08, not yet exercised live): also
+   register `https://mcp.1920agency.com/callback` and set `META_REDIRECT_URI` to
+   it; the hosted server bounces the browser back to the connect command on this
+   PC. Exact checklist, for Threads, Instagram and Google too: `deploy/README.md`,
+   "OAuth over https: the owner checklist". Without it: switch the app to
+   Development to connect, then back to Live (WAITING-LIST #17).
 6. Permissions needed later, at Advanced Access (these require App Review — do not
    submit until we have a working demo to show):
    - `pages_show_list`, `pages_read_engagement`, `pages_manage_posts`

@@ -26,6 +26,7 @@ import {
 } from '@social-publisher/db'
 import { TokenVault, parseKey } from '@social-publisher/vault'
 
+import { bounceNotice, listenAddress } from './callback-address.ts'
 import { waitForCallback } from './callback-server.ts'
 import { partialGrantRefusal } from './grant-check.ts'
 
@@ -226,6 +227,11 @@ async function main(): Promise<void> {
    */
   const scopeBundles = process.argv.slice(3)
 
+  // Port and path from the provider's redirect address; an https one comes back
+  // to this PC through the hosted server's bounce (callback-address.ts). Worked
+  // out before the database is touched, so a bad address costs nothing.
+  const address = listenAddress(provider.redirectUri, optional('OAUTH_CALLBACK_PORT'))
+
   const state = await health()
   if (!state.reachable) {
     console.error(`\n  Cannot reach the database: ${state.error ?? 'unknown error'}`)
@@ -235,17 +241,18 @@ async function main(): Promise<void> {
 
   const csrfState = createState()
   const authUrl = provider.authUrl(csrfState, { scopeBundles })
-  const redirect = new URL(provider.redirectUri)
 
   // Start listening BEFORE opening the browser. A fast authorisation against a
   // server that is not yet up fails with nothing to retry.
   const listener = waitForCallback({
-    port: Number(redirect.port === '' ? 80 : redirect.port),
-    path: redirect.pathname,
+    port: address.port,
+    path: address.path,
     expectedState: csrfState,
   })
 
   console.log(`\n  Opening ${provider.displayName} in your browser…`)
+  const notice = bounceNotice(provider.redirectUri, address)
+  if (notice !== undefined) console.log(notice)
   console.log('  If a DESKTOP APP opens instead of a browser, it cannot complete this.')
   console.log(`  Paste this into a browser instead:
 

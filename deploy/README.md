@@ -50,11 +50,13 @@ Two stages, so each can be checked before the next:
   once a month a restore test proves they work.
 - The owner keeps one new private key (for opening backups) and its passphrase,
   plus an offline copy. Without it the backups cannot be read.
-- **Not fixed by this plan alone:** reconnecting Facebook while the Meta app is
-  Live. The https address exists after Stage A, but no program on the server
-  receives Meta's redirect yet; it needs a small change to the connect command
-  first (see "OAuth callbacks"). Until then, reconnecting still needs the app in
-  Development mode for a moment, as today.
+- **Reconnecting while the Meta app is Live** (the 2026-10-02 "Can't load URL"):
+  solved by the "bounce" (branch `https-callbacks`, 2026-10-08): Meta redirects
+  to `https://mcp.1920agency.com/<path>`, the server's Caddy sends the browser
+  straight on to the connect command on the PC. Built and unit-tested only; not
+  yet exercised live (RULES R4). It needs the Caddy block reloaded and the owner
+  checklist in "OAuth callbacks" below. Until then, reconnecting still needs the
+  app in Development mode for a moment, as before.
 
 ### What it costs
 
@@ -158,20 +160,64 @@ So there is no need for a gap between switching the server on and the PC off.
 databases: the same job would then exist twice. The move requires the PC tasks
 off first (`--writers-stopped`).
 
-**OAuth callbacks.** No app on the server serves them. The routes
-(`/callback`, `/instagram/callback`, `/threads/callback`, `/pinterest/callback`,
-`/linkedin/callback`, `/linkedin-page/callback`, `/google/callback`) exist only
-in the one-shot listener of the PC's connect commands
-(`source/apps/cli/src/callback-server.ts`, port 8787). The hosted MCP serves
-only `/mcp` and `/health`. The CLI derives the port it listens on from the
-redirect address, so an https address would make it listen on port 80 and fail.
-The smallest fix, for a later approved change: the CLI listens on
-`OAUTH_CALLBACK_PORT` (default 8787) when the redirect host is not localhost;
-the Caddy block's commented `@oauth` lines then bounce the browser from
-`https://mcp.1920agency.com/<path>?code=...` to `http://localhost:8787/<path>?...`
-on the PC, which completes the connection as today. The code still only works
-with the app secret and the matching state check on the PC. Caddy keeps no
-access log, so the code is not recorded on the server.
+**OAuth callbacks (the "bounce").** No app on the server serves them. The
+routes (`/callback`, `/instagram/callback`, `/threads/callback`,
+`/pinterest/callback`, `/linkedin/callback`, `/linkedin-page/callback`,
+`/google/callback`) exist only in the one-shot listener of the PC's connect
+commands (`source/apps/cli/src/callback-server.ts`, 127.0.0.1 only). The hosted
+MCP serves only `/mcp` and `/health`.
+
+Meta refuses `http://localhost` redirects while an app is Live ("Enforce
+HTTPS"). So, with a redirect address of the https form:
+
+1. `pnpm connect` / `pnpm connect:provider <name>` on the PC starts its listener
+   on port 8787 (`OAUTH_CALLBACK_PORT`, optional, overrides it) and opens the
+   provider's dialog with `redirect_uri=https://mcp.1920agency.com/<path>`. It
+   prints one line saying the browser will come back through the server.
+2. After approval the provider sends the browser to
+   `https://mcp.1920agency.com/<path>?code=...&state=...`.
+3. Caddy answers `302 Location: http://localhost:8787/<same path and query>`
+   (`deploy/caddy/mcp.1920agency.com.caddy`, the `@oauth` block: GET only,
+   exactly the seven paths above, nothing else matched).
+4. The owner's browser delivers it to the listener on the same PC, which checks
+   the path and `state` and exchanges the code exactly as with a localhost
+   redirect. Nothing else changed: same state check, same token exchange, same
+   vault.
+
+The listener's port and path come from `source/apps/cli/src/callback-address.ts`:
+for an `http://localhost` address, the address's own port (as before; a
+conflicting `OAUTH_CALLBACK_PORT` is refused before the browser opens); for any
+other host, `OAUTH_CALLBACK_PORT` or 8787. The path is always the redirect
+address's path. A test (`source/apps/cli/test/callback-address.test.ts`) fails
+if the Caddy matcher's paths and the `*_REDIRECT_URI` paths in `.env.example`
+ever differ.
+
+**Security review of the bounce.**
+
+- **The code never stays on the server.** Caddy only answers with a redirect; no
+  app reads the request, Caddy keeps no access log for this site (codes are in
+  the query string), and the redirect carries `Cache-Control: no-store`. The code
+  goes to the browser that asked for it, and from there only to `localhost`.
+- **The code is useless on its own.** It is single-use, expires in minutes, is
+  bound to the registered redirect address, and exchanging it needs the app
+  secret, which is only in the PC's env file. The listener rejects any callback
+  whose `state` is not the random value it generated for this run (CSRF), so a
+  code an attacker obtained for their own account cannot be planted either.
+- **Not an open redirect.** The target is fixed in the Caddyfile
+  (`http://localhost:8787`), only seven exact paths match, and `{uri}` is always
+  a path plus query, so it can never change the host. A crafted link can only
+  send someone's browser to their own `localhost:8787`, where nothing is
+  listening unless they are mid-connect themselves (and then the state check
+  refuses it).
+- **Residual risk, the same as with a plain localhost redirect:** another
+  program on the PC already listening on 8787 during the connect window would
+  receive the code. It would still need the app secret to use it, and the
+  connect command fails loudly ("Something else is already using it") when it
+  cannot take the port.
+- **What the bounce does not do:** it cannot receive server-to-server calls
+  (webhooks, Meta's deauthorize/data-deletion callbacks, Shopify's compliance
+  webhooks), and it only works when the person approving the dialog uses a
+  browser on the PC that runs the connect command.
 
 ### Paths on the server
 
@@ -456,26 +502,126 @@ $S 'docker stats --no-stream'
 
 ### Open items (not in this kit)
 
-- CLI change for https OAuth redirects (`OAUTH_CALLBACK_PORT`), then the
-  redirect URIs below.
+- The OAuth bounce: merge `https-callbacks`, reload Caddy with the `@oauth`
+  block, then the owner checklist below. Not exercised live yet (R4).
 - Monitor wording that still mentions Task Scheduler (R1).
 - Media storage choice (decision 0010 §5) before or with Stage B.
 - Pin the Node and Postgres images by digest after the first good build.
 - Rate limiting on `/mcp` (stock Caddy has none; every unauthenticated request
   costs one token lookup in the database).
 
-### OAuth redirect URIs to add once the CLI change is in
-
-Add each **alongside** the existing localhost one (keeps the old way working),
-then set the matching `*_REDIRECT_URI` in the PC's env file:
-
-| Console | Setting | Add |
-|---|---|---|
-| Meta app (developers.facebook.com) | Facebook Login for Business, Settings, Valid OAuth Redirect URIs | `https://mcp.1920agency.com/callback` |
-| Meta app | App settings, Basic, App domains | `1920agency.com` |
-| Meta app, Instagram product | Business login settings, OAuth redirect URIs | `https://mcp.1920agency.com/instagram/callback` |
-| Meta app, Threads use case | Redirect callback URLs | `https://mcp.1920agency.com/threads/callback` |
-| Google Cloud, OAuth client (Web) | Authorized redirect URIs | `https://mcp.1920agency.com/google/callback` (optional: Google already accepts `http://localhost`) |
-| Pinterest, LinkedIn (both apps) | Redirect URIs | `https://mcp.1920agency.com/pinterest/callback`, `/linkedin/callback`, `/linkedin-page/callback`, only if they refuse localhost (not checked) |
+### OAuth over https: the owner checklist
 
 Meta enforces https only while the app is Live, which is the case this solves.
+Order matters: **console first, then the env file, then reconnect.** Changing the
+env file first makes the provider refuse the dialog ("URL blocked" / "Can't load
+URL"), because the address is not registered yet.
+
+**Step 0, once, before any provider (not the owner's part).**
+
+1. Branch `https-callbacks` merged into `master` on the PC. The connect commands
+   run from `source/apps/cli/src`, so nothing has to be rebuilt for them.
+2. The `@oauth` block live in Raptor's Caddy. The block from
+   `deploy/caddy/mcp.1920agency.com.caddy` goes into Raptor's repo
+   (`Websites/FreeVideoDownloaderOnline/site/deploy/Caddyfile`, between the
+   AdsPilot marker and the end of the file), committed there, then uploaded and
+   **reloaded** (no restart, no downtime for raptordownloader.com). Caddy's
+   Caddyfile is a single-file bind mount, so the file on the server must be
+   rewritten **in place** (same inode); `tar -x` or `sed -i` replace the file and
+   the running container would keep reading the old one:
+
+   ```bash
+   cd "/d/My AI Works/Websites/FreeVideoDownloaderOnline/site"
+   git -c core.autocrlf=false archive HEAD deploy/Caddyfile | tar -xO \
+     | $S 'cp /opt/raptor/site/deploy/Caddyfile /opt/raptor/site/deploy/Caddyfile.bak-$(date +%Y%m%d-%H%M) \
+           && cat > /opt/raptor/site/deploy/Caddyfile'
+   $S 'cd /opt/raptor/site/deploy \
+     && docker compose exec -T caddy grep -c "@oauth {" /etc/caddy/Caddyfile \
+     && docker compose exec -T caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile \
+     && docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile'
+   ```
+
+   Then check (no real code involved; `x` and `y` are placeholders):
+
+   ```bash
+   curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n' 'https://mcp.1920agency.com/callback?code=x&state=y'
+   #   302 http://localhost:8787/callback?code=x&state=y
+   curl -s -o /dev/null -w '%{http_code}\n' 'https://mcp.1920agency.com/callbackx'          # 404
+   curl -s -o /dev/null -w '%{http_code}\n' -X POST 'https://mcp.1920agency.com/callback'   # 404
+   curl -s https://mcp.1920agency.com/health                                                 # ok
+   for u in https://raptordownloader.com/ https://api.raptordownloader.com/health; do
+     echo "$(curl -s -o /dev/null -w '%{http_code}' -m 20 "$u") $u"; done                    # 200 200
+   ```
+
+   Rollback: `cat` the `.bak-*` copy back the same way and reload again.
+
+**Then, per provider, the owner** (one provider at a time; the localhost address
+stays registered next to the new one, so switching back is just the env value):
+
+| # | Provider | Developer console: where | Add exactly | PC env value to change | Reconnect with (in `source/apps/cli`) |
+|---|---|---|---|---|---|
+| 1 | Facebook Pages (+ the Instagram accounts linked to them) | developers.facebook.com, the Meta app (Mysmadspilot): **Facebook Login for Business, Settings, Valid OAuth Redirect URIs**. Keep "Enforce HTTPS" and "Use Strict Mode for redirect URIs" on. | `https://mcp.1920agency.com/callback` | `META_REDIRECT_URI` | `pnpm connect` |
+| 1b | (same app) | **App settings, Basic, App domains**, only if Meta still shows "The domain of this URL isn't included in the app's domains" | `1920agency.com` | none | |
+| 2 | Threads | the Meta app: **Use cases, Access the Threads API, Customize, Settings, Redirect Callback URLs** | `https://mcp.1920agency.com/threads/callback` | `THREADS_REDIRECT_URI` | `pnpm connect:provider threads` |
+| 3 | Instagram direct login (only if `INSTAGRAM_APP_ID` is in use; accounts linked to a Page come with step 1) | the Meta app: **Instagram, API setup with Instagram login, Set up Instagram business login, Business login settings, OAuth redirect URIs** | `https://mcp.1920agency.com/instagram/callback` | `INSTAGRAM_REDIRECT_URI` | `pnpm connect:provider instagram` |
+| 4 | Google / YouTube (optional) | console.cloud.google.com, project `gen-lang-client-0046538567`: **Google Auth Platform, Clients**, the Web application client, **Authorized redirect URIs**. Google may add `1920agency.com` to Branding, Authorized domains; that is expected. | `https://mcp.1920agency.com/google/callback` | `GOOGLE_REDIRECT_URI` | `pnpm connect:provider google youtube` |
+| - | Pinterest, LinkedIn (both apps) | no change: they accept localhost today. If ever needed, the bounce already covers `/pinterest/callback`, `/linkedin/callback`, `/linkedin-page/callback`. | | | |
+
+For each row:
+
+1. **Console:** add the address next to the existing `http://localhost:8787/...`
+   one (do not remove that one) and **Save**.
+2. **Env file:** in `%USERPROFILE%\.social-publisher\.env` on the PC, change only
+   the value of the named variable from `http://localhost:8787/<path>` to
+   `https://mcp.1920agency.com/<path>`, same path, no trailing slash. The owner
+   edits this file; no agent edits or prints it. `OAUTH_CALLBACK_PORT` stays
+   unset (8787 is where the bounce points).
+3. **Reconnect** with the command in the table. The terminal shows "Your browser
+   will come back through mcp.1920agency.com, which sends it straight on to this
+   PC (localhost:8787)". After approving, the browser visits
+   `mcp.1920agency.com` for a moment and lands on the green "Connected" page on
+   localhost; the terminal ends with "Done. N ... connected". Verified only then
+   (R4), and `list_accounts` shows the accounts as not needing reauth.
+4. **If it fails:** put the env value back to the localhost form; Meta then
+   needs Development mode for that one reconnect, as before. A 404 page from
+   `mcp.1920agency.com` means the Caddy block is not live (Step 0); "URL
+   blocked" or "Can't load URL" means the console address was not saved or is
+   not character-for-character the same as the env value.
+
+The server's own env file also holds copies of `META_REDIRECT_URI`,
+`THREADS_REDIRECT_URI` and `GOOGLE_REDIRECT_URI` (A3). They need no change: a
+redirect address is used only in the dialog and the code exchange, and both
+happen in the PC's connect commands (token refreshes do not send it).
+
+### Shopify: can its install callback use the bounce?
+
+Read with `research/2026-10-08-shopify-integration.md` and
+`architecture/2026-10-08-shopify-connector-plan.md`; no Shopify code is part of
+this change.
+
+- **The dev store needs no callback at all.** It is owned by the app's own
+  organisation, so phase 1 already gets its token by the client-credentials
+  grant (verified live 2026-10-08). Nothing to bounce.
+- **Rehearsing the OAuth install on the dev store: the bounce could serve it,
+  with conditions.** It works only if (a) a connect command on the PC starts the
+  authorisation itself (`https://<shop>/admin/oauth/authorize?...&state=...`)
+  and listens, as the other providers do; (b) `/shopify/callback` is added to
+  the Caddy `@oauth` paths and `https://mcp.1920agency.com/shopify/callback` to
+  `[auth] redirect_urls` in `integrations/shopify-app/shopify.app.toml` (and,
+  possibly, `application_url` on the same host; not verified); (c) the command
+  verifies Shopify's `hmac` with the app secret, the `state`, and that `shop` is
+  a `*.myshopify.com` name before exchanging the code; (d) the owner clicks
+  Install in a browser on that PC.
+- **Client stores (Muzaree, phase 1 proper) need a server-side handler.** The
+  custom-distribution install link is opened by the merchant, in the merchant's
+  own browser: the bounce would send their browser to *their* `localhost:8787`,
+  where nothing listens. The install link also starts at Shopify (it loads the
+  app's `application_url` with `shop` and `hmac`, not a code with our `state`),
+  so there is no waiting CLI to hold the state. And Shopify's webhooks
+  (`app/uninstalled`, the three compliance webhooks, order webhooks) are
+  server-to-server POSTs that a browser redirect can never receive. So:
+  `/shopify/install` and `/shopify/callback` (and the webhook endpoints) served
+  by the hosted MCP on `mcp.1920agency.com`, which verifies HMAC and state,
+  exchanges the code on the server and writes the offline token to the vault.
+  The bounce is at most a stopgap for an install the owner performs himself on
+  this PC with staff access to the store.

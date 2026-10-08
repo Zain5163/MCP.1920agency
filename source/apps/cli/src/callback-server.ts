@@ -104,6 +104,10 @@ export function waitForCallback(options: {
       )
     })
 
+    // Loopback only, never 0.0.0.0. With an https redirect the hosted server
+    // bounces the browser to http://localhost:8787, so the code reaches only a
+    // listener on the same machine as the browser that approved the dialog;
+    // nothing else on the network can connect here.
     server.listen(options.port, '127.0.0.1')
 
     timer = setTimeout(() => {

@@ -40,16 +40,43 @@ mcp.1920agency.com {
 		reverse_proxy adspilot-mcp:8080
 	}
 
-	# OAuth callbacks (Meta, Instagram, Threads, Google, ...). NOT ACTIVE.
-	# Today no server app serves them: the redirect is caught by the one-shot
-	# listener of `pnpm connect` / `pnpm connect:provider` on the owner's PC
-	# (source/apps/cli/src/callback-server.ts, http://localhost:8787/<path>).
-	# With a small CLI change (deploy/README.md, "OAuth callbacks"), this
-	# bounce lets Meta use an https address while the PC still catches the code:
-	# the browser is sent on to the PC's listener with the same query string.
+	# OAuth callbacks: the "bounce" (deploy/README.md, "OAuth callbacks").
+	# Meta refuses http://localhost redirects while an app is Live, so the
+	# provider redirects to https://mcp.1920agency.com/<path>?code=...&state=...
+	# and this answers with a 302 to http://localhost:8787/<same path and query>.
+	# The owner's own browser then delivers it to the one-shot listener of
+	# `pnpm connect` / `pnpm connect:provider` on the PC
+	# (source/apps/cli/src/callback-server.ts, 127.0.0.1 only), which checks
+	# `state` and exchanges the code exactly as before. No app on this server
+	# sees, keeps or logs the code: it only passes through this redirect, to
+	# the browser that asked for it.
 	#
-	# @oauth path /callback /instagram/callback /threads/callback /pinterest/callback /linkedin/callback /linkedin-page/callback /google/callback
-	# redir @oauth http://localhost:8787{uri} 302
+	# WHY this is safe:
+	# - Not an open redirect: the target is fixed (http://localhost:8787) and
+	#   only these exact paths match; {uri} is always a path and query, so it
+	#   can never change the host. The worst a crafted link can do is send
+	#   someone's browser to their OWN localhost:8787.
+	# - The code is single-use, short-lived, bound to this app's redirect
+	#   address, and worthless without the app secret, which only the PC has.
+	#   The listener refuses any callback whose state is not the one it made.
+	# - Residual risk, unchanged from the plain localhost redirect: another
+	#   program on the PC listening on 8787 during the connect window would
+	#   receive the code (it would still need the app secret to use it).
+	#
+	# Paths: exactly the callback paths the CLI uses, one per provider
+	# (connect-provider.ts and the adapters' defaults; checked by
+	# source/apps/cli/test/callback-address.test.ts against .env.example).
+	# GET only: providers redirect the browser with GET. Anything else falls
+	# through to the 404 below.
+	@oauth {
+		method GET
+		path /callback /instagram/callback /threads/callback /pinterest/callback /linkedin/callback /linkedin-page/callback /google/callback
+	}
+	handle @oauth {
+		# The redirect carries a one-time code; no cache may keep it.
+		header Cache-Control "no-store"
+		redir http://localhost:8787{uri} 302
+	}
 
 	handle {
 		respond "Not found. The MCP endpoint is /mcp." 404
