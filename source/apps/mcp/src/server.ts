@@ -6,6 +6,7 @@ import { createAnalytics, createLogger, flushOnExit } from '@social-publisher/te
 
 import { currentScope } from './context.ts'
 import { buildLocalServer } from './local-server.ts'
+import { createMcpAnalyticsClient, resolveServerBuild } from './mcp-analytics.ts'
 
 /**
  * AdsPilot MCP server over stdio: the owner's local server.
@@ -36,6 +37,20 @@ const analytics = createAnalytics({
 flushOnExit(analytics)
 
 /**
+ * PostHog MCP Analytics ($mcp_tool_call), undefined without POSTHOG_KEY (then
+ * the server is not instrumented). Failures go where analytics' go, never to
+ * stdout. Flushed at the same moments as analytics, below.
+ */
+const mcpAnalyticsClient = createMcpAnalyticsClient({
+  apiKey: analyticsSettings.posthogKey,
+  host: analyticsSettings.posthogHost,
+  onError: (message) => void logger.warn('mcp_analytics.failed', message),
+})
+if (mcpAnalyticsClient !== undefined) {
+  process.once('beforeExit', () => void mcpAnalyticsClient.shutdown(3_000))
+}
+
+/**
  * The tenant, resolved once and kept: it is the same for the life of a local
  * process, and resolving it again for every call would add a query to each.
  * A failed resolution is not kept, so the next call tries again.
@@ -54,6 +69,7 @@ const server = buildLocalServer({
   account: localAccount,
   upgradeUrl: optional('UPGRADE_URL'),
   analytics,
+  mcpAnalytics: mcpAnalyticsClient === undefined ? undefined : { client: mcpAnalyticsClient, serverBuild: resolveServerBuild() },
   log: (event, message, error) => {
     console.error(`[adspilot] ${message}: ${error instanceof Error ? error.message : String(error)}`)
     void logger.error(event, message, { data: { error } })
@@ -64,11 +80,16 @@ const transport = new StdioServerTransport()
 await server.connect(transport)
 // The client went away (VS Code reloaded, the chat closed): send what is
 // queued now, since the process may be killed rather than exit on its own.
-server.server.onclose = () => void analytics.flush()
+server.server.onclose = () => {
+  void analytics.flush()
+  void mcpAnalyticsClient?.flush()
+}
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.on(signal, () => {
     // Queued analytics go out first (bounded wait); beforeExit does not fire on exit().
-    void Promise.allSettled([analytics.shutdown(), disconnect()]).finally(() => process.exit(0))
+    void Promise.allSettled([analytics.shutdown(), mcpAnalyticsClient?.shutdown(3_000), disconnect()]).finally(() =>
+      process.exit(0),
+    )
   })
 }

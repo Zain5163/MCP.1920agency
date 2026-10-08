@@ -219,6 +219,78 @@ Every event: `distinct_id` = tenant id, `$lib` = `adspilot-server`,
    `list_accounts`, `distinct_id` = the owner's tenant id, `plan` = `premium`,
    and no other custom properties. Only then is Phase 2 "verified live" (R4).
 
+### Phase 2b — PostHog MCP Analytics (`$mcp_tool_call`)
+
+**Deployed 2026-10-08 ~11:45 PKT (owner asked for it), verification PENDING.**
+Merged into master (`10c829a`), installed and built on the PC (mcp tests 173/0),
+released to the server (`10c829a34833`, `BUILD_SHA` set in the container). One
+read-only `check_usage` call made through the hosted MCP at ~11:46 PKT; no send
+errors in the server log. Verified only when the owner sees that
+`$mcp_tool_call` (`$mcp_tool_name = check_usage`, person = tenant id) at
+https://eu.posthog.com/project/297949/mcp-analytics/activity. The local stdio MCP
+picks it up after a VS Code reload.
+
+**Status 2026-10-08: built and unit-tested on branch `posthog-mcp-analytics`
+(worktree), not merged, not deployed, no event sent.** The owner asked for
+PostHog's MCP Analytics (project 297949, EU) on top of our own `mcp_call`,
+which stays unchanged. This partly reverses "Why a small fetch client, not
+posthog-node" above: MCP Analytics reads PostHog's own `$mcp_*` event shape,
+which only its SDK produces, so third-party code now runs in the MCP process;
+it is contained by the two allow-list filters below.
+
+| Piece | Where |
+|---|---|
+| `@posthog/mcp` **0.22.1** (beta) + `posthog-node` **5.55.0**, pinned exactly. package.json says MIT for both (and for `@posthog/core` 1.57.1, `@posthog/types` 1.415.1); the LICENSE file they ship is the posthog-js repo's Apache-2.0 text, with MIT parts from AgentCat/MCPcat; both permissive. 0.22.2 was not used: it was younger than pnpm's minimum release age and needed exclusions in `pnpm-workspace.yaml` | `apps/mcp/package.json`; WHY comment in `apps/mcp/src/mcp-analytics.ts` |
+| `instrument(server, posthog, options)` on every server, after metering, before any tool. No `POSTHOG_KEY` (or not `phc_`, or not https): not instrumented, silently | `mcp-analytics.ts` `instrumentMcpAnalytics`, called from `mcp-server.ts` `createAdsPilotServer` |
+| Options: `context: false`, `enableConversationId: false`, `captureModel: false` (it would add an `llm_model` argument), `reportMissing: false`, `collectFeedback: false`, `enableExceptionAutocapture: false`, `shouldRecordInputKey: () => false`, plus `identify`, `eventProperties`, `beforeSend`, `serverBuild` | same |
+| One posthog-node client per process (20 events or 10 s, queue 1,000, 5 s timeout, no retry, GeoIP off). Stdio: flushed when the client disconnects, shut down on SIGINT/SIGTERM and `beforeExit`. Hosted: shut down on SIGTERM (Docker stop, 15 s grace) | `server.ts`, `http-server.ts` |
+| `serverBuild` = `BUILD_SHA` (docker-compose sets it from `ADSPILOT_TAG`, the release's 12-character SHA), else `git rev-parse --short=12 HEAD` on the PC; anything not a hex SHA is ignored | `resolveServerBuild`; `deploy/docker-compose.yml` |
+| Tests: no-op without key; input schemas identical with and without instrumentation (both transports); one event per call through real posthog-node with a fake fetch, canary string never on the wire; metering counts once; every tool still metered once when instrumented; hosted stateless HTTP sends no `Mcp-Session-Id`; the filter on its own | `apps/mcp/test/mcp-analytics.test.ts` (16) |
+
+**Composition with metering.** Metering wraps each handler at registration;
+the SDK then wraps the stored registry entry (around the metered handler) and
+the `tools/call` request handler. A call runs: SDK capture → MCP argument
+validation → metered handler → tool, so it is counted once and captured once.
+With a key, the stored handler is the SDK's wrapper and the `METERED` mark is
+one level in; the existing registration test builds without a key and is
+unchanged, and the new test calls every stored handler on both transports with
+instrumentation and checks each is recorded exactly once.
+
+**Identity.** `distinct_id` = the tenant id from the meter's `account()`:
+stdio, the owner's tenant (`currentScope`); hosted, the tenant behind the
+request's API token (`identifyToken` in `http-server.ts` → `identity.scope`).
+No `$set` (plan and industry already reach the same person through
+`mcp_call`). If the account cannot be resolved the event goes out under the
+SDK's random session id with `$process_person_profile: false`.
+
+**Error code.** Our tools report most failures as a normal result starting
+`[CODE]`, which the SDK would count as a success. The filter reads the result
+in memory the way metering does (`outcomeOf`) and sends the catalogue code as
+`$mcp_error_type`; the result and the message are then dropped.
+
+**Hosted, stateless.** Each request builds and instruments a fresh server on
+the shared client, so `$session_id` is new per request (opaque, not useful as
+a session); the client name on a tool call comes from the per-token memory
+metering already uses (`eventProperties`). The SDK tries to mint an
+`Mcp-Session-Id` token at `initialize` on stateless servers; with our SSE
+responses it never reaches the wire (headers are written before the handler
+runs), and a loopback test asserts no such header is sent.
+
+**Not verified live (R4).** Nothing has been sent. Local Node is 22.19 while
+the package declares `^20.20 || >=22.22`: it loads and every test passes on
+22.19, but updating Node on the PC is advisable; the server image
+(`node:22-bookworm-slim`) is a later 22.x. Docker is not on this PC, so the
+image was not built; the Dockerfile's filtered `pnpm install
+--frozen-lockfile` was run on a `git archive` copy and installs and imports
+both packages.
+
+**To verify live** (after merge, approval and release): with `POSTHOG_KEY`
+set, call `check_usage` (read-only, free, never counted) once from Claude Code
+on stdio and once through the hosted MCP; then open
+https://eu.posthog.com/project/297949/mcp-analytics/activity and look for one
+`$mcp_tool_call` per call with `$mcp_tool_name = check_usage`, the tenant id
+as the person, and only the properties in the privacy notes below.
+
 ### Privacy notes (analytics)
 
 Written so it can become the analytics part of the privacy policy.
@@ -244,9 +316,38 @@ access tokens, keys or passwords; web addresses; your email, name, phone or
 any other personal details; your location (location lookup is switched off on
 every event); the platforms' own error messages, which can quote your post.
 
+**MCP Analytics (PostHog's MCP pages).** Two further events about the same
+calls, in PostHog's own format: `$mcp_tool_call` (one per tool call) and
+`$mcp_initialize` (when an AI app connects). Each carries only:
+- `$mcp_tool_name` and `$mcp_resource_name` (the same AdsPilot tool name;
+  a name the AI app invents is sent as `unknown_tool`);
+- `$mcp_is_error`, and on failure `$mcp_error_type` = our error code (for
+  example `TOKEN_EXPIRED`, or `UNKNOWN`), never the error message;
+- `$mcp_duration_ms`;
+- `$mcp_client_name`, `$mcp_client_version` (as the AI app reports itself) and
+  `$mcp_protocol_version`;
+- `$mcp_server_name` (`adspilot`), `$mcp_server_version`, `$mcp_server_build`
+  (the code version, a git commit id);
+- `$session_id`, a random id the analytics library makes up (not tied to you);
+- PostHog's fixed markers: `$mcp_source`, `$geoip_disable` (always true),
+  `$process_person_profile` (only when no account id is known), and the
+  library's own `$lib`, `$lib_version`, `$is_server`.
+
+The person is the same opaque account id. Not sent, although the library
+would by default: what the tool was asked (arguments), even the argument
+names; what it answered; error messages and stack traces; the AI app's
+browser-style "user agent" and vendor headers; a separate identify event that
+would carry the whole request; the AI's stated intent and model name (those
+are switched off, so no tool's inputs change).
+
 **How it is enforced:** the analytics client accepts only a fixed list of
 property names and drops anything else, and drops any value that is not a short
 plain word or number. A test fails if a disallowed property can get through.
+For MCP Analytics the same is done twice: a filter on every event the library
+builds (`beforeSend`) keeps the two events and the properties above with
+checked values, and the PostHog client repeats the allow-list just before
+sending. A test puts a marker string in every tool argument and result and
+fails if it appears anywhere in what would be sent.
 
 **Our own records.** Separately, each tool call is recorded in our database
 (the `tool_calls` table: tool, success or error code, duration, AI app, plan

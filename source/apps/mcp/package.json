@@ -11,15 +11,17 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0",
+    "@posthog/mcp": "0.22.1",
     "@social-publisher/adapters": "workspace:*",
+    "@social-publisher/auth": "workspace:*",
     "@social-publisher/config": "workspace:*",
     "@social-publisher/core": "workspace:*",
     "@social-publisher/db": "workspace:*",
     "@social-publisher/publisher": "workspace:*",
+    "@social-publisher/telemetry": "workspace:*",
     "@social-publisher/vault": "workspace:*",
-    "zod": "^3.24.1",
-    "@social-publisher/auth": "workspace:*",
-    "@social-publisher/telemetry": "workspace:*"
+    "posthog-node": "5.55.0",
+    "zod": "^3.24.1"
   },
   "devDependencies": {
     "@types/node": "^22.9.0",
