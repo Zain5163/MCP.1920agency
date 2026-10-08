@@ -70,3 +70,10 @@ never publish without explicit approval.
 - **Client credentials** works only for stores owned by the app's organisation (dev
   stores). Client stores (Muzaree) need the install link and OAuth, which needs the public
   https callback (open decision above).
+- **2026-10-08, phase 1 (read) built and verified live** on the dev store through a fresh
+  AdsPilot: `list_shopify_stores`, `shopify_store_overview`, `shopify_products`,
+  `shopify_sales`, `shopify_store_audit` (client in `packages/adapters/src/shopify-admin.ts`).
+  Scope `read_legal_policies` added (app version 3); the dev store must approve the update
+  before policies can be read (the audit says so meanwhile). Next: phase 2 writes behind
+  approvals; for Muzaree, the OAuth install path once a public https address exists.
+

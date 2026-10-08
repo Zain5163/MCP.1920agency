@@ -248,6 +248,24 @@ Other things worth knowing:
 
 ---
 
+## 9. Shopify — the store connector (optional)
+
+AdsPilot reads Shopify stores through the app **"1920 Agency Store Connector"**
+(config in `integrations/shopify-app`, plan in `architecture/2026-10-08-shopify-connector-plan.md`).
+
+1. In `~/.social-publisher/.env`: `SHOPIFY_CONNECTOR_CLIENT_ID` and `SHOPIFY_CONNECTOR_CLIENT_SECRET`
+   (run `shopify app env show` in `integrations/shopify-app` to see them).
+2. List each store in `~/.social-publisher/shopify-stores.json`:
+   `{ "stores": [ { "key": "practice", "name": "Practice store", "shop": "1920-agency-test-store.myshopify.com" } ] }`
+3. The app must be installed on the store. Development stores owned by the same Shopify
+   organisation connect directly (client credentials). Client stores need the install link
+   and OAuth, which needs a public https callback (not built yet).
+4. **`SHOPIFY_CONNECT_ADDRESS`** (optional): an IP to connect to instead of what DNS returns,
+   only when a network route to Shopify is broken. On 2026-10-08 the ISP route to
+   `23.227.38.74` (where every `*.myshopify.com` name resolves) was dead and `23.227.38.69`
+   worked, so it is set to `23.227.38.69` for now. Remove it once
+   `https://<store>.myshopify.com` loads normally. TLS still verifies the store's name.
+
 ## Status
 
 | Step | Blocks | Status |
