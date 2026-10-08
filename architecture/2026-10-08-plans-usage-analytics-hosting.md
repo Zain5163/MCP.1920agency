@@ -111,7 +111,14 @@ texts say checkout is not open yet).
 - **Privacy:** a privacy policy that says what is recorded; no content of posts
   or ads in analytics; deletion on request.
 
-### Phase 2 status: BUILT on branch `phase2-analytics`, NOT live (2026-10-08)
+### Phase 2 status: LIVE and verified 2026-10-08
+
+Merged into master (`989def3`), running after the VS Code reload. The owner
+confirmed in PostHog (EU) → Activity an `mcp_call` with `plan: premium` and
+`industry: agency` after `set_business_type` + one counted call (~05:30 PKT).
+The hosted MCP and server worker (Phase 3, Stage A) carry the same key.
+
+(Build notes from before the merge, kept for the record:)
 
 **Industry (2026-10-08, branch `industry-column`): built, migration pending.**
 The owner approved the column on 2026-10-08. `tenants.industry` (nullable text,
@@ -264,8 +271,9 @@ Let's Encrypt certificate issued. Raptor: Caddy attached to the new network
 `/opt/raptor/*.before-mcp*`; raptordownloader.com and its API answered 200 after
 the Caddy recreate. Swap 2 GB (swappiness 10); 9.7 GB build cache pruned (27 GB
 free). Server env file holds only the names in `deploy/.env.example` (no Slack
-webhook exists on the PC either). **Not yet done:** A6 backups (the owner makes
-the gpg key on the PC), A7 the first post published by the server worker (both
+webhook exists on the PC either). A6: the owner made the gpg key; the first
+encrypted backup (52 KB) was made on the server and pulled to the PC
+(restore test needs the owner's passphrase). **Not yet done:** A7 the first post published by the server worker (both
 workers run; the PC task is switched off only after a server `PUBLISHED`), A8
 timers (after A7, so monitor/refresh do not run twice), A9 connecting an AI
 client to the hosted URL (needs a dashboard token). Then: the hosted OAuth
