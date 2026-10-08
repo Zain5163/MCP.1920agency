@@ -221,7 +221,11 @@ Every event: `distinct_id` = tenant id, `$lib` = `adspilot-server`,
 
 ### Phase 2b — PostHog MCP Analytics (`$mcp_tool_call`)
 
-**Deployed 2026-10-08 ~11:45 PKT (owner asked for it), verification PENDING.**
+**VERIFIED LIVE 2026-10-08 ~13:00 PKT:** the owner's screenshot of PostHog
+project 297949 → MCP analytics shows Users 1, Sessions 2, Tool calls 17, error rate
+0%, p95 latency 30 s (some tool calls are slow; to look into).
+
+**Deployed 2026-10-08 ~11:45 PKT (owner asked for it).**
 Merged into master (`10c829a`), installed and built on the PC (mcp tests 173/0),
 released to the server (`10c829a34833`, `BUILD_SHA` set in the container). One
 read-only `check_usage` call made through the hosted MCP at ~11:46 PKT; no send
