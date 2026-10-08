@@ -124,6 +124,7 @@ export const SERVER_INSTRUCTIONS = [
   'For wider marketing work (landing pages, emails, SEO, pricing, launch plans), use list_skills and get_skill.',
   'To build or improve a Shopify store, landing page or website (WordPress too), read get_skill store-builder,',
   'landing-page-builder, shopify-theme-developer, web-ui-design or wordpress-site-builder first, and',
+  'shopify-store-kit for a ready, tested premium design on Shopify’s Horizon theme, and',
   'selling-by-country for the buyer’s country (payments, prices and tax, consumer law, consent before tracking).',
   '',
   'Two rules for every campaign, on every platform (get_skill campaign-setup has the full method):',

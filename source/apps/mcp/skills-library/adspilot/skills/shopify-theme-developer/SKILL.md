@@ -147,6 +147,9 @@ Move the content that lived in the old theme: announcement bar, home page sectio
 page blocks, footer text, custom templates assigned to products or pages. Preview every
 template type before asking for approval.
 
+**Fastest route to a premium design: `get_skill shopify-store-kit`** (tested sections,
+settings recipe and example home page for Horizon 4.x, installed with the theme tools).
+
 **A theme's defaults are not a design.** (Learned 2026-10-08: a practice store moved to
 Horizon with only text edits was rejected by the owner as amateur.) An untouched Horizon
 reads as a template: Inter for every font role, 14 px body text, pill-shaped buttons and

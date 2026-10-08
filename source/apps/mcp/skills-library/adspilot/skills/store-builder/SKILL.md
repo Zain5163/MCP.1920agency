@@ -113,7 +113,9 @@ exchange terms; payment methods; contact details; and the business details the m
 requires on the site (legal name, address, registration or VAT number where required; see
 selling-by-country). Never fill those in yourself. Then, in this order, each step approved by the owner:
 
-1. **Theme:** `shopify_theme_start_draft` with `from` set to one of Shopify's free themes
+1. **Theme:** for a premium look in one pass, install `get_skill shopify-store-kit` (Horizon
+   sections, design settings, example home page). Otherwise:
+   `shopify_theme_start_draft` with `from` set to one of Shopify's free themes
    already on the store (e.g. "Horizon"; the owner adds it from the Theme Store if missing),
    or without `from` to improve the current one. Edit colours, fonts, logo text, the home
    page and the announcement bar in the draft; preview; publish only after the owner looks.

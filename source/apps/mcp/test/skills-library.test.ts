@@ -23,7 +23,7 @@ describe('the skills library', () => {
   const library = loadLibrary()
 
   test('loads every skill in the pinned copies', () => {
-    assert.equal(library.size, 68)
+    assert.equal(library.size, 69)
     for (const name of ['seo-audit', 'ai-seo', 'copywriting', 'ads', 'social', 'cro']) {
       assert.ok(library.has(name), `${name} is missing`)
     }
@@ -37,7 +37,7 @@ describe('the skills library', () => {
     const server = new McpServer({ name: 't', version: '1' })
     registerSkillsLibrary(server)
     const text = await callTool(server, 'list_skills', {})
-    assert.match(text, /^68 skills/)
+    assert.match(text, /^69 skills/)
     assert.match(text, /seo-audit/)
   })
 
@@ -314,7 +314,7 @@ describe('the instructions every client receives on connecting', () => {
   test('every skill they name is served', async () => {
     const { SERVER_INSTRUCTIONS } = await import('../src/playbooks.ts')
     const library = loadLibrary()
-    for (const name of ['store-builder', 'landing-page-builder', 'shopify-theme-developer', 'web-ui-design', 'wordpress-site-builder', 'campaign-setup', 'selling-by-country']) {
+    for (const name of ['store-builder', 'landing-page-builder', 'shopify-theme-developer', 'web-ui-design', 'wordpress-site-builder', 'shopify-store-kit', 'campaign-setup', 'selling-by-country']) {
       assert.ok(SERVER_INSTRUCTIONS.includes(name), `instructions miss ${name}`)
       assert.ok(library.has(name), `instructions name ${name}, which is not served`)
     }
@@ -344,5 +344,40 @@ describe('playbooks stay current', () => {
     const md = '# X\n\n**Updated 2026-01-01.** Something.'
     assert.equal(withFreshness(md, new Date('2026-02-01T00:00:00Z')), md)
     assert.match(withFreshness(md, new Date('2026-09-30T00:00:00Z')), /272 days old/)
+  })
+})
+
+describe('code templates in AdsPilot’s own skills', () => {
+  const library = loadLibrary()
+
+  test('the store kit serves its theme files, and third-party skills stay Markdown-only', () => {
+    const kit = library.get('shopify-store-kit')!
+    for (const f of ['references/theme/sections/ap-hero.liquid', 'references/theme/snippets/ap-kit-base.liquid', 'references/theme/templates/index.example.json', 'references/theme/config/settings_data.recipe.json']) {
+      assert.ok(kit.references.includes(f), f)
+    }
+    for (const skill of library.values()) {
+      if (skill.library.own === true) continue
+      for (const r of skill.references) assert.match(r, /\.md$/, `${skill.name}: ${r}`)
+    }
+  })
+
+  test('a template is served between markers, exactly as stored', async () => {
+    const { readFileSync } = await import('node:fs')
+    const { join } = await import('node:path')
+    const server = new McpServer({ name: 't', version: '1' })
+    registerSkillsLibrary(server)
+    const ref = 'references/theme/sections/ap-hero.liquid'
+    const text = await callTool(server, 'get_skill', { name: 'shopify-store-kit', reference: ref })
+    const body = text.split(`----- BEGIN ${ref} -----
+`)[1]!.split(`
+----- END ${ref} -----`)[0]
+    assert.equal(body, readFileSync(join(library.get('shopify-store-kit')!.dir, ref), 'utf8'))
+  })
+
+  test('the kit’s JSON templates parse', async () => {
+    const { readFileSync } = await import('node:fs')
+    const { join } = await import('node:path')
+    const kit = library.get('shopify-store-kit')!
+    for (const r of kit.references.filter((f) => f.endsWith('.json'))) JSON.parse(readFileSync(join(kit.dir, r), 'utf8'))
   })
 })

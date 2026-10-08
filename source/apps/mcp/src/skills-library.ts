@@ -153,12 +153,19 @@ function frontmatter(text: string): Record<string, string> {
   return out
 }
 
-function listFiles(dir: string): string[] {
+/**
+ * Reference files a skill may serve. Markdown everywhere; AdsPilot's own skills may
+ * also ship code templates (Shopify theme sections and JSON templates) that an AI
+ * installs unchanged, so those are served too. Third-party libraries stay Markdown-only.
+ */
+const CODE_REFERENCE = /\.(liquid|json)$/
+
+function listFiles(dir: string, withCode = false): string[] {
   const out: string[] = []
   for (const entry of readdirSync(dir)) {
     const full = join(dir, entry)
-    if (statSync(full).isDirectory()) out.push(...listFiles(full))
-    else if (entry.endsWith('.md')) out.push(full)
+    if (statSync(full).isDirectory()) out.push(...listFiles(full, withCode))
+    else if (entry.endsWith('.md') || (withCode && CODE_REFERENCE.test(entry))) out.push(full)
   }
   return out
 }
@@ -196,7 +203,7 @@ export function loadLibrary(
         )
       }
       const meta = frontmatter(skillText)
-      const references = listFiles(dir)
+      const references = listFiles(dir, source.own === true)
         .map((f) => relative(dir, f).split(sep).join('/'))
         .filter((f) => f !== 'SKILL.md')
         .sort()
@@ -324,7 +331,16 @@ export function registerSkillsLibrary(server: McpServer, root: string = LIBRARY_
         }
       }
 
-      const text = readFileSync(join(skill.dir, ...file.split('/')), 'utf8')
+      const raw = readFileSync(join(skill.dir, ...file.split('/')), 'utf8')
+      // Code templates are installed as-is: mark exactly where the file starts and ends,
+      // so the framing above never ends up inside a theme file.
+      const text = CODE_REFERENCE.test(file)
+        ? `This is a template file. Install the text between the two marker lines unchanged (for example with shopify_theme_edit, full content).
+----- BEGIN ${file} -----
+${raw}
+----- END ${file} -----
+`
+        : raw
       const footer =
         reference === undefined && skill.references.length > 0
           ? `\n\n---\nReference files for this skill (read with get_skill { name: "${name}", reference }):\n` +

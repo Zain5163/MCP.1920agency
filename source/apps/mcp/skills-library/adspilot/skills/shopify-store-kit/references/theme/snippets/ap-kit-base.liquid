@@ -1,0 +1,73 @@
+{%- comment -%}
+  AdsPilot store kit: shared styles for the ap-* sections. Holds no markup; Shopify
+  bundles every {% stylesheet %} in the theme into one file loaded on all pages, so
+  this file only needs to exist. Each ap-* section sets the colour variables
+  (--ap-bg, --ap-fg, --ap-muted, --ap-line, --ap-accent, --ap-btn-bg, --ap-btn-fg)
+  from its own settings.
+{%- endcomment -%}
+
+{% stylesheet %}
+  .ap-section { background: var(--ap-bg); color: var(--ap-fg); }
+  .ap-wrap {
+    max-width: var(--page-width);
+    margin-inline: auto;
+    padding-inline: var(--page-margin);
+    box-sizing: border-box;
+    width: 100%;
+  }
+  .ap-eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: var(--font-accent--family);
+    font-weight: var(--font-accent--weight);
+    font-size: 0.8125rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    margin: 0 0 12px;
+  }
+  .ap-eyebrow::before { content: ''; width: 28px; height: 3px; background: var(--ap-accent); flex: none; }
+  .ap-display {
+    font-family: var(--font-heading--family);
+    font-weight: var(--font-heading--weight);
+    line-height: 0.95;
+    text-transform: uppercase;
+    letter-spacing: -0.005em;
+    margin: 0;
+    color: inherit;
+  }
+  .ap-muted { color: var(--ap-muted); }
+  .ap-btn {
+    --button-padding-block: 14px;
+    --button-padding-inline: 28px;
+    min-height: 48px;
+    letter-spacing: 0.08em;
+    font-weight: 600;
+  }
+  .ap-btn--solid {
+    --button-background-color: var(--ap-btn-bg);
+    --button-color: var(--ap-btn-fg);
+    --button-border-color: var(--ap-btn-bg);
+    --button-border-width: 0px;
+  }
+  .ap-btn--solid:hover { filter: brightness(1.08); }
+  .ap-btn--outline {
+    --button-background-color: transparent;
+    --button-color: var(--ap-fg);
+    --button-border-color: var(--ap-fg);
+    --button-border-width: 1px;
+  }
+  .ap-btn--outline:hover { --button-background-color: color-mix(in srgb, var(--ap-fg) 10%, transparent); }
+  .ap-link { font-weight: 600; color: inherit; text-underline-offset: 4px; }
+  @media screen and (max-width: 749px) {
+    .ap-stack-mobile .ap-btn { width: 100%; }
+  }
+
+  /* Store-wide: Add to cart stays the only solid button in the buy box; Shopify's
+     dynamic "Buy it now" becomes an outline (Baymard: the main action gets a unique style). */
+  .shopify-payment-button__button--unbranded {
+    background: transparent !important;
+    color: var(--color-foreground) !important;
+    box-shadow: inset 0 0 0 1px var(--color-foreground) !important;
+  }
+{% endstylesheet %}

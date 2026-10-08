@@ -1,0 +1,102 @@
+{%- comment -%}
+  AdsPilot store kit · Fit help and FAQ: the question that stops orders (which size?)
+  answered with the start of the size chart and a link to the full guide, beside the
+  most common questions as accordions (native <details>, keyboard-friendly).
+  Chart rows and questions are blocks the owner edits. Real values only.
+{%- endcomment -%}
+{%- render 'ap-kit-base' -%}
+{%- assign s = section.settings -%}
+{%- assign rows = section.blocks | where: 'type', 'row' -%}
+{%- assign questions = section.blocks | where: 'type', 'question' -%}
+<section class="ap-help ap-section" aria-label="{{ s.heading | escape }}" style="--ap-bg: {{ s.background }}; --ap-fg: {{ s.text_color }}; --ap-muted: {{ s.muted_color }}; --ap-line: {{ s.line_color }}; --ap-btn-bg: {{ s.text_color }}; --ap-btn-fg: {{ s.background }};">
+  <div class="ap-help__grid ap-wrap page-width-normal">
+    {%- if rows.size > 0 or s.heading != blank -%}
+      <div class="ap-help__size">
+        <h2 class="ap-display ap-help__heading">{{ s.heading | escape }}</h2>
+        {%- if s.text != blank -%}<p class="ap-help__lead ap-muted">{{ s.text | escape }}</p>{%- endif -%}
+        {%- if rows.size > 0 -%}
+          <table class="ap-help__table">
+            <caption class="visually-hidden">{{ s.heading | escape }}</caption>
+            <thead><tr><th scope="col">{{ s.column_1 | escape }}</th><th scope="col">{{ s.column_2 | escape }}</th></tr></thead>
+            <tbody>
+              {%- for block in rows -%}
+                <tr {{ block.shopify_attributes }}><td>{{ block.settings.label | escape }}</td><td>{{ block.settings.value | escape }}</td></tr>
+              {%- endfor -%}
+            </tbody>
+          </table>
+        {%- endif -%}
+        {%- if s.button_label != blank -%}
+          <a class="button ap-btn ap-btn--solid" href="{{ s.button_link }}">{{ s.button_label | escape }}</a>
+        {%- endif -%}
+      </div>
+    {%- endif -%}
+    {%- if questions.size > 0 -%}
+      <div class="ap-help__faq">
+        <h2 class="ap-display ap-help__heading">{{ s.faq_heading | escape }}</h2>
+        {%- for block in questions -%}
+          <details class="ap-faq" {{ block.shopify_attributes }}>
+            <summary>{{ block.settings.question | escape }}<span aria-hidden="true"></span></summary>
+            <div class="ap-faq__answer">{{ block.settings.answer }}</div>
+          </details>
+        {%- endfor -%}
+        {%- if s.faq_link != blank -%}<a class="ap-link ap-help__more" href="{{ s.faq_link }}">{{ s.faq_link_label | escape }}</a>{%- endif -%}
+      </div>
+    {%- endif -%}
+  </div>
+</section>
+
+{% stylesheet %}
+  .ap-help__grid { display: grid; gap: 56px; padding-block: 64px; }
+  @media screen and (min-width: 990px) { .ap-help__grid { grid-template-columns: 5fr 7fr; gap: 96px; padding-block: 96px; } }
+  .ap-help__heading { font-size: clamp(2rem, 5vw, 3rem); margin-bottom: 16px; }
+  .ap-help__lead { font-size: 1.0625rem; line-height: 1.55; margin: 0 0 24px; max-width: 42ch; }
+  .ap-help__table { width: 100%; border-collapse: collapse; margin-bottom: 28px; font-size: 1rem; }
+  .ap-help__table th { text-align: left; font-family: var(--font-accent--family); font-weight: 600; font-size: 0.8125rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ap-muted); padding: 0 0 10px; }
+  .ap-help__table td { padding: 14px 0; border-top: 1px solid var(--ap-line); }
+  .ap-help__table td + td, .ap-help__table th + th { text-align: right; font-weight: 600; }
+  .ap-faq { border-top: 1px solid var(--ap-line); }
+  .ap-faq:last-of-type { border-bottom: 1px solid var(--ap-line); }
+  .ap-faq summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 20px 0; min-height: 48px; font-size: 1.0625rem; font-weight: 600; }
+  .ap-faq summary::-webkit-details-marker { display: none; }
+  .ap-faq summary span { width: 14px; height: 14px; flex: none; position: relative; }
+  .ap-faq summary span::before, .ap-faq summary span::after { content: ''; position: absolute; inset: 6px 0 auto; height: 2px; background: currentColor; transition: transform 0.2s ease; }
+  .ap-faq summary span::after { transform: rotate(90deg); }
+  .ap-faq[open] summary span::after { transform: rotate(0deg); }
+  .ap-faq__answer { padding: 0 0 20px; color: var(--ap-muted); line-height: 1.6; max-width: 60ch; }
+  .ap-faq__answer p { margin: 0; }
+  .ap-help__more { display: inline-block; margin-top: 20px; }
+  @media (prefers-reduced-motion: reduce) { .ap-faq summary span::after { transition: none; } }
+{% endstylesheet %}
+
+{% schema %}
+{
+  "name": "Fit help and FAQ",
+  "tag": "div",
+  "settings": [
+    { "type": "text", "id": "heading", "label": "Fit heading", "default": "Not sure on size?" },
+    { "type": "text", "id": "text", "label": "Fit text" },
+    { "type": "text", "id": "column_1", "label": "Chart column 1", "default": "Your measurement" },
+    { "type": "text", "id": "column_2", "label": "Chart column 2", "default": "Size" },
+    { "type": "text", "id": "button_label", "label": "Button", "default": "Open size guide" },
+    { "type": "url", "id": "button_link", "label": "Button link" },
+    { "type": "text", "id": "faq_heading", "label": "FAQ heading", "default": "Questions" },
+    { "type": "url", "id": "faq_link", "label": "All questions link" },
+    { "type": "text", "id": "faq_link_label", "label": "All questions label", "default": "All questions" },
+    { "type": "color", "id": "background", "label": "Background", "default": "#F5F4F0" },
+    { "type": "color", "id": "text_color", "label": "Text", "default": "#111315" },
+    { "type": "color", "id": "muted_color", "label": "Secondary text", "default": "#5A5F66" },
+    { "type": "color", "id": "line_color", "label": "Lines", "default": "#DCDAD3" }
+  ],
+  "blocks": [
+    { "type": "row", "name": "Chart row", "limit": 8, "settings": [
+      { "type": "text", "id": "label", "label": "Measurement", "default": "160–170 cm" },
+      { "type": "text", "id": "value", "label": "Size", "default": "M" }
+    ] },
+    { "type": "question", "name": "Question", "settings": [
+      { "type": "text", "id": "question", "label": "Question", "default": "How long does delivery take?" },
+      { "type": "richtext", "id": "answer", "label": "Answer (the store's real terms)", "default": "<p>Answer with the store's real terms.</p>" }
+    ] }
+  ],
+  "presets": [{ "name": "Fit help and FAQ" }]
+}
+{% endschema %}
