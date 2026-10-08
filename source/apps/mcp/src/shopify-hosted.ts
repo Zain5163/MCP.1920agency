@@ -18,12 +18,12 @@ import {
   type ShopifyTokenSet,
 } from '@social-publisher/adapters'
 import { CONFIG_DIR, optional } from '@social-publisher/config'
-import { listProviderAuths, markProviderAuthNeedsReauth, providerAuthCredentialStore, saveProviderAuth } from '@social-publisher/db'
+import { TenantScope, listProviderAuths, markProviderAuthNeedsReauth, providerAuthCredentialStore, saveProviderAuth } from '@social-publisher/db'
 import { TokenVault, parseKey, type StoredCredential } from '@social-publisher/vault'
 
-import { audit, guarded, type ToolResult } from './ads-tools.ts'
+import { guarded, type ToolResult } from './ads-tools.ts'
 import { registerShopifyBuildTools } from './shopify-build-tools.ts'
-import { registerShopifyTools, registerShopifyWriteTools, type ShopifyAccess, type ShopifyStoreEntry } from './shopify-tools.ts'
+import { auditFor, registerShopifyTools, registerShopifyWriteTools, type ShopifyAccess, type ShopifyStoreEntry } from './shopify-tools.ts'
 
 /**
  * Hosted Shopify: each AdsPilot user connects their own store from their AI chat.
@@ -156,6 +156,10 @@ export function hostedShopifyAccess(tenantId: string): ShopifyAccess {
       })
       return { client, store: { key: hit.key, name: hit.name, shop: hit.shop } }
     },
+    // This user's own activity log, never the server's first account.
+    record: async (action, detail) => {
+      await new TenantScope(tenantId).record('mcp', action, detail)
+    },
     backupDir: (store) => join(optional('SHOPIFY_BACKUP_DIR', join(CONFIG_DIR, 'shopify-backups'))!, 'tenants', tenantId, store.shop),
   }
 }
@@ -201,7 +205,7 @@ export function registerHostedShopifyTools(server: McpServer, tenantId: string):
         const hit = auths.find((a) => a.externalUserId === wanted || a.externalUserId === `${wanted}.myshopify.com` || (a.displayName ?? '').toLowerCase() === wanted)
         if (hit === undefined) return text(`No connected store called "${store}".`)
         await markProviderAuthNeedsReauth(tenantId, hit.id, 'disconnected by user')
-        await audit('shopify.store.disconnected', { shop: hit.externalUserId })
+        await auditFor(hostedShopifyAccess(tenantId), 'shopify.store.disconnected', { shop: hit.externalUserId })
         return text(`${hit.displayName ?? hit.externalUserId} is disconnected. AdsPilot no longer uses its access key.`)
       }),
   )

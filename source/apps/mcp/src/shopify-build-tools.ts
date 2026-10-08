@@ -4,7 +4,6 @@ import { z } from 'zod'
 import { ShopifyError, type MenuContent, type MenuItemInput, type ShopifyAdminClient } from '@social-publisher/adapters'
 import { decide, formatApprovalRequest } from '@social-publisher/core'
 
-import { audit } from './ads-tools.ts'
 import {
   confirmArg,
   hash,
@@ -15,6 +14,7 @@ import {
   withStore,
   type BackupKind,
   type ShopifyAccess,
+  auditFor,
 } from './shopify-tools.ts'
 
 /**
@@ -256,7 +256,7 @@ export function registerShopifyBuildTools(server: McpServer, access: ShopifyAcce
         if (!gate.allowed) return formatApprovalRequest(gate)
 
         const created = await client.createProduct({ ...spec, status: visible ? 'ACTIVE' : 'DRAFT', collectionIds })
-        await audit('shopify.product.created', { shop: entry.shop, id: created.id, handle: created.handle })
+        await auditFor(access, 'shopify.product.created', { shop: entry.shop, id: created.id, handle: created.handle })
         const notOnline = await publish(client, created.id)
         const back = await client.productContent(created.handle)
         const ok = back !== undefined && back.title === spec.title && back.status === (visible ? 'ACTIVE' : 'DRAFT') && created.variantsCount.count === spec.variants.length
@@ -329,7 +329,7 @@ export function registerShopifyBuildTools(server: McpServer, access: ShopifyAcce
         const notOnline = doPublish ? await publish(client, id) : undefined
         const after = await client.collectionContent(handle)
         const ok = after !== undefined && after.title === title && [...after.products].sort().join() === [...wanted].sort().join()
-        await audit('shopify.collection.saved', { shop: entry.shop, handle, created: before === undefined })
+        await auditFor(access, 'shopify.collection.saved', { shop: entry.shop, handle, created: before === undefined })
         return [
           ok ? `Done, and read back from Shopify: /collections/${handle} is "${title}" with ${after!.products.length} product(s).` : 'Saved, but the read-back does not match what was approved. Check the collection now.',
           ...(notOnline !== undefined ? [notOnline] : doPublish ? ['On the Online Store.'] : []),
@@ -394,7 +394,7 @@ export function registerShopifyBuildTools(server: McpServer, access: ShopifyAcce
         await client.saveMenu({ ...(before !== undefined ? { id: before.id } : {}), handle, title: name, items: built })
         const after = await client.menu(handle)
         const ok = after !== undefined && titlesOf(after.items) === titlesOf(items)
-        await audit('shopify.menu.saved', { shop: entry.shop, handle, created: before === undefined })
+        await auditFor(access, 'shopify.menu.saved', { shop: entry.shop, handle, created: before === undefined })
         return [
           ok ? `Done, and read back from Shopify: the "${name}" menu holds the approved ${items.length} item(s).` : 'Saved, but the read-back does not match what was approved. Check the menu now.',
           ...(backup !== undefined ? [`Previous version saved: ${backup}.`] : []),
@@ -443,7 +443,7 @@ export function registerShopifyBuildTools(server: McpServer, access: ShopifyAcce
         await client.savePolicy(shopifyType, bodyHtml)
         const after = (await client.policies()).find((p) => p.type === shopifyType)
         const ok = after !== undefined && plain(after.body, 100_000) === plain(bodyHtml, 100_000)
-        await audit('shopify.policy.saved', { shop: entry.shop, type: shopifyType })
+        await auditFor(access, 'shopify.policy.saved', { shop: entry.shop, type: shopifyType })
         return [
           ok ? `Done, and read back from Shopify: the ${type.replace(/_/g, ' ')} policy holds the approved text${after?.url ? ` (${after.url})` : ''}.` : 'Saved, but the read-back does not match what was approved. Check the policy now.',
           `Previous version saved: ${backup}.`,

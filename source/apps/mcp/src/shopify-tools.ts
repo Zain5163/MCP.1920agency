@@ -116,6 +116,27 @@ export interface ShopifyAccess {
   open(selector: string): Promise<{ client: ShopifyAdminClient; store: ShopifyStoreEntry } | { error: string }>
   /** Where earlier versions of this store's products and pages are saved. */
   backupDir(store: ShopifyStoreEntry): string
+  /**
+   * Records a change in the activity log of the account that made it. Hosted
+   * access sets this to the requesting user's own account: the fallback
+   * (`audit`, the server's first account) is right only for the owner's PC, and
+   * on the hosted server it filed one customer's store changes under another
+   * account (found 2026-10-08 in the WordPress review).
+   */
+  record?(action: string, detail: Record<string, unknown>): Promise<void>
+}
+
+/** Records a store change under the account the tools act for. Never throws. */
+export async function auditFor(access: ShopifyAccess, action: string, detail: Record<string, unknown>): Promise<void> {
+  if (access.record === undefined) {
+    await audit(action, detail)
+    return
+  }
+  try {
+    await access.record(action, detail)
+  } catch {
+    // Same rule as audit(): a log failure never changes what the tool did.
+  }
 }
 
 export const localShopifyAccess: ShopifyAccess = {
@@ -333,7 +354,7 @@ export function registerShopifyWriteTools(server: McpServer, access: ShopifyAcce
           (changes.seoTitle === undefined || after.seo.title === changes.seoTitle) &&
           (changes.seoDescription === undefined || after.seo.description === changes.seoDescription) &&
           (changes.descriptionHtml === undefined || plain(after.descriptionHtml, 10_000) === plain(changes.descriptionHtml, 10_000))
-        await audit('shopify.product.updated', { shop: entry.shop, handle, backup })
+        await auditFor(access, 'shopify.product.updated', { shop: entry.shop, handle, backup })
         return [
           ok ? `Done, and read back from Shopify: "${after!.title}" now holds the approved text.` : 'Saved, but the read-back does not match what was approved. Check the product page now.',
           `Previous version saved: ${backup} (restore with shopify_restore_backup).`,
@@ -379,7 +400,7 @@ export function registerShopifyWriteTools(server: McpServer, access: ShopifyAcce
         }
         const after = await client.pageContent(handle)
         const ok = after !== undefined && after.title === title && after.isPublished === publish && plain(after.body, 10_000) === plain(bodyHtml, 10_000)
-        await audit('shopify.page.saved', { shop: entry.shop, handle, created: before === undefined, publish })
+        await auditFor(access, 'shopify.page.saved', { shop: entry.shop, handle, created: before === undefined, publish })
         return [
           ok ? `Done, and read back from Shopify: /pages/${handle} holds the approved content (${publish ? 'published' : 'hidden draft'}).` : 'Saved, but the read-back does not match what was approved. Check the page now.',
           ...(backup !== undefined ? [`Previous version saved: ${backup}.`] : []),
@@ -438,7 +459,7 @@ export function registerShopifyWriteTools(server: McpServer, access: ShopifyAcce
         if (!gate.allowed) return formatApprovalRequest(gate)
 
         const created = await client.createDiscount({ ...spec, startsAt, title: spec.title ?? spec.code })
-        await audit('shopify.discount.created', { shop: entry.shop, code: created.code, id: created.id })
+        await auditFor(access, 'shopify.discount.created', { shop: entry.shop, code: created.code, id: created.id })
         const ok = created.code === spec.code && ['ACTIVE', 'SCHEDULED'].includes(created.status.toUpperCase())
         return ok
           ? `Done, and read back from Shopify: code ${created.code} is ${created.status.toLowerCase()} until ${created.endsAt ?? 'no end date'}.`
@@ -458,7 +479,7 @@ export function registerShopifyWriteTools(server: McpServer, access: ShopifyAcce
         )
         if (found.codeDiscountNodeByCode === null) return `No discount with the code "${code}".`
         await client.deactivateDiscount(found.codeDiscountNodeByCode.id)
-        await audit('shopify.discount.ended', { shop: entry.shop, code })
+        await auditFor(access, 'shopify.discount.ended', { shop: entry.shop, code })
         return `Code ${code} is ended on ${entry.name}. Orders already placed with it are unaffected.`
       }),
   )
@@ -513,19 +534,19 @@ export function registerShopifyWriteTools(server: McpServer, access: ShopifyAcce
             seoDescription: saved.content.seo?.description ?? '',
             ...(saved.content.status === 'ACTIVE' || saved.content.status === 'DRAFT' || saved.content.status === 'ARCHIVED' ? { status: saved.content.status } : {}),
           })
-          await audit('shopify.product.restored', { shop: entry.shop, handle: saved.handle, from: file })
+          await auditFor(access, 'shopify.product.restored', { shop: entry.shop, handle: saved.handle, from: file })
           return `Restored "${saved.content.title}". The version it replaced is saved as ${backup}.`
         }
         if (saved.kind !== 'page') {
           const restored = await restoreBuildBackup(client, access.backupDir(entry), entry.shop, saved)
-          await audit(`shopify.${saved.kind}.restored`, { shop: entry.shop, handle: saved.handle, from: file })
+          await auditFor(access, `shopify.${saved.kind}.restored`, { shop: entry.shop, handle: saved.handle, from: file })
           return restored
         }
         const now = await client.pageContent(saved.handle)
         if (now === undefined) return `The page "${saved.handle}" no longer exists.`
         const backup = saveBackup(access.backupDir(entry), entry.shop, 'page', saved.handle, now)
         await client.updatePage(now.id, { title: saved.content.title, body: saved.content.body ?? '', isPublished: saved.content.isPublished ?? false })
-        await audit('shopify.page.restored', { shop: entry.shop, handle: saved.handle, from: file })
+        await auditFor(access, 'shopify.page.restored', { shop: entry.shop, handle: saved.handle, from: file })
         return `Restored page "${saved.content.title}". The version it replaced is saved as ${backup}.`
       }),
   )
