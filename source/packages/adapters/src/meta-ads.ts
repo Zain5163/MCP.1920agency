@@ -401,16 +401,34 @@ export interface AdPerformance {
  * was captured. Checked in order; the first present is the one counted.
  */
 const LEAD_ACTIONS = ['lead', 'onsite_conversion.lead_grouped', 'offsite_conversion.fb_pixel_lead']
+/** Purchase actions, in the order counted (pixel first: what the store's pixel reported). */
+export const PURCHASE_ACTIONS = ['offsite_conversion.fb_pixel_purchase', 'purchase', 'omni_purchase']
+
+/**
+ * What a campaign is paying for, as the actions to count. Without this, an ad in a
+ * Sales campaign with no purchase yet was judged on link clicks against a purchase
+ * target ("PKR 23 per result, under target") — found live 2026-10-09.
+ */
+export function resultActionsForObjective(objective: string | undefined): readonly string[] | undefined {
+  if (objective === 'OUTCOME_SALES' || objective === 'CONVERSIONS' || objective === 'PRODUCT_CATALOG_SALES') return PURCHASE_ACTIONS
+  if (objective === 'OUTCOME_LEADS' || objective === 'LEAD_GENERATION') return LEAD_ACTIONS
+  return undefined
+}
 
 export function assessPerformance(
   row: Record<string, unknown>,
-  options: { targetCostMinor?: number; resultAction?: string } = {},
+  options: { targetCostMinor?: number; resultAction?: string; resultActions?: readonly string[] } = {},
 ): AdPerformance {
   const num = (v: unknown) => (v === undefined || v === null || v === '' ? 0 : Number(v))
   const actions = (row.actions as Array<{ action_type: string; value: string }> | undefined) ?? []
 
+  // The campaign's own result first (purchases for Sales, even when there are none yet),
+  // then leads if any were recorded, then link clicks.
   const resultAction =
     options.resultAction ??
+    (options.resultActions !== undefined
+      ? (options.resultActions.find((a) => actions.some((x) => x.action_type === a)) ?? options.resultActions[0]!)
+      : undefined) ??
     LEAD_ACTIONS.find((a) => actions.some((x) => x.action_type === a)) ??
     'link_click'
   const results = num(actions.find((a) => a.action_type === resultAction)?.value)
@@ -1090,6 +1108,8 @@ export class MetaAdsClient {
     campaignId: string,
     options: { datePreset?: string; targetCostMinor?: number; resultAction?: string } = {},
   ): Promise<AdPerformance[]> {
+    const campaign = (await this.#get(campaignId, { fields: 'objective' })) as { objective?: string }
+    const resultActions = resultActionsForObjective(campaign.objective)
     const data = (await this.#get(`${campaignId}/insights`, {
       level: 'ad',
       date_preset: options.datePreset ?? 'last_7d',
@@ -1098,7 +1118,7 @@ export class MetaAdsClient {
       limit: '200',
     })) as { data?: Array<Record<string, unknown>> }
 
-    return (data.data ?? []).map((row) => assessPerformance(row, options))
+    return (data.data ?? []).map((row) => assessPerformance(row, { ...options, ...(resultActions !== undefined ? { resultActions } : {}) }))
   }
 
   /**

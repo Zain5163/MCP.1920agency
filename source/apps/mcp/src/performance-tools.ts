@@ -348,8 +348,18 @@ export function registerPerformanceTools(server: McpServer): void {
       await guarded(async () => {
         const loaded = loadClient(account)
         if ('error' in loaded) return text(loaded.error)
-        const obj = await loaded.client.readObject(id, 'name,effective_status,daily_budget')
+        // Only ad sets and campaigns have a daily_budget; asking an ad for it fails with
+        // "(#100) nonexisting field" (found live, 2026-10-09, switching a losing ad off).
+        // Read what every object has, then the budget only where it exists.
+        const obj: Record<string, unknown> = await loaded.client.readObject(id, 'name,effective_status')
         const name = String(obj.name ?? id)
+        if (on) {
+          try {
+            Object.assign(obj, await loaded.client.readObject(id, 'daily_budget'))
+          } catch {
+            // an ad: it spends from the budget above it
+          }
+        }
 
         if (!on) {
           await loaded.client.setDelivery(id, false)

@@ -137,3 +137,31 @@ describe('instant forms', () => {
     )
   })
 })
+
+describe('a sales campaign is judged on purchases, never on clicks', () => {
+  // Found live 2026-10-09: an ad with no purchase yet was reported as
+  // "17 link clicks, PKR 23 each, under target" against a PKR 700 purchase target.
+  test('the objective decides what counts as a result', async () => {
+    const { resultActionsForObjective, PURCHASE_ACTIONS } = await import('../src/meta-ads.ts')
+    assert.deepEqual(resultActionsForObjective('OUTCOME_SALES'), PURCHASE_ACTIONS)
+    assert.ok(resultActionsForObjective('OUTCOME_LEADS')!.includes('lead'))
+    assert.equal(resultActionsForObjective('OUTCOME_TRAFFIC'), undefined)
+  })
+
+  test('no purchases yet means zero purchases, not a click count', async () => {
+    const { assessPerformance, PURCHASE_ACTIONS } = await import('../src/meta-ads.ts')
+    const row = { spend: '390.68', impressions: '1200', frequency: '1.2', inline_link_click_ctr: '1.46', actions: [{ action_type: 'link_click', value: '17' }] }
+    const p = assessPerformance(row, { targetCostMinor: 70_000, resultActions: PURCHASE_ACTIONS })
+    assert.equal(p.results, 0)
+    assert.match(p.resultAction, /purchase/)
+    assert.equal(p.costPerResultMinor, undefined)
+  })
+
+  test('purchases are counted from the pixel event when present', async () => {
+    const { assessPerformance, PURCHASE_ACTIONS } = await import('../src/meta-ads.ts')
+    const row = { spend: '2301.30', impressions: '8000', frequency: '1.2', inline_link_click_ctr: '1.19', actions: [{ action_type: 'link_click', value: '99' }, { action_type: 'offsite_conversion.fb_pixel_purchase', value: '2' }] }
+    const p = assessPerformance(row, { targetCostMinor: 70_000, resultActions: PURCHASE_ACTIONS })
+    assert.equal(p.results, 2)
+    assert.equal(p.costPerResultMinor, 115_065)
+  })
+})

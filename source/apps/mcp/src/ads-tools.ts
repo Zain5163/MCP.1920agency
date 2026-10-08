@@ -71,6 +71,14 @@ const labelOf = (name: string, id: string) => `${name} (act_${id})`
  * With no `selector`, the default account from `.env`, as before. With one, an
  * entry from `ad-accounts.json`, using the same token.
  */
+/** A Meta action type as people say it. */
+export function resultLabel(action: string): string {
+  if (/purchase/.test(action)) return 'purchase(s)'
+  if (/lead/.test(action)) return 'lead(s)'
+  if (action === 'link_click') return 'link click(s)'
+  return `${action.replace(/[._]/g, ' ')}(s)`
+}
+
 export function loadClient(selector?: string): LoadedAccount | { error: string } {
   const accessToken = optional('META_ADS_ACCESS_TOKEN')
   if (accessToken === undefined) {
@@ -727,7 +735,7 @@ export function registerAdsTools(server: McpServer): void {
         const money = (minor: number) => formatMoney({ minor, currency: loaded.account.currency })
         const lines = rows.flatMap((r) => [
           `${r.name}`,
-          `  spent ${money(r.spendMinor)}, ${r.results} ${r.resultAction.replace(/_/g, ' ')}(s)` +
+          `  spent ${money(r.spendMinor)}, ${r.results} ${resultLabel(r.resultAction)}` +
             (r.costPerResultMinor !== undefined ? `, ${money(r.costPerResultMinor)} each` : '') +
             `, frequency ${r.frequency.toFixed(1)}, link CTR ${r.linkCtr.toFixed(2)}%`,
           ...r.suggestions.map((s) => `  → ${s}`),
