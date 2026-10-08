@@ -185,3 +185,26 @@ by introspection (collections now use `collection:` inputs and `collectionByIden
   `list_shopify_stores` lists the practice store for that account; `shopify_store_overview` and
   `shopify_store_audit` (including policies) work through the stored, encrypted per-account token.
   Next: the store-building rehearsal on the practice store, then the public-app checklist.
+
+## Rehearsal on the practice store, through the hosted AdsPilot (2026-10-08)
+
+Built with the store-builder, conversion-checklists, shopify-theme-developer and web-ui-design
+skills; every change approved by the owner, read back, backed up:
+round 1: sold-out board hidden; shipping and refund policies; FAQ page; "Snowboards" collection
+(11 boards, on the Online Store). Round 2: size guide page; main menu (6) and footer (8) menus;
+code TWOBOARDS (10% off 2+ items, ends 2026-11-30). Audit: 8 findings → 3, and the 3 left need
+the owner (real photos, real product specs, costs). Product descriptions deliberately not
+rewritten: no invented specs. Theme step (Horizon redesign on a hidden copy) still to do; runs
+from the PC's AdsPilot.
+
+Found and fixed: approval summaries for Shopify changes said "Nothing becomes public" (each
+Shopify action now has its own consequence sentence); `shopify_products` now shows handles.
+
+**Open design issue: approvals and hosted releases.** The approval key is made per server
+process, so every release of the hosted server invalidates all customers' pending approvals
+(happened twice during the rehearsal: releases 332c6c5 and 48f107d). Not a quick fix: the
+per-process key also backs `ApprovalLedger` (apps/mcp/src/approvals.ts), the in-memory record
+that stops a used publish approval from posting twice. A stable key with a time window would
+let a used token work again after a restart. Proper fix: a stable key (derived from a server
+secret) + expiry window + the used-token ledger in the database. Until then: avoid releasing
+while a customer is mid-approval, and expect "approval needed" again after a release.

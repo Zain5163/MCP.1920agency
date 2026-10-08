@@ -195,7 +195,7 @@ export function registerShopifyTools(server: McpServer, access: ShopifyAccess = 
           `${rows.length} product(s), most recently updated first:`,
           ...rows.map(
             (p) =>
-              `• ${p.title} [${p.status.toLowerCase()}] ${p.minPrice === p.maxPrice ? p.minPrice : `${p.minPrice}–${p.maxPrice}`}` +
+              `• ${p.title} (handle: ${p.handle}) [${p.status.toLowerCase()}] ${p.minPrice === p.maxPrice ? p.minPrice : `${p.minPrice}–${p.maxPrice}`}` +
               (p.compareAt !== null ? ` (was ${p.compareAt})` : '') +
               ` · stock ${p.inventory}` +
               (p.soldOut.length > 0 ? ` · sold out: ${p.soldOut.slice(0, 8).join(', ')}` : '') +

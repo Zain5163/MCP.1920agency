@@ -111,6 +111,7 @@ export const ACTION_POLICY: Readonly<Record<string, ActionPolicy>> = {
       'The previous version is saved first so it can be restored.',
     risk: 'high',
     reversible: true,
+    consequence: 'Customers see the change as soon as it is saved. The previous version is kept and can be put back.',
     spendsMoney: false,
   },
   shopify_save_page: {
@@ -119,6 +120,7 @@ export const ACTION_POLICY: Readonly<Record<string, ActionPolicy>> = {
       'customers once published. The previous version is saved first.',
     risk: 'high',
     reversible: true,
+    consequence: 'If published, customers see the page at once; a hidden draft stays private. The previous version is kept and can be put back.',
     spendsMoney: false,
   },
   shopify_create_discount: {
@@ -136,12 +138,14 @@ export const ACTION_POLICY: Readonly<Record<string, ActionPolicy>> = {
       'theme is kept and can be put back.',
     risk: 'high',
     reversible: true,
+    consequence: 'Every customer sees the new theme from this moment. The previous theme is kept for rollback.',
     spendsMoney: false,
   },
   shopify_theme_rollback: {
     rationale: 'Puts the previous live theme back. Every customer sees it at once.',
     risk: 'high',
     reversible: true,
+    consequence: 'Every customer sees the previous theme again at once.',
     spendsMoney: false,
   },
   shopify_create_product: {
@@ -150,18 +154,21 @@ export const ACTION_POLICY: Readonly<Record<string, ActionPolicy>> = {
       'once at the stated price. It can be hidden or archived afterwards.',
     risk: 'high',
     reversible: true,
+    consequence: 'If visible, customers can see and buy it at once at this price; a draft stays hidden. It can be hidden or archived later.',
     spendsMoney: false,
   },
   shopify_save_collection: {
     rationale: 'Creates or changes a collection and which products it shows. Public once on the Online Store.',
     risk: 'high',
     reversible: true,
+    consequence: 'Customers see the collection once it is on the Online Store. The previous version is kept and can be put back.',
     spendsMoney: false,
   },
   shopify_save_menu: {
     rationale: 'Replaces a navigation menu customers use on every page. The previous menu is saved first.',
     risk: 'high',
     reversible: true,
+    consequence: 'Customers see the new menu on every page at once. The previous menu is kept and can be put back.',
     spendsMoney: false,
   },
   shopify_save_policy: {
@@ -170,12 +177,14 @@ export const ACTION_POLICY: Readonly<Record<string, ActionPolicy>> = {
       'checkout. The previous text is saved first, but orders placed under it keep its terms.',
     risk: 'high',
     reversible: false,
+    consequence: 'Customers see this policy at checkout at once, and orders placed under it keep its terms even if it changes later.',
     spendsMoney: false,
   },
   shopify_restore_backup: {
     rationale: 'Puts a saved earlier version of a product or page back. Public at once.',
     risk: 'high',
     reversible: true,
+    consequence: 'Customers see the restored version at once. The version it replaces is kept too.',
     spendsMoney: false,
   },
 
