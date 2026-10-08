@@ -145,6 +145,13 @@ The full list with reasoning is in `get_skill frontend-design` ("Process" sectio
 
 ## 6. Review checklist (before showing a design or approving a theme preview)
 
+**Hard gate:** no design is shown to the owner until (a) the design system above is set in
+the theme, not left at the theme's defaults, and (b) you have looked at screenshots of the
+preview at 390 px and 1440 px yourself. A default theme with new text is not a design
+(owner feedback, 2026-10-08). The evidence base for what premium stores do, section by
+section, with palettes and type pairings: `get_skill web-ui-design` reference
+`references/premium-store-patterns.md`.
+
 - [ ] The page's one job is obvious in 5 seconds on a phone.
 - [ ] The primary button is the most visible element and appears in the first screen.
 - [ ] Fonts, sizes, spacing and colours come only from the design system.

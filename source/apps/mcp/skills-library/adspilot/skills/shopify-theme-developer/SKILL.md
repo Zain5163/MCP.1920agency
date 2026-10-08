@@ -147,6 +147,41 @@ Move the content that lived in the old theme: announcement bar, home page sectio
 page blocks, footer text, custom templates assigned to products or pages. Preview every
 template type before asking for approval.
 
+**A theme's defaults are not a design.** (Learned 2026-10-08: a practice store moved to
+Horizon with only text edits was rejected by the owner as amateur.) An untouched Horizon
+reads as a template: Inter for every font role, 14 px body text, pill-shaped buttons and
+badges, a narrow page, an empty hero, placeholder social links. A redesign is not ready to
+show until all of this is done:
+
+1. **Design system set in `config/settings_data.json`** (from `web-ui-design` section 2,
+   approved by the owner when there is no brand yet): heading and body fonts from Shopify's
+   library (e.g. `barlow_condensed_n7` + `barlow_n4`; read the font handle list on
+   shopify.dev), `type_size_paragraph` 16, heading sizes and case, `color_palette`, button /
+   badge / input / card radius, button text case, `page_width`, `card_hover_effect`. Read the
+   theme's `config/settings_schema.json` for the exact ids and allowed values first; they
+   change between versions (Horizon 4.x replaced colour schemes with `color_palette`).
+2. **A real first screen:** a full-bleed photo with a short headline and 1–2 CTAs, the photo
+   loaded eagerly with `fetchpriority="high"`, a phone crop, and a gradient so text keeps
+   4.5:1 contrast. Photos: the owner's own first. Stock only with a licence that allows
+   commercial use (e.g. Unsplash, no attribution needed); never a photo showing another
+   brand's logo or the wrong sport or product. Without a Files upload tool, ship photos as
+   theme `assets/` and render them from a section with an `image_picker` override, so the
+   owner can swap them in the theme editor later.
+3. **Home page built from the research pattern** (`get_skill web-ui-design`, reference
+   `references/premium-store-patterns.md`): hero → shop paths or benefits strip (real promises only) → one
+   curated product row → one story block → fit help + FAQ → email with a reason → footer
+   with a Help menu. Restraint over quantity.
+4. **Product page:** size-guide link next to the variant picker; one line under Add to cart
+   with delivery cost / time and returns; collapsed accordions below the description.
+5. **Looked at, not assumed:** screenshot the hidden preview at 390 px and 1440 px (home,
+   collection, product, a page) and fix what looks wrong before the owner sees it. Text
+   edits to a default theme are not a redesign; never present them as one.
+
+Custom sections written for a store go in `sections/` with a schema, presets and settings
+the owner can edit; reuse the theme's CSS variables (`--font-heading--family`,
+`--font-body--family`, `--page-margin`, `.button`, `.button-secondary`) so they follow the
+global design settings.
+
 ## 5. Speed: what to check and fix first
 
 Shopify's own "essential practices" for theme speed (shopify.dev, performance best
