@@ -12,8 +12,11 @@ the owner or developer, on staging first.
 |---|---|---|
 | Guest checkout | Settings > Accounts & Privacy | Allow checkout without an account |
 | Checkout type | Pages > Checkout (block or `[woocommerce_checkout]` shortcode) | Checkout block for new stores; keep classic only if a needed plugin requires it |
-| Checkout fields | Block checkout settings in the Site Editor; extra fields through the Additional Checkout Fields API (8.9+) | Only what delivery needs; phone required if couriers call |
-| Payments | Settings > Payments | Methods buyers expect: cash on delivery (built in, with any fee stated), local gateways, cards |
+| Checkout fields | Block checkout settings in the Site Editor; extra fields through the Additional Checkout Fields API (8.9+) | Only what delivery needs; phone required only if couriers call |
+| Payments | Settings > Payments | The methods buyers in that market expect (`get_skill selling-by-country`): cards and wallets, buy now pay later, local methods, or cash on delivery (built in, with any fee stated) in COD markets |
+| Tax | Settings > Tax (enable taxes in Settings > General) | "Prices entered with tax" and "Display prices in the shop" set to include tax where the market expects it (UK, EU, Australia, New Zealand, the Gulf); tax added at checkout in the US and Canada; rates per country or state |
+| Final order button | Checkout block settings | Wording that says the order means paying where the market requires it (EU and UK; "zahlungspflichtig bestellen" in Germany) |
+| Privacy and consent | Settings > Accounts & Privacy (privacy policy page); a consent plugin | Privacy policy page set; pixel and analytics blocked until consent where the market requires it |
 | Shipping | Settings > Shipping > zones | Rates and times by zone, matching the product page and the shipping policy |
 | Free shipping threshold | A "Free shipping" method with a minimum order amount | Above one item's price, shown on the cart |
 | Coupons | Marketing > Coupons | Always with an expiry date; not listed publicly unless meant for everyone |
@@ -60,6 +63,16 @@ the owner or developer, on staging first.
   delivery. Refused parcels should be marked cancelled or refunded so sales reports are honest.
 - Everything else (delivery promise, WhatsApp, confirmation, cost per delivered order):
   `store-builder` reference `cash-on-delivery.md`.
+
+## Selling to several countries
+
+- Currencies and languages need plugins (a multi-currency plugin and a translation
+  plugin); choose maintained ones, one of each, and check they add `hreflang` links
+  between language versions.
+- EU stores selling across borders above the EU threshold charge the buyer's country's VAT
+  (One-Stop Shop); tax rates per country go in Settings > Tax. Rules and sources:
+  `selling-by-country`, reference `european-union.md`.
+- Policies, legal notice and returns wording per market: `selling-by-country`.
 
 ## Sources (checked 2026-10-08; cited, not copied)
 

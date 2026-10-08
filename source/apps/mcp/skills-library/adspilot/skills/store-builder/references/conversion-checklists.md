@@ -2,7 +2,9 @@
 
 **Updated 2026-10-08.** Use with the store-builder skill: run `shopify_store_audit` and
 `shopify_sales` first, find the weakest funnel step, then work through the checklist for
-that page. Numbers carry their source; Baymard Institute and Unbounce figures are cited,
+that page. These checklists hold in every country; what changes by market (payment
+methods, tax in the price, returns wording, legal notice, cookie consent) is in
+`get_skill selling-by-country`. Baymard's survey figures below are from US shoppers. Numbers carry their source; Baymard Institute and Unbounce figures are cited,
 not copied (their research is proprietary). Re-check a figure before quoting it to a client.
 
 ## What the evidence says, in one table
@@ -26,11 +28,13 @@ sites, not shops.
 ## Home page (for visitors who arrive without a product in mind)
 
 - [ ] First screen says what the store sells, to whom, and the main reason to buy here
-      (delivery time, price level, quality, cash on delivery). One line each, no slogans.
+      (delivery time, price level, quality, payment options the market expects such as
+      cash on delivery or buy now pay later). One line each, no slogans.
 - [ ] Best sellers or the main collections visible within one scroll on a phone.
 - [ ] Announcement bar shows **today's** offer and the delivery promise; nothing expired.
 - [ ] Search works and finds products by the words customers use (sizes, colours, local names).
-- [ ] Contact route visible (WhatsApp or phone) in the header or footer.
+- [ ] Contact route visible in the header or footer: the channel buyers in that market use
+      (WhatsApp in Pakistan, India and the Gulf; phone, email or live chat elsewhere).
 
 ## Collection pages
 
@@ -50,8 +54,8 @@ Above the fold on a phone:
 - [ ] Name, price, and the variant selector (size, colour) with sold-out variants marked.
 - [ ] One clear buy button; it stays reachable (sticky on mobile is fine if it does not cover
       content or the focused field).
-- [ ] One line under the button with the delivery promise, payment options (including cash on
-      delivery where offered) and the exchange or return term.
+- [ ] One line under the button with the delivery promise, payment options (cash on delivery,
+      buy now pay later or local methods where offered) and the exchange or return term.
 
 Below:
 
@@ -60,8 +64,9 @@ Below:
 - [ ] Size guide linked next to the size selector, in every size system buyers use, plus
       "fits true to size / runs small" advice (`shopify_save_page` for the guide).
 - [ ] Real reviews and customer photos only. Never invent ratings or counts.
-- [ ] FAQ answers the objections that stop orders: delivery time by city, cash on delivery,
-      exchange process, original or copy, warranty.
+- [ ] FAQ answers the objections that stop orders: delivery time by city or region, payment
+      options, returns or exchange process (including the legal withdrawal right where the
+      market has one), original or copy, warranty or legal guarantee.
 - [ ] Related products or "complete the look" to raise basket size.
 - [ ] SEO title and description set (`shopify_update_product`).
 
@@ -80,21 +85,30 @@ Below:
 AdsPilot's tools do not change checkout settings. Give the owner these steps:
 
 - [ ] Guest checkout allowed (customer accounts optional).
-- [ ] Only the fields needed for delivery; phone required where couriers call before delivery.
-- [ ] Payment options buyers expect in that country (see `cod-and-pakistan.md`).
+- [ ] Only the fields needed for delivery; phone required only where couriers call before
+      delivery (usual in cash-on-delivery markets). Every extra field is also personal data
+      the store must protect.
+- [ ] Payment options buyers expect in that country (`get_skill selling-by-country`, the
+      market's reference; for cash-on-delivery markets also `cash-on-delivery.md`).
+- [ ] Prices and totals shown the way the market expects: tax included in the UK, EU,
+      Australia, New Zealand and the Gulf; sales tax added at checkout in the US and Canada.
+- [ ] The final button's wording meets the market's rule (EU: it must say the order means
+      paying; Germany: "zahlungspflichtig bestellen" or equally clear).
 - [ ] Shipping rates by zone with honest delivery times; the same terms as the policy pages
       (`shopify_save_policy`) and the product page.
 - [ ] A test order placed on a development store, or a real one refunded, before ads run.
 
 ## Trust
 
-- [ ] Contact details that work: WhatsApp, phone, email, and a city or address.
+- [ ] Contact details that work: phone, email, the chat channel the market uses, and a
+      city or address (a full legal notice where the market requires it, e.g. Germany).
 - [ ] Refund/exchange and shipping policies written in plain words (`shopify_save_policy`),
       linked in the footer (`shopify_save_menu`).
 - [ ] About page with real people, real photos, how long the business has run.
 - [ ] Social proof that can be checked: Instagram link, real reviews, order counts only if true.
 - [ ] No fake countdown timers, fake "12 people are viewing" counters or invented scarcity.
-      They break trust and, in many countries, consumer law.
+      They break trust and are named as unfair practices by regulators in the EU, UK, US,
+      Australia and India (sources in selling-by-country).
 
 ## Mobile and speed
 

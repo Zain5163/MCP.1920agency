@@ -1,6 +1,6 @@
 ---
 name: store-platform-choice
-description: "Help a business choose where to sell online before building anything: Shopify, WooCommerce (WordPress), a simpler site builder (Wix, Squarespace), a marketplace, or social selling with WhatsApp and Instagram, judged on their products, budget, skills, payment methods (including cash on delivery), growth plans and how AdsPilot can help on each. Use when someone asks which platform to use, whether to move from one platform to another, or wants a store but has nothing yet."
+description: "Help a business choose where to sell online before building anything: Shopify, WooCommerce (WordPress), a simpler site builder (Wix, Squarespace), a marketplace, or social selling with WhatsApp and Instagram, judged on their products, budget, skills, the countries they sell to and the payment methods buyers there use (cards, wallets, buy now pay later, local methods, cash on delivery), growth plans and how AdsPilot can help on each. Use when someone asks which platform to use, whether to move from one platform to another, or wants a store but has nothing yet."
 ---
 
 # Choosing a store platform
@@ -18,15 +18,18 @@ own pricing page before quoting a number, and never quote one from memory.
 5. Where buyers come from: ads to a website, Instagram or TikTok, WhatsApp, marketplaces?
 6. Plans for the next 12 months: more products, other countries, wholesale, subscriptions?
 7. Is there an existing site, domain, product data, customers and search traffic to keep?
+8. Which countries will it sell to now, and within 12 months? Where is the business
+   registered? Each market changes payments, tax display, languages and legal pages: check
+   them in `get_skill selling-by-country` before choosing.
 
 ## 2. The options
 
 | Option | Fits when | Watch out for | AdsPilot today |
 |---|---|---|---|
-| **Shopify** | Most product businesses that want a store working quickly, with little maintenance; good themes, checkout and apps; scales well | Monthly plan plus app costs; Shopify Payments is not available in every country (not in Pakistan), and Shopify charges an extra transaction fee on orders paid through third-party gateways when Shopify Payments is not used (not on cash on delivery or other manual methods); theme code changes need care | **Connected**: store audit, sales, products, pages, collections, menus, policies, discounts, and theme drafts with preview and approved publish (theme tools in the local app). Skills: store-builder, shopify-theme-developer |
+| **Shopify** | Most product businesses that want a store working quickly, with little maintenance; good themes, checkout and apps; scales well | Monthly plan plus app costs; Shopify Payments is not available in every country (for example not in Pakistan; check the official list for the business's country), and Shopify charges an extra transaction fee on orders paid through third-party gateways when Shopify Payments is not used (not on cash on delivery or other manual methods); theme code changes need care | **Connected**: store audit, sales, products, pages, collections, menus, policies, discounts, and theme drafts with preview and approved publish (theme tools in the local app). Skills: store-builder, shopify-theme-developer |
 | **WooCommerce on WordPress** | A business that already has a WordPress site or content; wants full control and ownership; has a developer or a good managed host | Hosting, updates, backups and security are the owner's job; plugin quality varies (most WordPress vulnerabilities are in plugins); speed depends on hosting and theme | **Guidance only**: no WordPress tools. Skill: wordpress-site-builder |
 | **Wix, Squarespace and similar** | Small catalogue, a brochure site with a few products, an owner who wants to do everything visually | Fewer e-commerce features and integrations; harder to move away later | Guidance only (landing-page-builder, web-ui-design) |
-| **Marketplace** (for example Daraz in Pakistan, Amazon) | Testing demand without a store; reaching buyers who search marketplaces | Commission per sale, marketplace rules, no customer list, price competition next to rivals | Ads and content only |
+| **Marketplace** (Amazon in many countries; regional ones such as Daraz in Pakistan, Flipkart in India, noon in the Gulf, Zalando in Europe, Etsy for handmade) | Testing demand without a store; reaching buyers who search marketplaces | Commission per sale, marketplace rules, no customer list, price competition next to rivals | Ads and content only |
 | **Social selling** (Instagram or Facebook shop, WhatsApp Business catalogue, orders by chat) | Very small catalogue, made-to-order items, or the first weeks of a business | Manual order handling, no checkout, hard to measure sales from ads | Social posting and messaging-objective ads (campaign-setup) |
 
 A common path: start with social selling or a marketplace to prove demand, move to Shopify
@@ -41,9 +44,16 @@ regular, and keep the marketplace as an extra channel.
   starting over, and keep the content and search rankings.
 - **Existing store that works:** do not switch platforms to fix conversion; fix the pages,
   offer and speed first (store-builder, landing-page-builder). Switching costs months.
-- **Cash-on-delivery market:** any of the above handles cash on delivery; the choice
-  depends more on courier and payment-app integrations available in that country. Check
-  the platform's app or plugin directory for the local couriers and gateways before deciding.
+- **Any market:** the choice often depends on which payment gateways, couriers and tax
+  tools integrate in that country. Check the platform's app or plugin directory for them
+  before deciding, and the market's reference in `selling-by-country`.
+- **Cash-on-delivery market** (Pakistan, India, the Gulf): any of the above handles cash on
+  delivery; local courier and wallet integrations decide it.
+- **Selling to several countries:** one store with Shopify Markets (or WooCommerce with
+  multi-currency and translation plugins) usually beats one store per country, until a
+  market needs its own legal entity, warehouse, brand or tax set-up. EU, UK, Australian
+  and New Zealand buyers expect tax-inclusive prices and local payment methods; plan for
+  that from the start.
 - **Moving platforms:** plan redirects from every old product and page URL to the new one,
   move reviews and customer data where allowed, and run both until the new store has had
   a test order and the ad pixels fire correctly.

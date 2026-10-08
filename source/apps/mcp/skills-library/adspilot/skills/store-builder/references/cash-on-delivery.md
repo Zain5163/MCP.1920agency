@@ -6,6 +6,12 @@ conversion problem has two halves: getting the order, and getting the order **ac
 the door**. A store that maximises orders but ships parcels that come back loses money on
 both delivery legs.
 
+This file is one market pattern, not the default. The rest of each market's rules
+(prices and tax, consumer law, privacy, payments) are in `get_skill selling-by-country`:
+references `pakistan.md`, `india.md` and `gulf.md`. In card-first markets (the US, Canada,
+the UK, the EU, Australia, New Zealand) buyers expect cards, wallets and buy now pay later;
+do not add cash on delivery there unless the owner asks for it.
+
 ## What is known (and how well)
 
 | Fact | Confidence | Source |

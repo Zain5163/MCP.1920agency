@@ -1,6 +1,6 @@
 ---
 name: wordpress-site-builder
-description: "Plan, build, fix and speed up a WordPress site or WooCommerce store for a business that runs ads: block themes versus classic themes and page builders, theme.json and patterns, landing pages, WooCommerce product, cart and checkout (block checkout, cash on delivery, Meta pixel and Conversions API), plugins to keep or avoid, caching and Core Web Vitals, security and backups, and WP-CLI / REST API basics for developers. AdsPilot has no WordPress tools: this skill guides the AI and the owner, and every change is made by the owner or their developer. Use when the site is on WordPress or WooCommerce, or the user asks to build one."
+description: "Plan, build, fix and speed up a WordPress site or WooCommerce store for a business that runs ads: block themes versus classic themes and page builders, theme.json and patterns, landing pages, WooCommerce product, cart and checkout (block checkout, payments and tax display per country, cash on delivery, cookie consent, Meta pixel and Conversions API), plugins to keep or avoid, caching and Core Web Vitals, security and backups, and WP-CLI / REST API basics for developers. AdsPilot has no WordPress tools: this skill guides the AI and the owner, and every change is made by the owner or their developer. Use when the site is on WordPress or WooCommerce, or the user asks to build one."
 ---
 
 # WordPress site builder
@@ -35,6 +35,9 @@ Plugins, Tools > Site Health):
 4. Backups: what runs, where copies go, when one was last restored as a test.
 5. For stores: payment methods, shipping zones, cart and checkout type (block or classic).
 6. The goal: what result the ads pay for (see `campaign-setup`) and which page they land on.
+7. The countries it sells to, the currency and the languages. Each market changes the
+   payment methods, how prices and tax are shown, the legal pages and the consent banner:
+   read `get_skill selling-by-country` and the market's reference before advising.
 
 Site Health's "Critical issues" and outdated plugins come first: they are security risks.
 
@@ -65,9 +68,18 @@ Full checklists in `references/woocommerce.md`. The essentials:
 - **Checkout**: new stores use the **Cart and Checkout blocks** (default since WooCommerce
   8.3). Older checkout-field plugins that use the classic `woocommerce_checkout_fields`
   filter do not change the block checkout; check each plugin before switching.
-- **Cash on delivery** is a built-in payment method (WooCommerce > Settings > Payments).
-  State it, and any fee, on product pages; follow `store-builder/references/cash-on-delivery.md`
-  for delivery promise, WhatsApp and refused-parcel advice.
+- **Payments**: the methods buyers in that market expect (selling-by-country): cards and
+  wallets through a payment plugin, buy now pay later, local methods (for example iDEAL in
+  the Netherlands, UPI in India), or **cash on delivery**, a built-in method
+  (WooCommerce > Settings > Payments) for COD markets. State COD and any fee on product
+  pages; follow `store-builder/references/cash-on-delivery.md` for delivery promise,
+  WhatsApp and refused-parcel advice.
+- **Tax display**: WooCommerce > Settings > Tax decides whether prices are entered and
+  shown with tax. Show prices including tax where the market expects it (UK, EU,
+  Australia, New Zealand, the Gulf); in the US and Canada tax is usually added at checkout.
+- **Consent**: where the market requires consent before tracking (EU, UK and others in
+  selling-by-country), a consent plugin must block the pixel and analytics until the
+  visitor agrees, and Google tags need Consent Mode. Ask the owner before adding any tracking.
 - **Product pages**: the same checklist as Shopify (store-builder's
   `references/conversion-checklists.md`): photos, price, variations, delivery and
   return line by the button, size guide, real reviews.
@@ -91,7 +103,7 @@ that can break the site or let an attacker in.
   same job (two SEO plugins, two cache plugins, two pixels), "all-in-one" bundles used for
   one feature, and speed plugins that only hide problems from test tools.
 - One of each: SEO, caching, forms, backups, security (or the host's own), image
-  optimisation if the host does not do it.
+  optimisation if the host does not do it, and cookie consent where the market requires it.
 
 ## 5. Speed
 
@@ -151,7 +163,8 @@ Give these to the owner's developer; AdsPilot does not run them.
 - Claim AdsPilot changed a WordPress site, or invent a WordPress tool.
 - Ask for passwords, application passwords or database credentials in the chat.
 - Recommend nulled themes or plugins, or editing a live site without a backup.
-- Invent reviews, prices or delivery promises.
+- Invent reviews, prices or delivery promises, or legal text (legal notice, VAT numbers,
+  withdrawal terms): the owner supplies the facts, and a local adviser checks anything binding.
 
 ## Sources (checked 2026-10-08; WordPress and WooCommerce documentation is GPL or
 unlicensed, so it is cited and paraphrased, never copied)

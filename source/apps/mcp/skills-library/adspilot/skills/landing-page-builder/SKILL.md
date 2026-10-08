@@ -1,6 +1,6 @@
 ---
 name: landing-page-builder
-description: "Plan, build and test a landing page for paid ad traffic, on Shopify, WordPress or plain HTML: pick the page type from the result the ad pays for (purchase, lead, WhatsApp chat, call), match the page to each ad, structure the first screen, forms and the call to action, keep it fast on phones, set up pixel and Conversions API events, and run a test plan. Use when asked to make a landing page, a sales page or offer page for an ad, a lead capture page, a page for a WhatsApp campaign, when ads get clicks but no results, or before sending traffic from a new campaign. Includes section-by-section blueprints in references/page-blueprints.md."
+description: "Plan, build and test a landing page for paid ad traffic, on Shopify, WordPress or plain HTML: pick the page type from the result the ad pays for (purchase, lead, WhatsApp chat, call), match the page to each ad, structure the first screen, forms and the call to action, keep it fast on phones, set up pixel and Conversions API events with the consent the market needs, apply the target country's payment, price and legal rules (selling-by-country), and run a test plan. Use when asked to make a landing page, a sales page or offer page for an ad, a lead capture page, a page for a WhatsApp campaign, when ads get clicks but no results, or before sending traffic from a new campaign. Includes section-by-section blueprints in references/page-blueprints.md."
 ---
 
 # Landing page builder (for ad traffic)
@@ -9,7 +9,9 @@ description: "Plan, build and test a landing page for paid ad traffic, on Shopif
 principles of page conversion read `get_skill cro`; for the words, `copywriting`; for which
 funnel fits the buyer's trust level (direct sale, lead magnet, call, quiz),
 `conversion-path-builder`; for testing, `ab-testing`; for tracking in depth, `analytics`.
-Do not repeat their advice here; apply it.
+Do not repeat their advice here; apply it. For the country the ad targets (payment
+methods, price and tax display, discount and urgency rules, legal notice, cookie consent),
+read `get_skill selling-by-country` and the reference for that market before building.
 
 ## 1. Start from the result the ad pays for
 
@@ -30,7 +32,9 @@ route (instant form, chat, product page) usually beats a new page. Say so.
 
 ## 2. Ask before building (never invent these)
 
-The offer and price; what is included; delivery or service area and times; payment
+The countries the ads target and the page's language (never assume a default market);
+the business's legal details the market requires on the page (selling-by-country);
+the offer and price; what is included; delivery or service area and times; payment
 options; guarantee, exchange or refund terms; real proof (reviews, photos, client names
 with permission, numbers the business can stand behind); the brand's logo, colours and
 fonts; who answers leads or chats, and how fast; the ad or ads that will point here
@@ -45,7 +49,9 @@ The visitor clicked a promise. The first screen must repeat it before saying any
       the first screen, or one page per ad set.
 - [ ] The first image shows the same product, person or scene as the ad.
 - [ ] A discount, price or deadline in the ad appears on the page and in the cart, exactly.
-- [ ] The ad's language and tone (Urdu, Roman Urdu, English) carry over.
+- [ ] The ad's language, script and tone carry over (for example Urdu or Roman Urdu in
+      Pakistan, Arabic in the Gulf, French for Quebec, German in Germany). Currency, number
+      and date formats are the market's own.
 - [ ] UTM parameters on every ad URL (`utm_source`, `utm_medium`, `utm_campaign`,
       `utm_content` per ad) so `shopify_sales` and analytics can attribute orders.
 
@@ -61,8 +67,9 @@ About 83% of landing-page visits in Unbounce's 2024 benchmark came from mobile. 
       the proof), the image, and the call to action, all visible without scrolling.
 - [ ] One primary action. Remove or reduce the site menu on dedicated landing pages; keep a
       way to contact the business.
-- [ ] The trust line under the button: delivery time, cash on delivery or payment options,
-      guarantee or exchange term, rating if real.
+- [ ] The trust line under the button: delivery time, the payment options the market expects
+      (cash on delivery, buy now pay later, local methods), guarantee, return or exchange
+      term, rating if real.
 - [ ] Plain words at a reading level a 12-year-old follows: Unbounce found pages written at
       a 5th–7th grade level converted at 11.1%, 56% better than 8th–9th grade pages
       (vendor data, 2024).
@@ -72,17 +79,41 @@ benefits, proof, details, objections answered (FAQ), the offer again, the action
 
 ## 5. Forms and order forms
 
-- [ ] Only the fields the next step needs. For leads: name, phone or WhatsApp, and one
-      qualifying question at most. For COD orders: name, phone, city, address, size/quantity.
+- [ ] Only the fields the next step needs. For leads: name, phone or email (or WhatsApp
+      where buyers use it), and one qualifying question at most. For COD orders: name,
+      phone, city, address, size/quantity.
       Baymard finds the average checkout shows 23.5 form elements where 12–14 suffice.
 - [ ] Correct input types and autocomplete (`type="tel"`, `autocomplete="name"`, `tel`,
       `address-line1`), labels above fields, errors shown next to the field in plain words.
-- [ ] Phone fields accept the formats people type (03xx…, +92…, spaces).
+- [ ] Phone fields accept the formats people type in that market, local and international,
+      with spaces or dashes (for example 03xx… and +92… in Pakistan, 07… and +44… in the UK,
+      (555) 123-4567 and +1… in the US); store them in international (E.164) form.
+- [ ] Address fields fit the market (postcode or ZIP, state, province or emirate; area and
+      city in COD markets). On Shopify the checkout adapts itself; on custom forms, match it.
+- [ ] Consent wording where the market needs it: marketing email or SMS sign-ups need
+      their own unticked box or clear consent in the UK, EU, Canada and Australia, and an
+      unsubscribe route everywhere (selling-by-country).
 - [ ] After submit: a thank-you page or message that says what happens next and when
-      ("We will WhatsApp you within 2 hours to confirm"). The conversion event fires there.
+      ("We will call you within 2 hours", or "We will WhatsApp you to confirm" where that is
+      the custom). The conversion event fires there.
 - [ ] Leads reach a person fast. A form nobody answers in hours wastes the ad spend.
 
-## 6. Speed
+## 6. Country rules on the page
+
+Read the market's reference in `get_skill selling-by-country`; the usual changes are:
+
+- [ ] Prices with tax included where the market requires it (UK, EU, Australia, New
+      Zealand, the Gulf); in the US and Canada, say tax is added at checkout.
+- [ ] A discount's "was" price meets the market's rule (EU: the lowest price of the previous
+      30 days) and every deadline or stock claim is true.
+- [ ] Returns, withdrawal and guarantee wording matches the law there (14 days in the EU and
+      UK; consumer guarantees in Australia and New Zealand that a "no refunds" line breaks).
+- [ ] The legal notice, company details or VAT number the market requires are reachable
+      (Germany's Impressum, Italy's VAT number, Saudi Arabia's registration details).
+- [ ] The page meets the ad platform's landing page rules for that market (the platform's
+      `get_playbook`, and `campaign-setup` for special ad categories).
+
+## 7. Speed
 
 Targets (web.dev, 75th percentile of real visits): LCP ≤ 2.5 s, INP ≤ 200 ms, CLS ≤ 0.1.
 A Deloitte study for Google found a 0.1 s faster mobile site lifted retail conversions by
@@ -98,8 +129,13 @@ A Deloitte study for Google found a 0.1 s faster mobile site lifted retail conve
 
 Depth: `get_skill core-web-vitals` and `get_skill performance`.
 
-## 7. Tracking (before any ad points here)
+## 8. Tracking (before any ad points here)
 
+- **Consent first, and ask before adding anything.** Tell the owner which tags the page
+  will load and get approval. In the EU and UK (and wherever the market's reference says),
+  pixels and analytics may fire only after the visitor agrees in a consent banner; Google
+  tags need Consent Mode there; in US states with privacy laws, honour "Do not sell or
+  share" choices. Set this up before ads run (details in selling-by-country).
 - Meta: the pixel plus the Conversions API, with the same `event_id` on the browser and
   server copy of each event so Meta removes duplicates (it matches within 48 hours).
   Purchase needs `value` and `currency`; catalogue ads need `content_ids`.
@@ -117,7 +153,7 @@ Depth: `get_skill core-web-vitals` and `get_skill performance`.
 - Fire Lead or Purchase on **success** only (thank-you page or confirmed submit), never on
   the button click or page load. Test with the platform's test-events tool before launch.
 
-## 8. Building it, by platform
+## 9. Building it, by platform
 
 **Shopify.** Two routes:
 
@@ -144,10 +180,11 @@ write the content and the steps, and the owner or developer builds it. See
 WebP or AVIF with fallbacks, the form posting to a service the owner controls. Hosting and
 publishing are the owner's; AdsPilot does not host pages.
 
-## 9. Check three times, then test
+## 10. Check three times, then test
 
 1. **Plan check:** page type matches the campaign objective and event; every claim, price
-   and term comes from the owner; the first screen matches each ad.
+   and term comes from the owner; the first screen matches each ad; the market's rules
+   (prices, discounts, legal notice, consent) are met.
 2. **Preview check:** on a phone and a computer: first screen, form or cart, success page,
    the event in the test-events tool, page speed.
 3. **Live check:** after publishing (approved), open the live URL from the ad's preview
@@ -166,6 +203,9 @@ then run before/after periods with the same ad spend and report it as such.
 - Publish a page, template or discount without the owner's approval of the exact content.
 - Promise delivery times, guarantees or prices the owner has not confirmed.
 - Fire a conversion event on a page view or a click.
+- Add a pixel, tag or tracking script without the consent set-up the market requires and
+  the owner's approval.
+- Assume the business sells in Pakistan, or anywhere else: ask which countries.
 - Copy a competitor's page text or images.
 
 ## Sources (checked 2026-10-08)

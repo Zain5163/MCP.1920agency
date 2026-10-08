@@ -106,9 +106,10 @@ Structure and copy: `get_skill landing-page-builder`.
 
 **Product page.** Layout and blocks are in `templates/product.json` (and the main product
 section, often `sections/main-product.liquid` or a `product-information` section in Horizon).
-Typical additions near the buy button: delivery promise, cash-on-delivery and returns line,
-size-guide link, WhatsApp contact. Build them as a block or snippet with settings, so the
-owner can edit the words.
+Typical additions near the buy button: delivery promise, a payment and returns line (cash
+on delivery, buy now pay later or local methods, as the market expects), size-guide link,
+and the contact route the market uses (WhatsApp where buyers expect it). Build them as a
+block or snippet with settings, so the owner can edit the words per market.
 
 **Trust or delivery block reused on many pages.** A theme block (`blocks/`) in Horizon-style
 themes, or a snippet plus a small section in older OS 2.0 themes such as Dawn.
@@ -116,6 +117,29 @@ themes, or a snippet plus a small section in older OS 2.0 themes such as Dawn.
 **Colours and fonts.** `config/settings_data.json` holds the current values; change them
 there (or tell the owner which setting to change in the theme editor). Check contrast
 after any colour change (section 6).
+
+**Selling in more than one country.** Markets, currencies, languages, domains or
+subfolders, tax-inclusive pricing, duties and the cookie banner are set by the owner in
+the Shopify admin (Settings > Markets, Taxes and duties, Customer privacy), not in the
+theme. In the theme:
+
+- Every word customers read lives in `locales/` and is printed with the `t` filter, so a
+  translation (Shopify's Translate & Adapt app, or the owner's) covers it. No hard-coded
+  English (or Urdu) in Liquid.
+- Print prices with Shopify's money filters (`money`, `money_with_currency`), never by
+  hand, so currency, symbol and decimal format follow the market.
+- Payment badges from the methods actually enabled (`shop.enabled_payment_types` with
+  `payment_type_svg_tag`), not a fixed image of cards the store may not take.
+- Any script that tracks visitors must respect the visitor's consent choice through
+  Shopify's Customer Privacy API; never paste a pixel into `theme.liquid` where it fires
+  before consent. Prefer the official apps (Facebook & Instagram, Google & YouTube).
+- Legal notice, withdrawal and guarantee text the market requires (selling-by-country)
+  goes in pages and policies (`shopify_save_page`, `shopify_save_policy`), linked from
+  the footer, not in theme code.
+- For Arabic, the theme must support right-to-left layout; check the header, product
+  page, cart and footer in the preview with the Arabic language selected.
+
+Which market needs what: `get_skill selling-by-country`.
 
 **Switching or redesigning a theme.** The owner adds the new theme (for example Horizon)
 from the Theme Store to the theme library; then `shopify_theme_start_draft` with `from`.
@@ -181,7 +205,8 @@ Depth: `get_skill accessibility`.
 
 - Edit or publish the live theme directly, or publish without the owner seeing the preview.
 - Remove an app's code without the owner confirming the app is gone or unused.
-- Paste in third-party scripts, tracking codes or "speed" hacks the owner did not ask for.
+- Paste in third-party scripts, tracking codes or "speed" hacks the owner did not ask for,
+  or any tracking that ignores the visitor's consent choice.
 - Invent setting ids, file names or Liquid objects: read the file, or look them up on shopify.dev.
 - Copy code from Shopify's Dawn or Horizon themes into another platform: their licence
   allows use only for building Shopify themes.
@@ -194,6 +219,8 @@ Depth: `get_skill accessibility`.
 - Shopify, theme blocks: https://shopify.dev/docs/storefronts/themes/architecture/blocks/theme-blocks
 - Shopify, Theme Store requirements (Lighthouse 60 / 90, accessibility rules): https://shopify.dev/docs/storefronts/themes/store/requirements
 - Shopify, theme accessibility best practices: https://shopify.dev/docs/storefronts/themes/best-practices/accessibility
+- Shopify, Customer Privacy API: https://shopify.dev/docs/api/customer-privacy
+- Shopify, Liquid `shop.enabled_payment_types` and `payment_type_svg_tag`: https://shopify.dev/docs/api/liquid/objects/shop
 - web.dev, Core Web Vitals thresholds: https://web.dev/articles/vitals
 - W3C, WCAG 2.2: https://www.w3.org/TR/WCAG22/
 - Liquid conventions also informed by Shopify's AI Toolkit (MIT), github.com/Shopify/shopify-ai-toolkit at 26d0623.

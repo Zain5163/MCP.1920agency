@@ -13,7 +13,10 @@ skill prevents both. It applies to every platform and every user.
 
 Answer these, from the user or from their site. Ask when they are missing; never invent:
 
-1. **What do they sell, to whom, where?** Product, price range, countries/cities.
+1. **What do they sell, to whom, where?** Product, price range, countries/cities. Never
+   assume a country. For each country, the landing page, prices, consent before tracking
+   and some ad rules differ: read `get_skill selling-by-country` before building the page
+   or the tracking.
 2. **What result do they want to pay for?** In their words. Then restate it as one
    measurable event: "a website purchase", "a filled lead form", "a WhatsApp chat
    started", "a phone call", "a landing page view".
@@ -77,7 +80,12 @@ result being paid for, and optimise for its event, never a proxy.
 - The user's words decide the objective. If they say "sales", it is a Sales
   objective optimising for purchases, whatever is easier to set up.
 - Everything in the ad must be true today: live prices, stock, delivery and
-  return terms, offers the business really gives. Check the live site.
+  return terms, offers the business really gives. Check the live site. Prices and
+  discounts in the ad follow the target market's rules (tax-inclusive prices where the
+  market requires them; "was" prices that are real; no false urgency).
+- Ads about credit, employment, housing, or social issues, elections and politics fall
+  under the platform's special or restricted categories in many countries; read the
+  platform's playbook before building.
 - Supply the creative shapes each placement needs. Keep claims the business can stand behind.
 
 ## Step 4: Three assessments before anything goes live (and before saying "done")
@@ -90,7 +98,8 @@ launched or working without having read it back.
 beside the plan and tick each row: objective, optimisation goal, conversion event,
 conversion location/destination, pixel or tag, budget and schedule, countries/cities,
 ages, audience, placements, every ad's text, headline, image or video, landing URL,
-call to action, prices and claims checked on the live site. Then run the platform's
+call to action, prices and claims checked on the live site, and the market's consent
+set-up for the pixel or tag (selling-by-country). Then run the platform's
 review (AdsPilot: `review_ad_plan`) and resolve every error.
 
 **Assessment 2: the built campaign, read back.** Creation succeeding is not proof.

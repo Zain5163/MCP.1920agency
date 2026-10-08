@@ -15,7 +15,11 @@ is a planning failure, not bad luck. The full dated calendar, with sources, is
 1. **Know where the business sells and what.** Countries and cities, product category,
    and whether it ships (shipping cut-offs move every deadline earlier).
 2. **Look 6–8 weeks ahead** in the calendar for those countries and that category.
-   Do this in every weekly review, not only when asked.
+   Do this in every weekly review, not only when asked. Canada, Australia and New Zealand
+   have no dated section yet: use the shared dates (Black Friday, Christmas, Boxing Day,
+   Mother's and Father's Day rules in section 2) and confirm local ones (for example
+   Australia's end-of-financial-year sales in June) with the owner or an official
+   holiday page before planning.
 3. **For each relevant event, decide:** run it, adapt it, or skip it. Not every event
    fits every business; a footwear store gains from wedding season and White Friday,
    not from Earth Day.
@@ -23,7 +27,10 @@ is a planning failure, not bad luck. The full dated calendar, with sources, is
    learning phase, so event creative goes live 1–3 weeks before the peak (the calendar
    gives a launch-by date for each). Prepare creative a week before that.
 5. **Get the offer from the business.** Never invent a discount, bundle or free gift.
-   Propose options; the owner decides.
+   Propose options; the owner decides. How a sale may be shown differs by country (in the
+   EU a "was" price must be the lowest of the previous 30 days; countdowns must be true
+   everywhere): check `get_skill selling-by-country` for the market before building
+   banners and landing pages.
 6. **Plan the budget curve**: ad prices (CPM) rise around big sale periods (late
    October to mid-December is the costliest stretch); start earlier at a steady budget
    rather than late at a high one, and expect cheaper delivery after the peak.

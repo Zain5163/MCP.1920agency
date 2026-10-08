@@ -23,7 +23,7 @@ describe('the skills library', () => {
   const library = loadLibrary()
 
   test('loads every skill in the pinned copies', () => {
-    assert.equal(library.size, 67)
+    assert.equal(library.size, 68)
     for (const name of ['seo-audit', 'ai-seo', 'copywriting', 'ads', 'social', 'cro']) {
       assert.ok(library.has(name), `${name} is missing`)
     }
@@ -37,7 +37,7 @@ describe('the skills library', () => {
     const server = new McpServer({ name: 't', version: '1' })
     registerSkillsLibrary(server)
     const text = await callTool(server, 'list_skills', {})
-    assert.match(text, /^67 skills/)
+    assert.match(text, /^68 skills/)
     assert.match(text, /seo-audit/)
   })
 
@@ -261,7 +261,7 @@ describe('the instructions every client receives on connecting', () => {
   test('every skill they name is served', async () => {
     const { SERVER_INSTRUCTIONS } = await import('../src/playbooks.ts')
     const library = loadLibrary()
-    for (const name of ['store-builder', 'landing-page-builder', 'shopify-theme-developer', 'web-ui-design', 'wordpress-site-builder', 'campaign-setup']) {
+    for (const name of ['store-builder', 'landing-page-builder', 'shopify-theme-developer', 'web-ui-design', 'wordpress-site-builder', 'campaign-setup', 'selling-by-country']) {
       assert.ok(SERVER_INSTRUCTIONS.includes(name), `instructions miss ${name}`)
       assert.ok(library.has(name), `instructions name ${name}, which is not served`)
     }

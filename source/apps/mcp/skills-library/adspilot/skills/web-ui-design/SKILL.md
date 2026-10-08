@@ -18,7 +18,7 @@ sites the owner likes (and why). The brand's own assets always win over a new id
 there is no brand yet, propose a small system (section 2) and get it approved before
 designing pages.
 
-Decide the page's single job first ("buy this product", "send a WhatsApp message"). Every
+Decide the page's single job first ("buy this product", "send an enquiry"). Every
 design choice should make that job easier to see and do.
 
 ## 2. A small design system (write it down before designing pages)
@@ -69,6 +69,22 @@ theme draft) or the WordPress `theme.json`, so pages stay consistent.
 - Images: real product photos, consistent backgrounds and crop ratios, the product filling
   the frame. A photo showing scale (on a person, in a hand) helps buyers judge size.
 
+**Design for the market's language and formats** (which markets: `get_skill selling-by-country`):
+
+- Leave room for longer words: German and French labels often run much longer than
+  English ones; buttons and menus must wrap or grow, not cut off.
+- Arabic (the Gulf) reads right to left: set `dir="rtl"` and `lang="ar"`, use CSS logical
+  properties (`margin-inline-start`, not `margin-left`), mirror arrows and progress steps,
+  and pick a font with proper Arabic glyphs. Urdu is also right to left.
+- Currency, decimals and dates follow the market (12,99 € in Germany and France, €12.99 in
+  Ireland, £12.99, $12.99, ₹1,299 or ₹1,29,999 with Indian grouping). Let the platform
+  format money; never hand-build price strings.
+- Payment and trust badges are the ones that market's buyers recognise, and only for
+  methods the store really offers.
+- A cookie or consent banner, where required, is part of the design: it must not cover
+  the buy button or the focused field, and "reject" must be as easy to find as "accept"
+  where the market requires that (EU and UK regulators' guidance).
+
 ## 4. Accessibility: the numbers (WCAG 2.2 AA)
 
 WCAG 2.2 became a W3C Recommendation on 5 October 2023. The criteria that matter most on
@@ -88,9 +104,22 @@ stores and landing pages:
 | Not colour alone | errors, sale prices and stock states also use text or an icon | 1.4.1 |
 
 Also: never disable pinch-zoom; form inputs at 16 px or more (smaller text makes iPhones
-zoom in on focus); respect "reduce motion" settings. In the EU, the European Accessibility
-Act applies to e-commerce from 28 June 2025 (micro-enterprises providing services are
-exempt); for EU buyers, treat these rules as legal requirements.
+zoom in on focus); respect "reduce motion" settings.
+
+**Accessibility is law in several markets** (details and sources in each market's
+reference in `get_skill selling-by-country`; confirm with a local adviser for anything
+binding):
+
+- **EU:** the European Accessibility Act applies to e-commerce from 28 June 2025
+  (micro-enterprises providing services are exempt); treat these rules as legal
+  requirements for EU buyers.
+- **US:** the ADA has no web regulation for private businesses, but many lawsuits are
+  filed each year over inaccessible store websites; WCAG 2.x AA is the usual yardstick.
+- **UK, Canada, Australia, New Zealand:** equality and disability-discrimination laws
+  apply to services offered online; Ontario also sets a WCAG standard for larger
+  organisations.
+
+Meeting WCAG 2.2 AA is the safe target everywhere.
 
 ## 5. Patterns that make a page look machine-generated
 
@@ -119,6 +148,8 @@ The full list with reasoning is in `get_skill frontend-design` ("Process" sectio
 - [ ] Works with keyboard only; focus visible; nothing hidden under sticky bars.
 - [ ] No horizontal scroll at 360 px; images sized for mobile; nothing jumps while loading.
 - [ ] Every price, claim, badge and review is real and confirmed by the owner.
+- [ ] Prices, dates and numbers in the market's format; layout works in the market's
+      language (longer words, right-to-left for Arabic and Urdu).
 - [ ] Looks like this brand, not like a template.
 
 ## Sources (checked 2026-10-08)
