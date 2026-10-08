@@ -54,9 +54,9 @@ practice, and ask a local lawyer for binding questions:
 
 ## Privacy, cookies and tracking
 
-No comprehensive personal data protection law was confirmed as in force for this
-reference; a Personal Data Protection Bill has been under discussion for years. Good
-practice until that changes:
+No comprehensive personal data protection law is in force: the Personal Data Protection
+Bill 2023 was approved by the federal cabinet but was still pending in Parliament in 2026
+(reported by law firms; re-check before relying on it). Good practice until that changes:
 
 - A privacy policy that says which data is collected at checkout (name, phone, address),
   why, and that Meta, Google or TikTok tracking is used for ads.
@@ -107,4 +107,5 @@ tap targets, readable text and a fast first screen matter for sales.
 
 - Shopify Payments supported countries: https://help.shopify.com/en/manual/payments/shopify-payments/supported-countries
 - State Bank of Pakistan and other COD sources: see `cash-on-delivery.md`, section Sources
-- Punjab Consumer Protection Act 2005 (Punjab Code): http://punjabcode.punjab.gov.pk/
+- Punjab Consumer Protection Act 2005 (Punjab Code; not read for this reference): http://punjabcode.punjab.gov.pk/
+- Pakistan data protection status (DLA Piper, Data Protection Laws of the World): https://www.dlapiperdataprotection.com/?t=law&c=PK

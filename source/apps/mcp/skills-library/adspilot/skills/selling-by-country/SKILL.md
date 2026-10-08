@@ -42,7 +42,9 @@ registration>, priced in <currency>, paid by <methods>, on <platform>."**
 
 When a business directs its selling at consumers in a country (local language, currency,
 domain, shipping there, ads targeted there), that country's mandatory consumer rules
-usually apply even if the business is elsewhere (in the EU: Rome I Regulation, Art. 6).
+usually apply even if the business is elsewhere (in the EU: Rome I Regulation, Art. 6,
+https://eur-lex.europa.eu/eli/reg/2008/593/oj/eng — a contract's choice of another law
+cannot take away the consumer's mandatory protections).
 So the reference to read is the **buyer's** market, and for several markets, each one.
 
 ## 2. Read the reference for each market
@@ -108,9 +110,10 @@ Then apply the market's rule:
 |---|---|
 | EU, UK | Consent **before** non-essential cookies, pixels and analytics fire; rejecting as easy as accepting; Google tags with Consent Mode; Meta pixel held until consent |
 | US | Privacy notice; in states with privacy laws (California and others), a "Do Not Sell or Share My Personal Information" route that also honours the browser's Global Privacy Control signal, because ad pixels count as "sharing" |
-| Canada | Meaningful consent under federal law; in Quebec, tracking technologies off by default unless the visitor turns them on |
-| Australia, New Zealand | Privacy notice that names the tracking and its purpose; no general cookie-banner law, but regulators expect openness about pixels |
-| Gulf, India, Pakistan | Privacy notice; the market reference gives the status of each data-protection law |
+| Canada | Meaningful consent under federal law; in Quebec, tracking technologies off by default until the visitor turns them on |
+| Australia | Privacy policy describing the pixels and their purpose, minimal data, a simple opt-out from targeted marketing (OAIC guidance); most businesses under AUD 3 M turnover are exempt from the Privacy Act, but follow it anyway |
+| New Zealand | Privacy Act principles cover data from forms and pixels; say what is tracked and why |
+| Gulf, India, Pakistan | Privacy notice; consent for marketing; the market reference gives each data-protection law's status (India's main DPDP duties from May 2027; UAE regulations not yet issued; Pakistan has no law in force) |
 
 The Conversions API (server-side events) is still tracking: send events only for
 visitors whose consent allows it where consent is required. Details and sources are in
@@ -120,7 +123,9 @@ each market's reference.
 
 - **Shopify:** the owner sets up Markets (countries, currencies, languages, domains or
   subfolders), tax-inclusive pricing per market, duties, payment methods and the cookie
-  banner in the admin. Shopify adds `hreflang` links between market versions itself.
+  banner in the admin. Shopify adds `hreflang` links (and `x-default`) between market versions itself, and
+recommends subfolders for most stores (help.shopify.com, Markets SEO). Shopify's
+policy templates are English-only and not country-aware.
   Translation: Shopify's Translate & Adapt app or another the owner chooses. Theme side:
   `shopify-theme-developer`, "Selling in more than one country".
 - **WooCommerce:** multi-currency and translation plugins, tax per country, and an EU
@@ -139,16 +144,27 @@ each market's reference.
 Do not repeat the playbooks; read them: `get_playbook meta-ads` (and google-ads,
 tiktok-ads and others) and `get_skill campaign-setup`. Points that vary by country:
 
-- **Special and restricted categories.** Ads about credit and financial products,
-  employment, housing, and social issues, elections or politics have targeting limits and
-  extra checks on Meta and Google; health, alcohol, gambling and weight-loss are
-  restricted and vary by country.
+- **Special ad categories on Meta** (housing, employment, financial products and
+  services, and social issues, elections or politics) are mandatory for audiences in the
+  US, Canada and certain European countries, and limit targeting; elsewhere advertisers
+  outside the US may opt in or out. Health, alcohol, gambling and weight-loss are
+  restricted goods, with rules that vary by country.
 - **Political and social-issue ads in the EU:** Meta and Google stopped serving them in
   the EU from October 2025 (see `european-union.md`).
-- **Destination rules:** platforms reject landing pages that do not work, cannot be
-  crawled, hide the business's identity or misrepresent the offer; shopping ads need
-  visible return, shipping and contact information.
+- **Destination rules:** Google rejects landing pages that do not work for its crawler,
+  cannot be crawled, are not reachable in the targeted country, or whose domain does not
+  match the ad; offers in the ad must be on the page with the full cost disclosed
+  (Misrepresentation). Shopping ads need visible contact information, a return policy
+  findable without logging in, and a secure checkout (Merchant Center).
 - **Local language:** ad and landing page in the same language.
+
+## 7. How sure each rule is
+
+Each reference marks its points: **V** (read on the official page on the date shown),
+**R** (reported by a law firm, news or a search summary, often because the official site
+blocked automated reading), **Est.** (vendor or industry data) and **U** (market
+knowledge). Say which when you tell the owner. A reference older than about six months:
+re-check the points you rely on, especially anything marked pending or with a future date.
 
 ## Never
 

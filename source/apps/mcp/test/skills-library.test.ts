@@ -216,6 +216,50 @@ describe('the skills library', () => {
     }
   })
 
+  /**
+   * The owner (2026-10-08): the website skills must work in every market, not
+   * only Pakistan. Each one must send the AI to the country rules, and every
+   * market reference the country skill names must really be served.
+   */
+  test('the website and store skills send the AI to the buyer’s country rules', async () => {
+    const { readFileSync } = await import('node:fs')
+    const { join } = await import('node:path')
+    for (const name of [
+      'store-builder',
+      'landing-page-builder',
+      'shopify-theme-developer',
+      'web-ui-design',
+      'wordpress-site-builder',
+      'store-platform-choice',
+      'campaign-setup',
+    ]) {
+      const skill = library.get(name)!
+      const text = readFileSync(join(skill.dir, 'SKILL.md'), 'utf8')
+      assert.match(text, /selling-by-country/, `${name} does not point to selling-by-country`)
+    }
+    const markets = library.get('selling-by-country')!
+    const named = readFileSync(join(markets.dir, 'SKILL.md'), 'utf8').matchAll(/^\|[^\n]*?`(references\/[a-z-]+\.md)`/gm)
+    const listed = [...named].map((m) => m[1]!)
+    assert.ok(listed.length >= 9, 'the market table lists too few references')
+    for (const ref of listed) assert.ok(markets.references.includes(ref), `${ref} is named but not served`)
+    for (const market of ['united-states', 'canada', 'united-kingdom', 'european-union', 'australia', 'new-zealand', 'gulf', 'india', 'pakistan']) {
+      assert.ok(markets.references.includes(`references/${market}.md`), `${market} reference missing`)
+    }
+  })
+
+  test('every market reference is dated, sourced and says it is not legal advice', async () => {
+    const { readFileSync } = await import('node:fs')
+    const { join } = await import('node:path')
+    const markets = library.get('selling-by-country')!
+    for (const ref of markets.references) {
+      const text = readFileSync(join(markets.dir, ...ref.split('/')), 'utf8')
+      assert.match(text, /\*\*Updated \d{4}-\d{2}-\d{2}\.\*\*/, `${ref} has no date`)
+      assert.match(text, /not legal advice/, `${ref} does not say it is not legal advice`)
+      assert.match(text, /## Sources/, `${ref} has no sources`)
+      assert.match(text, /https:\/\//, `${ref} cites no link`)
+    }
+  })
+
   /** AdsPilot has no WordPress tools; the skill must say so before anything else. */
   test('the WordPress skill says AdsPilot cannot change a WordPress site', async () => {
     const server = new McpServer({ name: 't', version: '1' })
