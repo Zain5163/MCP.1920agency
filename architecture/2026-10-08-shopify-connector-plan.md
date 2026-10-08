@@ -86,4 +86,14 @@ never publish without explicit approval.
   `~/.social-publisher/shopify-backups/<shop>/` → change → read-back. The live test caught a
   bug (an implicit "start now" broke the approval token) that was fixed and re-verified.
   Next, phase 2b: theme changes on a duplicate theme with a preview link and approved publish.
+- **2026-10-08, phase 2b (themes) built and verified live.** Theme writes through the app
+  were refused ("needs write_themes and an exemption from Shopify"), so themes go through the
+  Shopify CLI, which signs in as a person (owner login, collaborator, or a Theme Access
+  password per store). Tools: `shopify_theme_start_draft` (download live = backup, editable
+  copy), `shopify_theme_read`, `shopify_theme_edit` (exact find-and-replace or full content;
+  JSON must stay valid; paths confined to theme folders), `shopify_theme_preview` (hidden
+  theme + preview link), `shopify_theme_publish` (approval; refuses if the draft changed after
+  preview or the live theme changed since the draft), `shopify_theme_rollback` (approval),
+  `shopify_theme_discard`. Full flow run live on the dev store; store left as it was.
+- **For phase 4 (public app):** apply for Shopify's theme exemption, or keep the CLI route.
 

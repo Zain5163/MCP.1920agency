@@ -264,7 +264,14 @@ AdsPilot reads Shopify stores through the app **"1920 Agency Store Connector"**
 3. The app must be installed on the store. Development stores owned by the same Shopify
    organisation connect directly (client credentials). Client stores need the install link
    and OAuth, which needs a public https callback (not built yet).
-4. **`SHOPIFY_CONNECT_ADDRESS`** (optional): an IP to connect to instead of what DNS returns,
+4. **Theme changes** use the Shopify CLI (`npm install -g @shopify/cli`), because theme writes
+   through an app need a Shopify exemption. The CLI signs in as a person:
+   - development stores of the same organisation: the CLI's own login (`shopify theme list --store <shop>` once);
+   - a client store: the client either adds the agency as a **collaborator**, or installs Shopify's
+     free **Theme Access** app and creates a password for the agency; put that password in `.env` as
+     `SHOPIFY_THEME_PASSWORD_<STORE KEY>` (e.g. `SHOPIFY_THEME_PASSWORD_MUZAREE`).
+   Drafts and the live-theme backups are kept in `~/.social-publisher/shopify-themes/<shop>/`.
+5. **`SHOPIFY_CONNECT_ADDRESS`** (optional): an IP to connect to instead of what DNS returns,
    only when a network route to Shopify is broken. On 2026-10-08 the ISP route to
    `23.227.38.74` (where every `*.myshopify.com` name resolves) was dead and `23.227.38.69`
    worked, so it is set to `23.227.38.69` for now. Remove it once

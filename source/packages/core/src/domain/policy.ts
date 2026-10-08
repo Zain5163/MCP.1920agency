@@ -130,6 +130,20 @@ export const ACTION_POLICY: Readonly<Record<string, ActionPolicy>> = {
     reversible: false,
     spendsMoney: true,
   },
+  shopify_theme_publish: {
+    rationale:
+      'Replaces the live theme: every customer sees the new design at once. The previous ' +
+      'theme is kept and can be put back.',
+    risk: 'high',
+    reversible: true,
+    spendsMoney: false,
+  },
+  shopify_theme_rollback: {
+    rationale: 'Puts the previous live theme back. Every customer sees it at once.',
+    risk: 'high',
+    reversible: true,
+    spendsMoney: false,
+  },
   shopify_restore_backup: {
     rationale: 'Puts a saved earlier version of a product or page back. Public at once.',
     risk: 'high',
