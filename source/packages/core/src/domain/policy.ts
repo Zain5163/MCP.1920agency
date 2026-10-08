@@ -144,6 +144,34 @@ export const ACTION_POLICY: Readonly<Record<string, ActionPolicy>> = {
     reversible: true,
     spendsMoney: false,
   },
+  shopify_create_product: {
+    rationale:
+      'Adds a product with its prices and photos. If made visible, customers can buy it at ' +
+      'once at the stated price. It can be hidden or archived afterwards.',
+    risk: 'high',
+    reversible: true,
+    spendsMoney: false,
+  },
+  shopify_save_collection: {
+    rationale: 'Creates or changes a collection and which products it shows. Public once on the Online Store.',
+    risk: 'high',
+    reversible: true,
+    spendsMoney: false,
+  },
+  shopify_save_menu: {
+    rationale: 'Replaces a navigation menu customers use on every page. The previous menu is saved first.',
+    risk: 'high',
+    reversible: true,
+    spendsMoney: false,
+  },
+  shopify_save_policy: {
+    rationale:
+      'Publishes a refund, shipping, privacy or terms policy: a promise to customers, shown at ' +
+      'checkout. The previous text is saved first, but orders placed under it keep its terms.',
+    risk: 'high',
+    reversible: false,
+    spendsMoney: false,
+  },
   shopify_restore_backup: {
     rationale: 'Puts a saved earlier version of a product or page back. Public at once.',
     risk: 'high',

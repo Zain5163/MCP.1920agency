@@ -70,6 +70,22 @@ describe('theme drafts', () => {
   })
 })
 
+describe('a draft built from another theme (a redesign)', () => {
+  test('changes are counted against that theme, not against the live one', () => {
+    const root = draftOnDisk()
+    // base/ is the theme the draft was built from; the draft starts as its copy.
+    mkdirSync(join(root, 'base', 'sections'), { recursive: true })
+    writeFileSync(join(root, 'base', 'sections', 'hero.json'), '{"a":1}')
+    writeFileSync(join(root, 'draft', 'sections', 'hero.json'), '{"a":1}')
+    writeFileSync(join(root, 'base', 'sections', 'header-group.json'), readFileSync(join(root, 'draft', 'sections', 'header-group.json')))
+    mkdirSync(join(root, 'base', 'layout'), { recursive: true })
+    writeFileSync(join(root, 'base', 'layout', 'theme.liquid'), readFileSync(join(root, 'draft', 'layout', 'theme.liquid')))
+    assert.deepEqual(draftChanges(root), { changed: [], added: [], removed: [] })
+    assert.ok('ok' in editDraftFile(root, 'sections/hero.json', { find: '1', replace: '2' }))
+    assert.deepEqual(draftChanges(root), { changed: ['sections/hero.json'], added: [], removed: [] })
+  })
+})
+
 describe('theme changes need the owner’s approval', () => {
   test('publish and rollback have their own high-risk policies', async () => {
     const { policyFor } = await import('@social-publisher/core')

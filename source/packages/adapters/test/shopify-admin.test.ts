@@ -219,3 +219,50 @@ describe('the store audit', () => {
     assert.ok(!a.findings.some((f) => /Gift Card/.test(f.finding)))
   })
 })
+
+describe('building a store', () => {
+  const created = { product: { id: 'gid://shopify/Product/9', handle: 'h', title: 'T', status: 'DRAFT', variantsCount: { count: 1 }, mediaCount: { count: 0 } }, userErrors: [] }
+
+  test('a product without options is sent as Shopify’s single "Default Title" variant, stock not tracked', async () => {
+    const f = fake([token, data({ productSet: created })])
+    await client(f.transport).createProduct({ title: 'T', descriptionHtml: '<p>x</p>', options: [], variants: [{ options: {}, price: 10, cost: 4 }], images: [], status: 'DRAFT' })
+    const input = (JSON.parse(f.calls[1]!.body) as { variables: { input: Record<string, unknown> } }).variables.input
+    assert.deepEqual(input.productOptions, [{ name: 'Title', position: 1, values: [{ name: 'Default Title' }] }])
+    assert.deepEqual(input.variants, [{ optionValues: [{ optionName: 'Title', name: 'Default Title' }], price: '10', inventoryPolicy: 'DENY', inventoryItem: { tracked: false, cost: 4 } }])
+    assert.equal(input.status, 'DRAFT')
+    assert.equal('files' in input, false)
+  })
+
+  test('sizes, a "was" price and photos go in one call', async () => {
+    const f = fake([token, data({ productSet: created })])
+    await client(f.transport).createProduct({
+      title: 'Boot', descriptionHtml: 'd', status: 'ACTIVE',
+      options: [{ name: 'Size', values: ['40', '41'] }],
+      variants: [{ options: { Size: '40' }, price: 5500, compareAtPrice: 6500 }, { options: { Size: '41' }, price: 5500 }],
+      images: [{ url: 'https://cdn.example.com/a.jpg' }],
+      collectionIds: ['gid://shopify/Collection/1'],
+    })
+    const input = (JSON.parse(f.calls[1]!.body) as { variables: { input: Record<string, any> } }).variables.input
+    assert.deepEqual(input.variants[0].optionValues, [{ optionName: 'Size', name: '40' }])
+    assert.equal(input.variants[0].compareAtPrice, '6500')
+    assert.deepEqual(input.files, [{ originalSource: 'https://cdn.example.com/a.jpg', alt: 'Boot', contentType: 'IMAGE' }])
+    assert.deepEqual(input.collections, ['gid://shopify/Collection/1'])
+  })
+
+  test('Shopify’s refusal is reported with the field, and nothing is assumed created', async () => {
+    const f = fake([token, data({ productSet: { product: null, userErrors: [{ field: ['input', 'handle'], message: 'has already been taken' }] } })])
+    await assert.rejects(
+      client(f.transport).createProduct({ title: 'T', descriptionHtml: 'd', options: [], variants: [{ options: {}, price: 1 }], images: [], status: 'DRAFT' }),
+      /input\.handle: has already been taken/,
+    )
+  })
+
+  test('publishing finds the Online Store channel; a store without one says so', async () => {
+    const pubs = data({ publications: { nodes: [{ id: 'gid://shopify/Publication/1', name: 'Point of Sale', catalog: null }, { id: 'gid://shopify/Publication/2', name: 'Online Store', catalog: null }] } })
+    const f = fake([token, pubs, data({ publishablePublish: { userErrors: [] } })])
+    await client(f.transport).publishToOnlineStore('gid://shopify/Product/9')
+    assert.deepEqual((JSON.parse(f.calls[2]!.body) as { variables: unknown }).variables, { id: 'gid://shopify/Product/9', input: [{ publicationId: 'gid://shopify/Publication/2' }] })
+    const g = fake([token, data({ publications: { nodes: [] } })])
+    await assert.rejects(client(g.transport).publishToOnlineStore('x'), /no Online Store/)
+  })
+})

@@ -146,3 +146,30 @@ privacy webhooks and `app/uninstalled` are built; a privacy policy page exists; 
 answered in writing whether AdsPilot (sold mainly outside Shopify) must bill Shopify merchants
 through Shopify Billing. Listing choice when applying: unlisted public app first (install by
 link, no App Store page), App Store listing later.
+
+## Owner decisions, 2026-10-08 (later)
+
+- **Billing: through Shopify** (Shopify Billing API, recurring app charge), not AdsPilot's own
+  billing, "for the time being". Build it when the public app is prepared; price per plan still
+  to set. Shopify's revenue share applies.
+- **Public app:** yes, once it works end to end (deploy → test on the dev store → privacy
+  webhooks → privacy page → submit). Muzaree: nothing is touched until the client gives access.
+- **First, prove the AI can build a store**, on the practice store.
+
+## Phase 2c: building a store (built 2026-10-08, live test pending)
+
+New tools (`source/apps/mcp/src/shopify-build-tools.ts`), each summary → approval → backup →
+change → read-back, local and hosted: `shopify_create_product` (options, a variant per size,
+"was" price, photos from https URLs, collections; draft by default; stock untracked),
+`shopify_save_collection` (hand-picked, exact product list, publish), `shopify_save_menu`
+(short links: collection:/page:/product:/policy:/home/catalog/search/URL),
+`shopify_save_policy` (refund, shipping, privacy, terms, contact). `shopify_update_product` now
+also sets status (hide a sold-out product). `shopify_theme_start_draft` takes `from` (start from
+another theme, e.g. Horizon: a redesign). `shopify_restore_backup` restores collections, menus
+and policies too.
+
+New scopes (app config v6, NOT yet released to Shopify): `read_publications`,
+`write_publications` (new products and collections onto the Online Store), `write_legal_policies`.
+After the release the dev store must approve the update. Checked against the live 2026-10 schema
+by introspection (collections now use `collection:` inputs and `collectionByIdentifier`;
+`collectionAddProducts` no longer exists, so membership uses productUpdate collectionsToJoin/Leave).

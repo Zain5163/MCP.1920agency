@@ -35,11 +35,11 @@ show it to the owner before changing anything.
 
 | Area | What good looks like | AdsPilot tool |
 |---|---|---|
-| **Delivery and returns clarity** | One delivery promise everywhere (time, cost, free-delivery threshold); returns or exchange terms in plain words; cash on delivery stated where it applies. Contradicting terms (two different free-delivery limits) cost trust | `shopify_save_page` (policies/FAQ page), theme draft (announcement bar, product page text) |
+| **Delivery and returns clarity** | One delivery promise everywhere (time, cost, free-delivery threshold); returns or exchange terms in plain words; cash on delivery stated where it applies. Contradicting terms (two different free-delivery limits) cost trust | `shopify_save_policy` (refund, shipping), `shopify_save_page` (FAQ), theme draft (announcement bar, product page text) |
 | **Out-of-date banners** | Banners match today's offer; an expired sale banner says "this store is not looked after" | theme draft: usually `sections/header-group.json` or `sections/announcement-bar.liquid` |
 | **Product page photos** | Several photos per product: angles, detail, on-body/on-foot, scale. Clothing and footwear buyers judge fit and finish from photos | the store owner uploads; the audit lists products with fewer than 3 |
 | **Size help** | A size guide next to the size selector, in every system the buyers use (for footwear: cm, EU, UK, US, local), and how the item fits | `shopify_save_page` (size guide) + theme draft (link near the selector in `templates/product.json` / the product section) |
-| **Sold-out sizes** | Hidden or clearly marked; never advertised | the audit lists them; fix in Shopify or stop the ads that show them |
+| **Sold-out sizes** | Hidden or clearly marked; never advertised | the audit lists them; hide a sold-out product with `shopify_update_product` (status DRAFT), and stop the ads that show it |
 | **Product descriptions** | What it is made of, how it fits, how to wear it, what makes it worth the price, care; in the buyer's words | `shopify_update_product` (with `copywriting`) |
 | **Offer and basket size** | A reason to buy more than one (two-item price, free delivery above a threshold that sits above one item's price) | `shopify_create_discount` (minimum quantity or subtotal, always with an end date) |
 | **Trust signals** | Real reviews and customer photos (only real ones), payment and delivery icons, contact details, a reachable WhatsApp or phone | theme draft (a snippet near the add-to-cart button) |
@@ -52,7 +52,7 @@ in the store owner's Shopify admin, not in AdsPilot's tools: say so and give the
 
 ## 3. Making changes safely (every change, every store)
 
-- **Content** (products, pages, discounts): the tool shows a before/after summary; nothing
+- **Content** (products, pages, collections, menus, policies, discounts): the tool shows a before/after summary; nothing
   happens without the owner's approval; the current version is backed up; the result is read
   back. Pages are saved as hidden drafts unless publishing is approved.
 - **Theme**: never edit the live theme.
@@ -93,12 +93,31 @@ Keep what helps; roll back what hurts. Add a field note to the meta-account-mana
 
 ## 6. Building a new store
 
-Same tools, in this order: theme (start from Shopify's free themes, e.g. Horizon or Dawn,
-unless the business has a good reason); navigation and collections; product pages with
-proper photos, descriptions and size help; delivery, returns, FAQ, contact and about pages;
-the owner sets payments (including cash on delivery where relevant), shipping rates, taxes
-and the domain in the admin; a test order on a development store; then ads. Launch with a
-clear first offer and an end date.
+Ask first for what only the owner knows: the products (names, prices, sizes, real
+photos), delivery times and costs, the return or exchange terms, payment methods, contact
+details. Never fill those in yourself. Then, in this order, each step approved by the owner:
+
+1. **Theme:** `shopify_theme_start_draft` with `from` set to one of Shopify's free themes
+   already on the store (e.g. "Horizon"; the owner adds it from the Theme Store if missing),
+   or without `from` to improve the current one. Edit colours, fonts, logo text, the home
+   page and the announcement bar in the draft; preview; publish only after the owner looks.
+2. **Products:** `shopify_create_product`, hidden as drafts first (`visible: false`): options
+   such as Size, one variant per size with its price, a "was" price only if it is real, photos
+   from public image URLs, a description written with `copywriting`. Make them visible with
+   `shopify_update_product` (status ACTIVE) once the owner has checked them.
+3. **Collections:** `shopify_save_collection`, hand-picked (e.g. "Boots", "Best sellers"),
+   `publish: true` when ready.
+4. **Pages:** `shopify_save_page`: FAQ, size guide, about, contact, delivery and returns.
+5. **Policies:** `shopify_save_policy`: refund and shipping at least, in the owner's real terms.
+6. **Menus:** `shopify_save_menu`: `main-menu` (home, the collections, FAQ, contact) and
+   `footer` (policies, size guide, contact). Links: `collection:<handle>`, `page:<handle>`,
+   `product:<handle>`, `policy:refund`, `home`, `catalog`, `search`, or an address.
+7. **Offer:** `shopify_create_discount` for a clear first offer, always with an end date.
+8. **The owner, in the admin:** payments (including cash on delivery where relevant),
+   shipping rates, taxes, stock quantities, the domain, and removing the store password.
+9. **Test order** on a development store, then the three checks below, then ads.
+
+Run `shopify_store_audit` at the end: it should come back with no high findings.
 
 ## Never
 

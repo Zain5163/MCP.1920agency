@@ -51,6 +51,9 @@ export interface DraftState {
   previewHash?: string
   publishedAt?: string
   previousLiveThemeId?: number
+  /** Set when the draft was built from another theme (a redesign), not from the live one. */
+  baseThemeId?: number
+  baseThemeName?: string
 }
 
 export type CliRunner = (args: string[], cwd: string) => Promise<{ code: number; stdout: string; stderr: string }>
@@ -123,15 +126,19 @@ function listFiles(dir: string): string[] {
 
 const fileHash = (path: string) => createHash('sha256').update(readFileSync(path)).digest('hex')
 
-/** Files added, removed or changed in the draft compared with the live download. */
+/**
+ * Files added, removed or changed in the draft compared with what it started
+ * from: the live download, or base/ when the draft was built from another theme.
+ */
 export function draftChanges(root: string): { changed: string[]; added: string[]; removed: string[] } {
-  const live = new Set(listFiles(join(root, 'live')))
+  const from = existsSync(join(root, 'base')) ? 'base' : 'live'
+  const live = new Set(listFiles(join(root, from)))
   const draft = new Set(listFiles(join(root, 'draft')))
   const changed: string[] = []
   const added: string[] = []
   for (const f of draft) {
     if (!live.has(f)) added.push(f)
-    else if (fileHash(join(root, 'live', f)) !== fileHash(join(root, 'draft', f))) changed.push(f)
+    else if (fileHash(join(root, from, f)) !== fileHash(join(root, 'draft', f))) changed.push(f)
   }
   const removed = [...live].filter((f) => !draft.has(f))
   return { changed, added, removed }
@@ -206,6 +213,23 @@ async function liveTheme(store: ShopifyStoreEntry, cli: CliRunner): Promise<{ id
   }
 }
 
+async function themes(store: ShopifyStoreEntry, cli: CliRunner): Promise<Array<{ id: number; name: string; role: string }> | { error: string }> {
+  const r = await cli(['theme', 'list', ...authArgs(store), '--json'], THEMES_DIR)
+  if (r.code !== 0) return { error: `Could not list themes on ${store.shop}: ${cliError(r)}` }
+  try {
+    return JSON.parse(r.stdout.slice(r.stdout.indexOf('['))) as Array<{ id: number; name: string; role: string }>
+  } catch {
+    return { error: `Unexpected output from the Shopify CLI: ${cliError(r)}` }
+  }
+}
+
+/** What a draft amounts to, in words: a theme switch, edits, or both. */
+function changeSummary(state: DraftState, c: { changed: string[]; added: string[]; removed: string[] }): string {
+  const files = [...c.changed, ...c.added.map((f) => `${f} (new)`), ...c.removed.map((f) => `${f} (removed)`)]
+  const edits = files.length === 0 ? 'no file edits' : `edited files: ${files.join(', ')}`
+  return state.baseThemeId !== undefined ? `switches the store to a copy of the theme "${state.baseThemeName}" (#${state.baseThemeId}), ${edits}` : edits
+}
+
 export function registerShopifyThemeTools(server: McpServer, cli: CliRunner = runShopifyCli): void {
   const withTheme = async (selector: string, fn: (store: ShopifyStoreEntry) => Promise<string>) =>
     await guarded(async () => {
@@ -217,24 +241,49 @@ export function registerShopifyThemeTools(server: McpServer, cli: CliRunner = ru
 
   server.tool(
     'shopify_theme_start_draft',
-    'Start a theme draft: download the live theme (kept untouched as the backup) and make an editable copy. Nothing on the store changes. Then use shopify_theme_read / shopify_theme_edit, shopify_theme_preview, and shopify_theme_publish.',
-    { store: storeArg },
-    async ({ store }) =>
+    'Start a theme draft: download the live theme (kept untouched as the backup) and make an editable copy. Nothing on the store changes. Give `from` (another theme on the store, e.g. "Horizon") to build the draft from that theme instead: a redesign or a theme switch. Then use shopify_theme_read / shopify_theme_edit, shopify_theme_preview, and shopify_theme_publish.',
+    { store: storeArg, from: z.string().optional().describe('Name or id of another theme on the store to start from. Default: the live theme.') },
+    async ({ store, from }) =>
       await withTheme(store, async (s) => {
         const live = await liveTheme(s, cli)
         if ('error' in live) return live.error
+        let base: { id: number; name: string } | undefined
+        if (from !== undefined) {
+          const all = await themes(s, cli)
+          if ('error' in all) return all.error
+          const wanted = from.trim().toLowerCase()
+          base = all.find((t) => String(t.id) === wanted || t.name.toLowerCase() === wanted)
+          if (base === undefined) return `No theme "${from}" on ${s.shop}. Themes: ${all.map((t) => `"${t.name}" (#${t.id}, ${t.role})`).join(', ')}.`
+          if (base.id === live.id) base = undefined
+        }
         const draft = `draft-${new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '')}`
         const root = draftRoot(s, draft)
         mkdirSync(join(root, 'live'), { recursive: true })
         const r = await cli(['theme', 'pull', ...authArgs(s), '--theme', String(live.id), '--path', join(root, 'live')], root)
         if (r.code !== 0) return `Could not download the live theme: ${cliError(r)}`
-        cpSync(join(root, 'live'), join(root, 'draft'), { recursive: true })
-        writeState(root, { shop: s.shop, draft, liveThemeId: live.id, liveThemeName: live.name, createdAt: new Date().toISOString() })
+        if (base !== undefined) {
+          mkdirSync(join(root, 'base'), { recursive: true })
+          const b = await cli(['theme', 'pull', ...authArgs(s), '--theme', String(base.id), '--path', join(root, 'base')], root)
+          if (b.code !== 0) return `Could not download the theme "${base.name}": ${cliError(b)}`
+          cpSync(join(root, 'base'), join(root, 'draft'), { recursive: true })
+        } else {
+          cpSync(join(root, 'live'), join(root, 'draft'), { recursive: true })
+        }
+        writeState(root, {
+          shop: s.shop,
+          draft,
+          liveThemeId: live.id,
+          liveThemeName: live.name,
+          createdAt: new Date().toISOString(),
+          ...(base !== undefined ? { baseThemeId: base.id, baseThemeName: base.name } : {}),
+        })
         const files = listFiles(join(root, 'draft'))
         const key = files.filter((f) => /^(layout\/theme\.liquid|config\/settings_data\.json|sections\/(header|footer|announcement)[^/]*|templates\/(index|product|collection|cart)\.json)$/.test(f))
         return [
-          `Draft "${draft}" made from the live theme "${live.name}" (#${live.id}): ${files.length} files.`,
-          'Nothing on the store has changed. The download in live/ is the backup.',
+          base !== undefined
+            ? `Draft "${draft}" made from the theme "${base.name}" (#${base.id}), to replace the live theme "${live.name}" (#${live.id}): ${files.length} files.`
+            : `Draft "${draft}" made from the live theme "${live.name}" (#${live.id}): ${files.length} files.`,
+          'Nothing on the store has changed. The download in live/ is the backup of the live theme.',
           '',
           'Files most edits start from:',
           ...key.map((f) => `  ${f}`),
@@ -281,7 +330,7 @@ export function registerShopifyThemeTools(server: McpServer, cli: CliRunner = ru
         const r = editDraftFile(root, file, { ...(find !== undefined ? { find } : {}), ...(replace !== undefined ? { replace } : {}), ...(content !== undefined ? { content } : {}) })
         if ('error' in r) return r.error
         const c = draftChanges(root)
-        return `${r.summary}\nDraft now differs from live in ${c.changed.length + c.added.length + c.removed.length} file(s). Preview it with shopify_theme_preview.`
+        return `${r.summary}\nDraft now differs from ${existsSync(join(root, 'base')) ? 'the theme it was built from' : 'live'} in ${c.changed.length + c.added.length + c.removed.length} file(s). Preview it with shopify_theme_preview.`
       }),
   )
 
@@ -295,7 +344,7 @@ export function registerShopifyThemeTools(server: McpServer, cli: CliRunner = ru
         const state = readState(root)
         if (state === undefined) return `No draft "${draft}".`
         const c = draftChanges(root)
-        if (c.changed.length + c.added.length + c.removed.length === 0) return 'The draft has no changes yet: nothing to preview.'
+        if (c.changed.length + c.added.length + c.removed.length === 0 && state.baseThemeId === undefined) return 'The draft has no changes yet: nothing to preview.'
         const target = state.previewThemeId !== undefined ? ['--theme', String(state.previewThemeId)] : ['--unpublished', '--theme', `AdsPilot ${draft}`]
         const r = await cli(['theme', 'push', ...authArgs(s), '--path', join(root, 'draft'), ...target, '--json'], root)
         if (r.code !== 0) return `Upload failed: ${cliError(r)}`
@@ -312,7 +361,7 @@ export function registerShopifyThemeTools(server: McpServer, cli: CliRunner = ru
           `Preview: ${theme.preview_url}`,
           `Editor: ${theme.editor_url}`,
           '',
-          `Files different from the live theme: ${[...c.changed, ...c.added.map((f) => `${f} (new)`), ...c.removed.map((f) => `${f} (removed)`)].join(', ')}`,
+          `The draft ${changeSummary(state, c)}.`,
           'Ask the owner to look at the preview on a phone and a computer before publishing.',
         ].join('\n')
       }),
@@ -343,7 +392,7 @@ export function registerShopifyThemeTools(server: McpServer, cli: CliRunner = ru
             [
               `Publish theme draft "${draft}" on ${s.name}: hidden theme #${state.previewThemeId} becomes the live theme.`,
               `  Preview first: ${state.previewUrl}`,
-              `  Changed files: ${[...c.changed, ...c.added, ...c.removed].join(', ')}`,
+              `  The draft ${changeSummary(state, c)}.`,
               `  The current live theme "${live.name}" (#${live.id}) is kept; shopify_theme_rollback puts it back.`,
               '',
               'Every customer sees the new theme from this moment.',

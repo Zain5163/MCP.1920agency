@@ -10,6 +10,7 @@ import { registerImageTools } from './image-tools.ts'
 import { registerPageTools } from './page-tools.ts'
 import { registerPerformanceTools } from './performance-tools.ts'
 import { registerSetupTools } from './setup-tools.ts'
+import { registerShopifyBuildTools } from './shopify-build-tools.ts'
 import { registerShopifyThemeTools } from './shopify-theme-tools.ts'
 import { registerShopifyTools, registerShopifyWriteTools } from './shopify-tools.ts'
 import { registerPlaybooks } from './playbooks.ts'
@@ -265,6 +266,7 @@ export function buildLocalServer(meter: MeterOptions): McpServer {
   registerShopifyTools(server)
   // Phase 2: store changes, each behind the owner's approval, backed up and read back.
   registerShopifyWriteTools(server)
+  registerShopifyBuildTools(server)
   // Phase 2b: theme changes through the Shopify CLI, on a hidden copy, published only on approval.
   registerShopifyThemeTools(server)
 

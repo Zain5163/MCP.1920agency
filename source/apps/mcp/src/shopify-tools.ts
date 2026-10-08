@@ -10,6 +10,7 @@ import { CONFIG_DIR, optional } from '@social-publisher/config'
 import { decide, formatApprovalRequest } from '@social-publisher/core'
 
 import { audit, guarded, type ToolResult } from './ads-tools.ts'
+import { restoreBuildBackup } from './shopify-build-tools.ts'
 
 /**
  * Shopify tools, read-only (phase 1 of architecture/2026-10-08-shopify-connector-plan.md).
@@ -35,7 +36,7 @@ export interface ShopifyStoreEntry {
   readonly shop: string
 }
 
-const text = (body: string): ToolResult => ({ content: [{ type: 'text' as const, text: body }] })
+export const text = (body: string): ToolResult => ({ content: [{ type: 'text' as const, text: body }] })
 
 export function readShopifyStores(path: string = STORES_PATH): ShopifyStoreEntry[] | { error: string } {
   if (!existsSync(path)) return []
@@ -123,7 +124,7 @@ export const localShopifyAccess: ShopifyAccess = {
   backupDir: (store) => join(BACKUP_DIR, store.shop),
 }
 
-const storeArg = z.string().describe('Which store: a name, key or myshopify.com address from list_shopify_stores.')
+export const storeArg = z.string().describe('Which store: a name, key or myshopify.com address from list_shopify_stores.')
 const fmt = (n: number, currency = '') => `${currency ? `${currency} ` : ''}${Math.round(n).toLocaleString('en-US')}`
 const pct = (n: number) => `${Math.round(n * 100)}%`
 const counts = (m: Record<string, number>) =>
@@ -132,7 +133,7 @@ const counts = (m: Record<string, number>) =>
     .map(([k, v]) => `${k} ${v}`)
     .join(', ') || 'none'
 
-async function withStore(
+export async function withStore(
   access: ShopifyAccess,
   selector: string,
   fn: (client: ShopifyAdminClient, store: ShopifyStoreEntry) => Promise<string>,
@@ -270,29 +271,32 @@ export function registerShopifyTools(server: McpServer, access: ShopifyAccess = 
 
 export const BACKUP_DIR = join(CONFIG_DIR, 'shopify-backups')
 
-const plain = (html: string, max = 280) => {
+export const plain = (html: string, max = 280) => {
   const t = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
   return t.length > max ? `${t.slice(0, max)}…` : t || '(empty)'
 }
-const hash = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex').slice(0, 16)
+export const hash = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex').slice(0, 16)
 
-function saveBackup(dir: string, shop: string, kind: 'product' | 'page', handle: string, content: unknown): string {
+export type BackupKind = 'product' | 'page' | 'collection' | 'menu' | 'policy'
+
+export function saveBackup(dir: string, shop: string, kind: BackupKind, handle: string, content: unknown): string {
   mkdirSync(dir, { recursive: true })
   const file = `${new Date().toISOString().replace(/[:.]/g, '-')}-${kind}-${handle.replace(/[^a-z0-9-]/gi, '_')}.json`
   writeFileSync(join(dir, file), JSON.stringify({ kind, handle, shop, savedAt: new Date().toISOString(), content }, null, 2))
   return file
 }
 
-const confirmArg = z.string().optional().describe('The approval token from the summary, once the owner has said yes.')
+export const confirmArg = z.string().optional().describe('The approval token from the summary, once the owner has said yes.')
 
 export function registerShopifyWriteTools(server: McpServer, access: ShopifyAccess = localShopifyAccess): void {
   server.tool(
     'shopify_update_product',
-    'Change a product page: title, description (HTML) or SEO title/description. Shows a before/after summary for the owner’s approval, saves the current version first, then reads the change back. Visible to customers immediately.',
+    'Change a product page: title, description (HTML), SEO title/description, or status (ACTIVE shows it to customers; DRAFT or ARCHIVED hides it, e.g. a sold-out product). Shows a before/after summary for the owner’s approval, saves the current version first, then reads the change back. Visible to customers immediately.',
     {
       store: storeArg,
       handle: z.string().describe('The product handle, from shopify_products.'),
       title: z.string().optional(),
+      status: z.enum(['ACTIVE', 'DRAFT', 'ARCHIVED']).optional(),
       descriptionHtml: z.string().optional(),
       seoTitle: z.string().max(70).optional(),
       seoDescription: z.string().max(320).optional(),
@@ -301,11 +305,12 @@ export function registerShopifyWriteTools(server: McpServer, access: ShopifyAcce
     async ({ store, handle, confirm, ...changes }) =>
       await withStore(access, store, async (client, entry) => {
         const wanted = Object.fromEntries(Object.entries(changes).filter(([, v]) => v !== undefined))
-        if (Object.keys(wanted).length === 0) return 'Nothing to change: give a title, descriptionHtml, seoTitle or seoDescription.'
+        if (Object.keys(wanted).length === 0) return 'Nothing to change: give a title, status, descriptionHtml, seoTitle or seoDescription.'
         const before = await client.productContent(handle)
         if (before === undefined) return `No product with the handle "${handle}". Use shopify_products to find it.`
         const lines = [`Change product "${before.title}" (${handle}) on ${entry.name}:`]
         if (changes.title !== undefined) lines.push(`  title: "${before.title}" → "${changes.title}"`)
+        if (changes.status !== undefined) lines.push(`  status: ${before.status ?? 'unknown'} → ${changes.status}${changes.status === 'ACTIVE' ? ' (customers can see and buy it)' : ' (hidden from customers)'}`)
         if (changes.descriptionHtml !== undefined) lines.push(`  description now: ${plain(before.descriptionHtml)}`, `  description new: ${plain(changes.descriptionHtml)}`)
         if (changes.seoTitle !== undefined) lines.push(`  SEO title: "${before.seo.title ?? ''}" → "${changes.seoTitle}"`)
         if (changes.seoDescription !== undefined) lines.push(`  SEO description: "${before.seo.description ?? ''}" → "${changes.seoDescription}"`)
@@ -324,6 +329,7 @@ export function registerShopifyWriteTools(server: McpServer, access: ShopifyAcce
         const ok =
           after !== undefined &&
           (changes.title === undefined || after.title === changes.title) &&
+          (changes.status === undefined || after.status === changes.status) &&
           (changes.seoTitle === undefined || after.seo.title === changes.seoTitle) &&
           (changes.seoDescription === undefined || after.seo.description === changes.seoDescription) &&
           (changes.descriptionHtml === undefined || plain(after.descriptionHtml, 10_000) === plain(changes.descriptionHtml, 10_000))
@@ -479,9 +485,9 @@ export function registerShopifyWriteTools(server: McpServer, access: ShopifyAcce
         const path = join(access.backupDir(entry), file)
         if (!existsSync(path)) return `No backup "${file}" for this store. Use shopify_list_backups.`
         const saved = JSON.parse(readFileSync(path, 'utf8')) as {
-          kind: 'product' | 'page'
+          kind: BackupKind
           handle: string
-          content: { title: string; descriptionHtml?: string; seo?: { title: string | null; description: string | null }; body?: string; isPublished?: boolean }
+          content: { title: string; status?: string; descriptionHtml?: string; seo?: { title: string | null; description: string | null }; body?: string; isPublished?: boolean }
         }
         const gate = decide({
           action: 'shopify_restore_backup',
@@ -489,8 +495,8 @@ export function registerShopifyWriteTools(server: McpServer, access: ShopifyAcce
           ...(confirm !== undefined ? { confirmation: confirm } : {}),
           describe: () =>
             [
-              `Restore the ${saved.kind} "${saved.content.title}" (${saved.handle}) on ${entry.name} to the version saved in ${file}:`,
-              `  ${plain(saved.content.descriptionHtml ?? saved.content.body ?? '')}`,
+              `Restore the ${saved.kind} "${saved.content.title ?? saved.handle}" (${saved.handle}) on ${entry.name} to the version saved in ${file}:`,
+              `  ${plain(saved.content.descriptionHtml ?? saved.content.body ?? JSON.stringify((saved.content as { items?: unknown }).items ?? ''))}`,
               '',
               'The current version is saved first, so this restore can be undone too.',
             ].join('\n'),
@@ -505,9 +511,15 @@ export function registerShopifyWriteTools(server: McpServer, access: ShopifyAcce
             descriptionHtml: saved.content.descriptionHtml ?? '',
             seoTitle: saved.content.seo?.title ?? '',
             seoDescription: saved.content.seo?.description ?? '',
+            ...(saved.content.status === 'ACTIVE' || saved.content.status === 'DRAFT' || saved.content.status === 'ARCHIVED' ? { status: saved.content.status } : {}),
           })
           await audit('shopify.product.restored', { shop: entry.shop, handle: saved.handle, from: file })
           return `Restored "${saved.content.title}". The version it replaced is saved as ${backup}.`
+        }
+        if (saved.kind !== 'page') {
+          const restored = await restoreBuildBackup(client, access.backupDir(entry), entry.shop, saved)
+          await audit(`shopify.${saved.kind}.restored`, { shop: entry.shop, handle: saved.handle, from: file })
+          return restored
         }
         const now = await client.pageContent(saved.handle)
         if (now === undefined) return `The page "${saved.handle}" no longer exists.`

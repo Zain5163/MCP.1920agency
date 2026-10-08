@@ -368,7 +368,7 @@ export class ShopifyAdminClient {
 
   async productContent(handle: string): Promise<ProductContent | undefined> {
     const d = await this.graphql<{ products: { nodes: ProductContent[] } }>(
-      `query($q: String) { products(first: 1, query: $q) { nodes { id handle title descriptionHtml seo { title description } } } }`,
+      `query($q: String) { products(first: 1, query: $q) { nodes { id handle title status descriptionHtml seo { title description } } } }`,
       { q: `handle:${JSON.stringify(handle)}` },
     )
     return d.products.nodes.find((p) => p.handle === handle)
@@ -378,6 +378,7 @@ export class ShopifyAdminClient {
     const product: Record<string, unknown> = { id }
     if (changes.title !== undefined) product.title = changes.title
     if (changes.descriptionHtml !== undefined) product.descriptionHtml = changes.descriptionHtml
+    if (changes.status !== undefined) product.status = changes.status
     if (changes.seoTitle !== undefined || changes.seoDescription !== undefined) {
       product.seo = {
         ...(changes.seoTitle !== undefined ? { title: changes.seoTitle } : {}),
@@ -386,7 +387,7 @@ export class ShopifyAdminClient {
     }
     const r = await this.#mutate<{ product: ProductContent }>(
       `mutation($product: ProductUpdateInput!) { productUpdate(product: $product) {
-        product { id handle title descriptionHtml seo { title description } }
+        product { id handle title status descriptionHtml seo { title description } }
         userErrors { field message } } }`,
       { product },
       'productUpdate',
@@ -475,17 +476,234 @@ export class ShopifyAdminClient {
       'discountCodeDeactivate',
     )
   }
+
+  // ------------------------------------------------------------------ building a store
+  //
+  // Phase 2c: what a new store needs beyond editing what is there: products,
+  // collections, menus and policies, and making them visible on the Online Store.
+
+  /** Ids for product handles; handles with no product are left out. */
+  async productIds(handles: readonly string[]): Promise<Map<string, string>> {
+    const out = new Map<string, string>()
+    for (let i = 0; i < handles.length; i += 50) {
+      const chunk = handles.slice(i, i + 50)
+      const d = await this.graphql<{ products: { nodes: Array<{ id: string; handle: string }> } }>(
+        'query($q: String) { products(first: 50, query: $q) { nodes { id handle } } }',
+        { q: chunk.map((h) => `handle:${JSON.stringify(h)}`).join(' OR ') },
+      )
+      for (const p of d.products.nodes) if (chunk.includes(p.handle)) out.set(p.handle, p.id)
+    }
+    return out
+  }
+
+  /**
+   * Creates a product with its options, variants and photos (from public image
+   * URLs) in one call. Stock is not tracked: setting quantities needs a location
+   * and the inventory permission, which the owner sets in the admin.
+   */
+  async createProduct(spec: NewProduct): Promise<CreatedProduct> {
+    const options = spec.options.length > 0 ? spec.options : [{ name: 'Title', values: ['Default Title'] }]
+    const variants = spec.variants.map((v) => ({
+      optionValues: options.map((o) => ({ optionName: o.name, name: spec.options.length > 0 ? (v.options[o.name] ?? '') : 'Default Title' })),
+      price: String(v.price),
+      ...(v.compareAtPrice !== undefined ? { compareAtPrice: String(v.compareAtPrice) } : {}),
+      ...(v.sku !== undefined ? { sku: v.sku } : {}),
+      inventoryPolicy: 'DENY',
+      inventoryItem: { tracked: false, ...(v.cost !== undefined ? { cost: v.cost } : {}) },
+    }))
+    const input: Record<string, unknown> = {
+      title: spec.title,
+      descriptionHtml: spec.descriptionHtml,
+      status: spec.status,
+      productOptions: options.map((o, i) => ({ name: o.name, position: i + 1, values: o.values.map((name) => ({ name })) })),
+      variants,
+      ...(spec.handle !== undefined ? { handle: spec.handle } : {}),
+      ...(spec.productType !== undefined ? { productType: spec.productType } : {}),
+      ...(spec.vendor !== undefined ? { vendor: spec.vendor } : {}),
+      ...(spec.tags !== undefined ? { tags: spec.tags } : {}),
+      ...(spec.collectionIds !== undefined && spec.collectionIds.length > 0 ? { collections: spec.collectionIds } : {}),
+      ...(spec.images.length > 0 ? { files: spec.images.map((img) => ({ originalSource: img.url, alt: img.alt ?? spec.title, contentType: 'IMAGE' })) } : {}),
+      ...(spec.seoTitle !== undefined || spec.seoDescription !== undefined
+        ? { seo: { ...(spec.seoTitle !== undefined ? { title: spec.seoTitle } : {}), ...(spec.seoDescription !== undefined ? { description: spec.seoDescription } : {}) } }
+        : {}),
+    }
+    const r = await this.#mutate<{ product: CreatedProduct | null }>(
+      `mutation($input: ProductSetInput!) { productSet(synchronous: true, input: $input) {
+        product { id handle title status variantsCount { count } mediaCount { count } }
+        userErrors { field message } } }`,
+      { input },
+      'productSet',
+    )
+    if (r.product === null) throw new ShopifyError('Shopify accepted the product but returned nothing; check the admin.', 'query')
+    return r.product
+  }
+
+  /**
+   * Makes a product or collection available on the Online Store sales channel.
+   * Needs read_publications and write_publications. A product also needs status
+   * ACTIVE before customers see it.
+   */
+  async publishToOnlineStore(id: string): Promise<void> {
+    const d = await this.graphql<{ publications: { nodes: Array<{ id: string; name: string; catalog: { title: string } | null }> } }>(
+      '{ publications(first: 20) { nodes { id name catalog { title } } } }',
+    )
+    const online = d.publications.nodes.find((p) => /online store/i.test(p.name) || /online store/i.test(p.catalog?.title ?? ''))
+    if (online === undefined) throw new ShopifyError('This store has no Online Store sales channel to publish to.', 'query')
+    await this.#mutate(
+      'mutation($id: ID!, $input: [PublicationInput!]!) { publishablePublish(id: $id, input: $input) { userErrors { field message } } }',
+      { id, input: [{ publicationId: online.id }] },
+      'publishablePublish',
+    )
+  }
+
+  async collectionContent(handle: string): Promise<CollectionContent | undefined> {
+    const d = await this.graphql<{ collectionByIdentifier: (Omit<CollectionContent, 'products'> & { products: { nodes: Array<{ handle: string }> } }) | null }>(
+      `query($h: String!) { collectionByIdentifier(identifier: { handle: $h }) {
+        id handle title descriptionHtml sortOrder ruleSet { appliedDisjunctively }
+        products(first: 250) { nodes { handle } } } }`,
+      { h: handle },
+    )
+    const c = d.collectionByIdentifier
+    if (c === null) return undefined
+    return { id: c.id, handle: c.handle, title: c.title, descriptionHtml: c.descriptionHtml, sortOrder: c.sortOrder, ruleSet: c.ruleSet ?? null, products: c.products.nodes.map((p) => p.handle) }
+  }
+
+  async createCollection(c: { title: string; handle: string; descriptionHtml: string; sortOrder: string }): Promise<{ id: string }> {
+    const r = await this.#mutate<{ collection: { id: string } }>(
+      `mutation($c: CollectionCreateInput!) { collectionCreate(collection: $c) { collection { id } userErrors { field message } } }`,
+      { c },
+      'collectionCreate',
+    )
+    return r.collection
+  }
+
+  async updateCollection(id: string, c: { title?: string; descriptionHtml?: string; sortOrder?: string }): Promise<void> {
+    await this.#mutate(
+      `mutation($c: CollectionUpdateInput!) { collectionUpdate(collection: $c) { collection { id } userErrors { field message } } }`,
+      { c: { id, ...c } },
+      'collectionUpdate',
+    )
+  }
+
+  /** Adds products to, or takes them out of, a hand-picked collection. */
+  async setProductCollections(productId: string, join: readonly string[], leave: readonly string[]): Promise<void> {
+    await this.#mutate(
+      `mutation($p: ProductUpdateInput!) { productUpdate(product: $p) { product { id } userErrors { field message } } }`,
+      { p: { id: productId, ...(join.length > 0 ? { collectionsToJoin: join } : {}), ...(leave.length > 0 ? { collectionsToLeave: leave } : {}) } },
+      'productUpdate',
+    )
+  }
+
+  async menu(handle: string): Promise<MenuContent | undefined> {
+    const d = await this.graphql<{ menus: { nodes: MenuContent[] } }>(
+      `{ menus(first: 50) { nodes { id handle title items { title type url resourceId items { title type url resourceId } } } } }`,
+    )
+    return d.menus.nodes.find((m) => m.handle === handle)
+  }
+
+  async saveMenu(menu: { id?: string; handle: string; title: string; items: MenuItemInput[] }): Promise<void> {
+    if (menu.id !== undefined) {
+      await this.#mutate(
+        `mutation($id: ID!, $title: String!, $items: [MenuItemUpdateInput!]!) { menuUpdate(id: $id, title: $title, items: $items) { menu { id } userErrors { field message } } }`,
+        { id: menu.id, title: menu.title, items: menu.items },
+        'menuUpdate',
+      )
+    } else {
+      await this.#mutate(
+        `mutation($title: String!, $handle: String!, $items: [MenuItemCreateInput!]!) { menuCreate(title: $title, handle: $handle, items: $items) { menu { id } userErrors { field message } } }`,
+        { title: menu.title, handle: menu.handle, items: menu.items },
+        'menuCreate',
+      )
+    }
+  }
+
+  /** Ids of the things a menu can link to, by handle. */
+  async linkTargets(): Promise<{ collections: Map<string, string>; pages: Map<string, string> }> {
+    const d = await this.graphql<{ collections: { nodes: Array<{ id: string; handle: string }> }; pages: { nodes: Array<{ id: string; handle: string }> } }>(
+      '{ collections(first: 250) { nodes { id handle } } pages(first: 250) { nodes { id handle } } }',
+    )
+    return {
+      collections: new Map(d.collections.nodes.map((c) => [c.handle, c.id])),
+      pages: new Map(d.pages.nodes.map((p) => [p.handle, p.id])),
+    }
+  }
+
+  async policies(): Promise<Array<{ type: string; body: string; url: string | null }>> {
+    return (await this.graphql<{ shop: { shopPolicies: Array<{ type: string; body: string; url: string | null }> } }>('{ shop { shopPolicies { type body url } } }')).shop.shopPolicies
+  }
+
+  /** Needs write_legal_policies. */
+  async savePolicy(type: string, body: string): Promise<void> {
+    await this.#mutate(
+      'mutation($p: ShopPolicyInput!) { shopPolicyUpdate(shopPolicy: $p) { shopPolicy { id } userErrors { field message } } }',
+      { p: { type, body } },
+      'shopPolicyUpdate',
+    )
+  }
+}
+
+export interface NewProduct {
+  title: string
+  descriptionHtml: string
+  handle?: string
+  productType?: string
+  vendor?: string
+  tags?: string[]
+  /** Up to three, e.g. { name: "Size", values: ["40", "41", "42"] }. Empty for a product with one version. */
+  options: Array<{ name: string; values: string[] }>
+  /** One per combination sold; `options` maps option name to value. One entry for a product without options. */
+  variants: Array<{ options: Record<string, string>; price: number; compareAtPrice?: number; sku?: string; cost?: number }>
+  /** Public image URLs Shopify downloads. */
+  images: Array<{ url: string; alt?: string }>
+  status: 'ACTIVE' | 'DRAFT'
+  collectionIds?: string[]
+  seoTitle?: string
+  seoDescription?: string
+}
+export interface CreatedProduct {
+  id: string
+  handle: string
+  title: string
+  status: string
+  variantsCount: { count: number }
+  mediaCount: { count: number }
+}
+export interface CollectionContent {
+  id: string
+  handle: string
+  title: string
+  descriptionHtml: string
+  sortOrder: string
+  /** Not null for an automated (rule-based) collection, whose products Shopify picks. */
+  ruleSet: { appliedDisjunctively: boolean } | null
+  products: string[]
+}
+export interface MenuItemInput {
+  title: string
+  type: string
+  url?: string
+  resourceId?: string
+  items?: MenuItemInput[]
+}
+export interface MenuContent {
+  id: string
+  handle: string
+  title: string
+  items: Array<{ title: string; type: string; url: string | null; resourceId: string | null; items?: Array<{ title: string; type: string; url: string | null; resourceId: string | null }> }>
 }
 
 export interface ProductContent {
   id: string
   handle: string
   title: string
+  /** ACTIVE (customers see it), DRAFT or ARCHIVED (hidden). */
+  status?: string
   descriptionHtml: string
   seo: { title: string | null; description: string | null }
 }
 export interface ProductChanges {
   title?: string
+  status?: 'ACTIVE' | 'DRAFT' | 'ARCHIVED'
   descriptionHtml?: string
   seoTitle?: string
   seoDescription?: string

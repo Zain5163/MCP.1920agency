@@ -22,6 +22,7 @@ import { listProviderAuths, markProviderAuthNeedsReauth, providerAuthCredentialS
 import { TokenVault, parseKey, type StoredCredential } from '@social-publisher/vault'
 
 import { audit, guarded, type ToolResult } from './ads-tools.ts'
+import { registerShopifyBuildTools } from './shopify-build-tools.ts'
 import { registerShopifyTools, registerShopifyWriteTools, type ShopifyAccess, type ShopifyStoreEntry } from './shopify-tools.ts'
 
 /**
@@ -45,8 +46,8 @@ import { registerShopifyTools, registerShopifyWriteTools, type ShopifyAccess, ty
 /** Must match integrations/shopify-app/shopify.app.toml. */
 export const SHOPIFY_SCOPES =
   'read_products,read_inventory,read_orders,read_returns,read_discounts,read_themes,read_content,' +
-  'read_online_store_navigation,read_legal_policies,write_products,write_content,' +
-  'write_online_store_navigation,write_themes,write_discounts'
+  'read_online_store_navigation,read_legal_policies,read_publications,write_products,write_content,' +
+  'write_online_store_navigation,write_themes,write_discounts,write_legal_policies,write_publications'
 
 const PROVIDER = 'shopify'
 const STATE_TTL_MS = 15 * 60_000
@@ -208,6 +209,7 @@ export function registerHostedShopifyTools(server: McpServer, tenantId: string):
   const access = hostedShopifyAccess(tenantId)
   registerShopifyTools(server, access)
   registerShopifyWriteTools(server, access)
+  registerShopifyBuildTools(server, access)
 }
 
 // ------------------------------------------------------------------ callback page
