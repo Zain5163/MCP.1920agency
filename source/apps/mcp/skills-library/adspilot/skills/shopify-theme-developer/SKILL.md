@@ -120,7 +120,7 @@ after any colour change (section 6).
 
 **Selling in more than one country.** Markets, currencies, languages, domains or
 subfolders, tax-inclusive pricing, duties and the cookie banner are set by the owner in
-the Shopify admin (Settings > Markets, Taxes and duties, Customer privacy), not in the
+the Shopify admin (Markets; Settings > Taxes and duties; Settings > Customer privacy), not in the
 theme. In the theme:
 
 - Every word customers read lives in `locales/` and is printed with the `t` filter, so a

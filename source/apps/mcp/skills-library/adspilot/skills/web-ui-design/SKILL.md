@@ -115,9 +115,13 @@ binding):
   requirements for EU buyers.
 - **US:** the ADA has no web regulation for private businesses, but many lawsuits are
   filed each year over inaccessible store websites; WCAG 2.x AA is the usual yardstick.
-- **UK, Canada, Australia, New Zealand:** equality and disability-discrimination laws
-  apply to services offered online; Ontario also sets a WCAG standard for larger
-  organisations.
+- **UK and Australia:** the Equality Act 2010 and the Disability Discrimination Act 1992
+  apply to services offered on websites, without a fixed WCAG level for private
+  businesses.
+- **Canada:** Ontario's AODA requires WCAG 2.0 AA on the public websites of
+  organisations with 50 or more employees.
+- **New Zealand:** the Human Rights Act bans disability discrimination in providing goods
+  and services; the government's WCAG standard covers public agencies only.
 
 Meeting WCAG 2.2 AA is the safe target everywhere.
 

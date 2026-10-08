@@ -78,6 +78,14 @@ same ground; a `get_playbook` playbook still wins on a platform's own rules.
     `references/conversion-checklists.md` and `references/cash-on-delivery.md`. A
     separate `shopify-store-cro` skill was proposed and **not** made: it would have
     repeated store-builder, so its content went there instead.
+- `selling-by-country` (2026-10-08, owner's request: "not only for Pakistan — overall the
+  world"): decide the buyer's market first, then one reference per market
+  (`united-states`, `canada`, `united-kingdom`, `european-union` with Germany, France,
+  Netherlands, Spain and Italy, `australia`, `new-zealand`, `gulf`, `india`, `pakistan`):
+  payments, price and tax display, consumer law that changes pages, consent before
+  tracking, accessibility law, delivery and trust, language, ad-policy notes. All the
+  website skills and campaign-setup point to it; cash on delivery is now one market's
+  pattern, not the default. Sources: `research/2026-10-08-global-markets-sources.md`.
 - **Never name a client** in these files: they are served to every user. A test
   fails if a known client name appears.
 
