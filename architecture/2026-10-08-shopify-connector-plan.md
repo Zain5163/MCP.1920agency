@@ -97,3 +97,30 @@ never publish without explicit approval.
   `shopify_theme_discard`. Full flow run live on the dev store; store left as it was.
 - **For phase 4 (public app):** apply for Shopify's theme exemption, or keep the CLI route.
 
+## How users connect their own store from Claude, ChatGPT or any AI (hosted, self-service)
+
+The goal (owner, 2026-10-08): a user who has AdsPilot connected in their AI app logs in
+to their Shopify store once and then works on it from the chat.
+
+**What the user does:** adds AdsPilot as a connector in Claude, ChatGPT or another MCP
+client (`mcp.1920agency.com`, signs in to AdsPilot) → says "connect my Shopify store" →
+AdsPilot replies with a Shopify install link → the user approves the permissions in
+Shopify → back in the chat, every Shopify tool works on their store. Changes still show a
+summary and wait for the user's "yes" in the chat.
+
+**What has to be built (in order):**
+
+| Step | What | Status |
+|---|---|---|
+| 1 | Public https address | Done by the hosting work: `mcp.1920agency.com` |
+| 2 | Server-side install flow: `/shopify/install` → Shopify consent → `/shopify/callback` on the server exchanges the code with the app secret (kept only on the server) | To build. Not the PC bounce: the redirect lands in the *user's* browser, so the server must finish it |
+| 3 | Per-user store token, encrypted in the vault, tied to the user's AdsPilot account | To build (the vault exists) |
+| 4 | Shopify tools registered on the hosted server, reading the user's own token and store list | To build (today they are local-only, using the owner's settings) |
+| 5 | Theme changes for hosted users: a Theme Access password per user (stored in the vault; the server runs the CLI with it), or Shopify's theme exemption | To decide |
+| 6 | Distribution: a **public app** (Shopify review, $19 fee, expiring tokens, mandatory privacy webhooks, protected-data approval) | Business decision first: Shopify staff said public apps must bill through Shopify |
+
+**Before the public app**, the owner's own clients (such as Muzaree) can be connected
+today-style: the client gives the agency staff or collaborator access, the owner installs
+the custom-distribution app in his own browser, and the existing redirect bounce through
+`mcp.1920agency.com` delivers the code to his PC. One custom app is needed per client store.
+
