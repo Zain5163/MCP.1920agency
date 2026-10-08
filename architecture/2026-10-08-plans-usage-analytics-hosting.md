@@ -252,9 +252,26 @@ deleted in PostHog (by the account id) along with its rows in our database.
 
 ## Phase 3 — Hosting on Hetzner
 
-**Status 2026-10-08: deployment kit built on branch `phase3-deploy` (`deploy/`),
-awaiting the owner's approval. Nothing is deployed; the server was only
-inspected read-only.** The plan, costs, risks and every step are in
+**Status 2026-10-08 ~05:55 PKT: Stage A DEPLOYED (owner approved A, swap +
+build-cache prune, own edge network).** Release `cd6e265b3f94` in
+`/opt/adspilot/releases/`, `app` linked to it; `setup.sh` built the image,
+confirmed Supabase is current (read-only) and started `adspilot-mcp-1` and
+`adspilot-worker-1`, both healthy. `https://mcp.1920agency.com/health` → 200
+(`database: reachable`, ~1.3 s to Singapore), `POST /mcp` without a token → 401,
+Let's Encrypt certificate issued. Raptor: Caddy attached to the new network
+`adspilot_edge` (shared only with the MCP; the MCP cannot resolve Raptor's
+`api`, checked), committed in Raptor's repo (`4188797`), previous files kept as
+`/opt/raptor/*.before-mcp*`; raptordownloader.com and its API answered 200 after
+the Caddy recreate. Swap 2 GB (swappiness 10); 9.7 GB build cache pruned (27 GB
+free). Server env file holds only the names in `deploy/.env.example` (no Slack
+webhook exists on the PC either). **Not yet done:** A6 backups (the owner makes
+the gpg key on the PC), A7 the first post published by the server worker (both
+workers run; the PC task is switched off only after a server `PUBLISHED`), A8
+timers (after A7, so monitor/refresh do not run twice), A9 connecting an AI
+client to the hosted URL (needs a dashboard token). Then: the hosted OAuth
+callback (Meta Live mode, Google, and the Shopify connector all need it).
+
+Earlier the same day (kept for the record): the plan, costs, risks and every step are in
 `deploy/README.md`: Stage A moves the MCP, the worker (as a loop) and the
 timers to the server with Supabase kept as the database; Stage B moves the data
 to Postgres on the server (decision 0010) after a tested restore. Findings that
