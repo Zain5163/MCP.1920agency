@@ -287,8 +287,22 @@ no-store`; `/callbackx` and POST `/callback` → 404; `/health` 200; `/mcp` 401
 without a token; Raptor's site and API 200. The owner added the https addresses
 in the Meta (Facebook Login for Business, Instagram business login) and Google
 consoles, keeping the localhost ones, and switched `META_`, `INSTAGRAM_`,
-`THREADS_` and `GOOGLE_REDIRECT_URI` in the PC `.env`. Not yet verified: a real
-reconnect through the bounce (owner runs `pnpm connect` etc. in `source/apps/cli`).
+`THREADS_` and `GOOGLE_REDIRECT_URI` in the PC `.env`. **Verified ~09:30 PKT:**
+`pnpm connect` (Facebook + linked Instagram) and `pnpm connect:provider google
+youtube` both completed through the bounce; `list_accounts` shows every Page and
+Instagram account ready and YouTube "RZR GaminG YT" ready. Two snags on the way,
+for the next person: Meta's App domains field did not save until the domains
+were entered as chips (`1920agency.com`, `mcp.1920agency.com`; checked via the
+Graph API `app_domains` field), and the YouTube Data API v3 had to be enabled in
+the Google Cloud project. The `.env` had the Google values under Google's own
+labels ("Client ID"); renamed to `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`
+(backup kept). The server env now also has the three `GOOGLE_*` values so the
+server worker can refresh YouTube access. Meta app stays in Development mode:
+Live needs Business Verification (public_profile advanced access for Facebook
+Login for Business), which belongs with Phase 4. Threads: not set up (needs the
+Threads use case, unavailable on this Business-type app). Server worker: one
+post published 09:00 PKT (queue 3 → 2, 0 failed), but which worker sent it is
+unknown (container logs were cleared by a recreate); the 15:30 post decides A7.
 
 Earlier the same day (kept for the record): the plan, costs, risks and every step are in
 `deploy/README.md`: Stage A moves the MCP, the worker (as a loop) and the
