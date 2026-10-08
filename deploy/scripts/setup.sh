@@ -83,6 +83,10 @@ chmod 750 "$ADSPILOT_HOME/logs" "$ADSPILOT_HOME/logs/"*
 mkdir -p "$ADSPILOT_HOME/data/shopify-backups"
 chown 1000:1000 "$ADSPILOT_HOME/data/shopify-backups"
 chmod 700 "$ADSPILOT_HOME/data/shopify-backups"
+# WordPress: the same, for users' pages, posts and products (wordpress-access.ts).
+mkdir -p "$ADSPILOT_HOME/data/wordpress-backups"
+chown 1000:1000 "$ADSPILOT_HOME/data/wordpress-backups"
+chmod 700 "$ADSPILOT_HOME/data/wordpress-backups"
 
 [ -f "$APP_ENV" ] || die "$APP_ENV does not exist. Copy it from the PC first (deploy/README.md, step A3). Names: deploy/.env.example."
 chown root:root "$APP_ENV" 2>/dev/null || true

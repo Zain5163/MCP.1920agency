@@ -1733,6 +1733,37 @@ before each client's work). Granted Claude edit access to `~/.social-publisher/`
   (backups `.env.backup-20261007221629-before-muzaree`, `.env.profile-*`).
 - 44 non-database MCP tests pass; typecheck clean. Live after the next `/mcp` reconnect.
 
+## 2026-10-08 — WordPress and WooCommerce connector (branch `wordpress-tools`, not merged, not deployed)
+
+Owner approved building it on 2026-10-08; users are worldwide. Research first:
+`research/2026-10-08-wordpress-connector.md`. Plan, tools and go-live steps:
+`architecture/2026-10-08-wordpress-connector-plan.md`.
+
+- **Decided: core REST API with an Application Password**, not WordPress's MCP Adapter
+  (a plugin on 40k sites, three read-only abilities by default; detect it later as an
+  option). WooCommerce REST v3 accepts the same login (from Woo's source; not yet tested
+  live).
+- **Storage: no migration.** Sites live in `provider_auths` (provider `wordpress`, one row
+  per site, the login sealed by the vault per account). Same on the local app and the
+  hosted server.
+- **SSRF guard** (`packages/adapters/src/safe-http.ts`): https on 443 only; every resolved
+  address must be public (private, loopback, link-local/metadata, CGNAT, reserved, IPv6
+  ULA/link-local, IPv4-mapped and NAT64 forms); the socket is pinned to the checked
+  address; no redirect to another host; re-checked on every request.
+- 14 tools on both transports, all metered: connect, disconnect, list, overview, list
+  content, read content, audit (findings, no score), WooCommerce products (reads); save
+  content (new ones always drafts), publish/unpublish, upload media, restore backup or
+  revision, WooCommerce product text and prices (approval, backup, change, read-back).
+- Skills updated: wordpress-site-builder (+ references/woocommerce.md),
+  store-platform-choice, landing-page-builder name the real tools; every change needs approval.
+- Found, not fixed (outside this work): on the hosted server the Shopify tools' activity
+  records (`audit()` in ads-tools.ts) go through `currentScope()`, which is the server's
+  first account, not the request's. The WordPress tools record under the request's account.
+- **Only unit-tested** with a fake WordPress behind the real guarded fetch: 75 new tests
+  (SSRF refusals, R1 error messages, approvals for every write, backup before write and
+  read-back after, rollback, a secret canary). Gate: 1,198 tests green. **Nothing has been
+  run against a real WordPress site.**
+
 ## Verified live, not just tested
 
 | What | How it was proven |

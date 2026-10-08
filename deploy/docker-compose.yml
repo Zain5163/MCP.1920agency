@@ -64,6 +64,9 @@ services:
       # Earlier versions of products and pages AdsPilot changed on users' Shopify
       # stores (shopify_restore_backup). Must survive container restarts.
       - ${ADSPILOT_HOME:-/opt/adspilot}/data/shopify-backups:/home/node/.social-publisher/shopify-backups
+      # The same for users' WordPress pages, posts and WooCommerce products
+      # (wordpress_restore_backup). Default WORDPRESS_BACKUP_DIR resolves here.
+      - ${ADSPILOT_HOME:-/opt/adspilot}/data/wordpress-backups:/home/node/.social-publisher/wordpress-backups
     expose:
       - "8080"
     mem_limit: 384m
