@@ -258,6 +258,15 @@ describe('the instructions every client receives on connecting', () => {
     for (const tool of ['get_playbook', 'list_skills', 'get_skill']) assert.ok(SERVER_INSTRUCTIONS.includes(tool))
   })
 
+  test('every skill they name is served', async () => {
+    const { SERVER_INSTRUCTIONS } = await import('../src/playbooks.ts')
+    const library = loadLibrary()
+    for (const name of ['store-builder', 'landing-page-builder', 'shopify-theme-developer', 'web-ui-design', 'wordpress-site-builder', 'campaign-setup']) {
+      assert.ok(SERVER_INSTRUCTIONS.includes(name), `instructions miss ${name}`)
+      assert.ok(library.has(name), `instructions name ${name}, which is not served`)
+    }
+  })
+
   test('the tools they name really exist', () => {
     const server = new McpServer({ name: 't', version: '0' })
     registerPlaybooks(server)

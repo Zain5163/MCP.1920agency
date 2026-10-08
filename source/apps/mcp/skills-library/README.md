@@ -63,6 +63,21 @@ same ground; a `get_playbook` playbook still wins on a platform's own rules.
   e-commerce account. `references/research-2026-10.md` is dated online research with
   sources; `references/field-notes.md` collects lessons from real accounts, which the
   daily account runs append to.
+- Website building (2026-10-08, owner's request; sources in
+  `research/2026-10-08-web-store-skills-sources.md`):
+  - `shopify-theme-developer`: Online Store 2.0 structure, Liquid, speed, accessibility,
+    and the theme-draft workflow (theme tools are local-only).
+  - `landing-page-builder`: pages for ad traffic by paid result, message match, forms,
+    events, platform routes, test plan; `references/page-blueprints.md`.
+  - `web-ui-design`: design system, hierarchy, WCAG 2.2 AA numbers, store conventions,
+    machine-generated look to avoid.
+  - `wordpress-site-builder`: WordPress and WooCommerce guidance; AdsPilot has no
+    WordPress tools and the skill says so first; `references/woocommerce.md`.
+  - `store-platform-choice`: Shopify vs WooCommerce vs others for a given business.
+  - `store-builder` (made earlier for the Shopify tools) gained
+    `references/conversion-checklists.md` and `references/cash-on-delivery.md`. A
+    separate `shopify-store-cro` skill was proposed and **not** made: it would have
+    repeated store-builder, so its content went there instead.
 - **Never name a client** in these files: they are served to every user. A test
   fails if a known client name appears.
 

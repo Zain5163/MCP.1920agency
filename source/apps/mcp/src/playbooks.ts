@@ -122,6 +122,8 @@ export const SERVER_INSTRUCTIONS = [
   'For someone new to Meta ads, run check_ad_setup first: it says what is missing (Page, business, ad account,',
   'payment, pixel) and who does each step.',
   'For wider marketing work (landing pages, emails, SEO, pricing, launch plans), use list_skills and get_skill.',
+  'To build or improve a Shopify store, landing page or website (WordPress too), read get_skill store-builder,',
+  'landing-page-builder, shopify-theme-developer, web-ui-design or wordpress-site-builder first.',
   '',
   'Two rules for every campaign, on every platform (get_skill campaign-setup has the full method):',
   '1. Understand the business first, then match the objective to the result they want to pay for: sales means a',

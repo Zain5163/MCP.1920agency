@@ -32,6 +32,7 @@ themselves in `source/packages/core/src/adapters/capabilities.ts`.
 | `2026-09-26-linkedin.md` | LinkedIn | Verified against the real app console |
 | `2026-09-26-mcp-landscape.md` | Whether LinkedIn ships an official MCP | Answers an owner question |
 | `2026-10-02-linkedin-documents.md` | LinkedIn document posts (PDF carousels): Documents API, title, processing | Verified against docs; nothing posted live |
+| `2026-10-08-web-store-skills-sources.md` | Sources and licences behind the website-building skills (Shopify themes, landing pages, web design, WordPress/WooCommerce) | Verified against live pages where marked; weak figures labelled |
 
 ## Adding a note
 
