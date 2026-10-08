@@ -173,3 +173,8 @@ New scopes (app config v6, NOT yet released to Shopify): `read_publications`,
 After the release the dev store must approve the update. Checked against the live 2026-10 schema
 by introspection (collections now use `collection:` inputs and `collectionByIdentifier`;
 `collectionAddProducts` no longer exists, so membership uses productUpdate collectionsToJoin/Leave).
+- **Before the public listing (found 2026-10-08):** a merchant who installs from the Shopify
+  admin or App Store lands on `/shopify` without an AdsPilot account link (only
+  `shopify_connect_store` from the chat links one). Today that page explains the step (commit
+  4f972f5). For review, Shopify expects the app to take the merchant straight into the app after
+  install: add a sign-in / sign-up step on that page that links the install to an AdsPilot account.
