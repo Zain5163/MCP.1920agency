@@ -10,9 +10,11 @@ This folder **is** served, so what goes in it matters more.
 
 | Folder | Source | Licence | Commit | Skills |
 |---|---|---|---|---|
-| `adspilot/` | **Our own**, written and maintained here | AdsPilot's | in-repo | 1 |
+| `adspilot/` | **Our own**, written and maintained here | AdsPilot's | in-repo | see below |
 | `marketingskills/` | github.com/coreyhaines31/marketingskills | MIT | `dda3841f0b294e01e93b1541486beefbfab0915e` | 50 |
 | `advertising-skills/` | github.com/realkimbarrett/advertising-skills | MIT (declared; see its NOTICE.md) | `45f4a4a1dabe24113193369b55b929b1de4ff04a` | 4 of 12 |
+| `web-quality-skills/` | github.com/addyosmani/web-quality-skills | MIT | `afa8da942115f2961fdbfa80807ea0b232ff6c00` | 3 of 6 |
+| `anthropic-skills/` | github.com/anthropics/skills (`frontend-design` only) | Apache-2.0 (the skill's own LICENSE.txt) | `683bc88e56f3e09ba94f7055977f3d3aa499f202` | 1 |
 
 `marketingskills` was fetched 2026-09-30 at the owner's request, so future SEO,
 WordPress and Google work starts from this knowledge rather than from new
@@ -39,6 +41,17 @@ names returns the replacement (`COVERED_ELSEWHERE` in `src/skills-library.ts`):
 `headline-matrix` → copywriting and ad-creative · `objection-crusher` → offers and cro ·
 `generic-language-killer` → copy-editing · `performance-diagnosis` → the
 `meta-performance` playbook.
+
+`web-quality-skills` and `anthropic-skills` were added 2026-10-08 at the owner's
+request for top-level website-building skills (Shopify stores, landing pages,
+WordPress). Kept: `core-web-vitals`, `performance`, `accessibility` (nothing served
+covered speed or WCAG 2.2 in depth) and `frontend-design` (visual direction and
+the tells of machine-generated pages). Left out: `seo` (seo-audit, schema and ai-seo
+cover it), `best-practices` (host-level headers), `web-quality-audit` (an
+orchestrator), and every other anthropics/skills folder (not web-building, and
+some are source-available only). Each folder's NOTICE.md records what was copied.
+The full source survey, including what was read for knowledge only and why, is
+`research/2026-10-08-web-store-skills-sources.md`.
 
 ## Our own skills (`adspilot/`)
 

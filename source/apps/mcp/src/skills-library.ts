@@ -8,7 +8,7 @@ import { z } from 'zod'
 /**
  * A library of marketing and advertising skills, served to any MCP client.
  *
- * Two sources, each pinned to one commit and vendored into this server:
+ * Third-party sources, each pinned to one commit and vendored into this server:
  *
  * - `coreyhaines31/marketingskills` (MIT): 50 skills covering SEO, AI search
  *   visibility, copywriting, CRO, email, pricing, launch, social, ads and more.
@@ -31,6 +31,12 @@ import { z } from 'zod'
  *    its references to files that only exist in the original project.
  * 3. **Controls stay in code.** Nothing a skill says changes a spend ceiling, an
  *    approval or a limit. Those are enforced regardless.
+ *
+ * - `addyosmani/web-quality-skills` (MIT): core-web-vitals, performance and
+ *   accessibility, for building fast, accessible stores and landing pages
+ *   (owner's request for website-building skills, 2026-10-08).
+ * - `anthropics/skills` (Apache-2.0): frontend-design only, for visual direction
+ *   and for avoiding pages that look machine-generated.
  *
  * Our own playbooks (Meta, Google, TikTok) take precedence where both cover the
  * same ground, because they describe this server's tools and rules.
@@ -98,6 +104,32 @@ export const LIBRARIES: readonly LibrarySource[] = [
           .join('; ') +
         '.',
       '- For running Meta ads, follow it with get_playbook { platform: "meta-ads" } and this server’s ad tools.',
+    ],
+  },
+  {
+    folder: 'web-quality-skills',
+    source: 'addyosmani/web-quality-skills',
+    commit: 'afa8da942115f2961fdbfa80807ea0b232ff6c00',
+    licence: 'MIT licence',
+    note: [
+      '- Links such as "../performance/references/MEASUREMENT.md" point to another served skill: read it with',
+      '  get_skill { name: "performance", reference: "references/MEASUREMENT.md" }. "web-quality-audit", "seo" and',
+      '  "best-practices" are not served; use seo-audit, schema and ai-seo for search.',
+      '- "Chrome DevTools MCP" tools belong to another server. Without them, use PageSpeed Insights or Lighthouse,',
+      '  and say which figures are lab tests and which are real-visitor data.',
+      '- On Shopify, theme changes go through shopify-theme-developer (draft copy, preview, publish on approval).',
+    ],
+  },
+  {
+    folder: 'anthropic-skills',
+    source: 'anthropics/skills',
+    commit: '683bc88e56f3e09ba94f7055977f3d3aa499f202',
+    licence: 'Apache License 2.0',
+    note: [
+      '- For a store or an ad landing page, conversion conventions in web-ui-design and store-builder come first:',
+      '  shoppers expect a familiar product page, cart and checkout. Spend the distinctive choices on brand,',
+      '  type, colour and imagery, never on where the price, size selector or buy button sit.',
+      '- The brand’s own logo, colours and fonts always win over a new visual direction.',
     ],
   },
 ]

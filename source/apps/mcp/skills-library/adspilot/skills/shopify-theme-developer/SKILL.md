@@ -71,8 +71,10 @@ of date. Ask the owner not to edit the theme until you publish or discard.
 | `locales/*.json` | Storefront words and labels per language (`{{ 'key' \| t }}`) | button labels, "Sold out" text |
 | `assets/` | CSS, JS, fonts, images served from Shopify's CDN | small CSS additions |
 
-Limits worth knowing (shopify.dev, checked 2026-10-08): a JSON template renders **up to 25
-sections**, each section **up to 50 blocks**, and a theme holds **up to 1,000 JSON templates**.
+Limits worth knowing (shopify.dev theme limits, checked 2026-10-08): a JSON template renders
+**up to 25 sections**, each section **up to 50 blocks**; a theme holds **up to 1,000 JSON
+templates**; theme blocks nest **up to 8 levels**; a JSON template file is at most **512 KB**
+and a Liquid file **256 KB**.
 
 Liquid rules that catch people out:
 
@@ -187,7 +189,7 @@ Depth: `get_skill accessibility`.
 ## Sources (checked 2026-10-08)
 
 - Shopify, performance best practices for themes: https://shopify.dev/docs/storefronts/themes/best-practices/performance
-- Shopify, JSON templates (limits): https://shopify.dev/docs/storefronts/themes/architecture/templates/json-templates
+- Shopify, JSON templates and theme limits: https://shopify.dev/docs/storefronts/themes/architecture/templates/json-templates and https://shopify.dev/docs/storefronts/themes/architecture/limits
 - Shopify, alternate templates and the `view` parameter: https://shopify.dev/docs/storefronts/themes/architecture/templates/alternate-templates
 - Shopify, theme blocks: https://shopify.dev/docs/storefronts/themes/architecture/blocks/theme-blocks
 - Shopify, Theme Store requirements (Lighthouse 60 / 90, accessibility rules): https://shopify.dev/docs/storefronts/themes/store/requirements

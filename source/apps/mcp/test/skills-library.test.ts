@@ -23,7 +23,7 @@ describe('the skills library', () => {
   const library = loadLibrary()
 
   test('loads every skill in the pinned copies', () => {
-    assert.equal(library.size, 59)
+    assert.equal(library.size, 63)
     for (const name of ['seo-audit', 'ai-seo', 'copywriting', 'ads', 'social', 'cro']) {
       assert.ok(library.has(name), `${name} is missing`)
     }
@@ -37,7 +37,7 @@ describe('the skills library', () => {
     const server = new McpServer({ name: 't', version: '1' })
     registerSkillsLibrary(server)
     const text = await callTool(server, 'list_skills', {})
-    assert.match(text, /^59 skills/)
+    assert.match(text, /^63 skills/)
     assert.match(text, /seo-audit/)
   })
 
@@ -105,6 +105,37 @@ describe('the skills library', () => {
       const text = await callTool(server, 'get_skill', { name })
       assert.match(text, /realkimbarrett\/advertising-skills/, name)
       assert.doesNotMatch(text, /coreyhaines31/, name)
+    }
+  })
+
+  test('serves the web-building additions under their own sources and licences', async () => {
+    const server = new McpServer({ name: 't', version: '1' })
+    registerSkillsLibrary(server)
+    for (const [name, source, licence] of [
+      ['core-web-vitals', 'addyosmani/web-quality-skills', 'MIT'],
+      ['performance', 'addyosmani/web-quality-skills', 'MIT'],
+      ['accessibility', 'addyosmani/web-quality-skills', 'MIT'],
+      ['frontend-design', 'anthropics/skills', 'Apache License 2.0'],
+    ] as const) {
+      assert.equal(library.get(name)?.library.source, source, name)
+      const text = await callTool(server, 'get_skill', { name })
+      assert.ok(text.includes(source) && text.includes(licence), name)
+    }
+    // A link into a sibling skill is explained, so the AI can follow it.
+    const cwv = await callTool(server, 'get_skill', { name: 'core-web-vitals' })
+    assert.match(cwv, /get_skill \{ name: "performance", reference: "references\/MEASUREMENT\.md" \}/)
+    assert.ok(library.get('performance')!.references.includes('references/MEASUREMENT.md'))
+  })
+
+  test('every vendored source keeps its licence text beside the copy', async () => {
+    const { existsSync } = await import('node:fs')
+    const root = new URL('../skills-library/', import.meta.url)
+    for (const source of LIBRARIES.filter((l) => l.own !== true)) {
+      const dir = new URL(`${source.folder}/`, root)
+      assert.ok(
+        ['LICENSE', 'LICENSE.txt', 'NOTICE.md'].some((f) => existsSync(new URL(f, dir))),
+        `${source.folder} has no licence file`,
+      )
     }
   })
 
