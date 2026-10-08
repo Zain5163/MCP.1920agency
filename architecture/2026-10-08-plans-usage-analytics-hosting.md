@@ -304,6 +304,16 @@ Threads use case, unavailable on this Business-type app). Server worker: one
 post published 09:00 PKT (queue 3 → 2, 0 failed), but which worker sent it is
 unknown (container logs were cleared by a recreate); the 15:30 post decides A7.
 
+**~10:30 PKT: backups proven restorable, hosted MCP verified.** The owner ran
+`deploy/scripts/pc-backups.sh restore-test`: the 08 Oct backup was decrypted on
+the PC and loaded into a throwaway Postgres on the server; all 10 migrations
+applied on plain Postgres (the NOLOGIN roles worked) and every table restored
+(posts 25, connections 57, jobs 20, targets 27, tenants 6, tool_calls 19 ...),
+then the copy was deleted. A9 done: an AI client (Claude Code, "adspilot-hosted")
+is connected to https://mcp.1920agency.com/mcp; `check_usage` answers Premium /
+Agency and `list_shopify_stores` lists `1920-agency-test-store` connected through
+the hosted Shopify flow.
+
 Earlier the same day (kept for the record): the plan, costs, risks and every step are in
 `deploy/README.md`: Stage A moves the MCP, the worker (as a loop) and the
 timers to the server with Supabase kept as the database; Stage B moves the data
