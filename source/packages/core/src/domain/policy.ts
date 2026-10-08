@@ -189,6 +189,51 @@ export const ACTION_POLICY: Readonly<Record<string, ActionPolicy>> = {
   },
 
   /**
+   * WordPress and WooCommerce changes (research/2026-10-08-wordpress-connector.md).
+   * Each saves the previous version first. New content is always a draft, so
+   * making something public is its own approval.
+   */
+  wordpress_save_content: {
+    rationale:
+      'Creates a draft page or post, or changes an existing one. A change to a published page is ' +
+      'seen by visitors at once. The previous version is saved first.',
+    risk: 'high',
+    reversible: true,
+    consequence: 'A new page or post stays a private draft. A change to a published one is seen by visitors at once. The previous version is kept and can be put back.',
+    spendsMoney: false,
+  },
+  wordpress_publish_content: {
+    rationale: 'Makes a draft public (or takes a public page back to draft, breaking links and ads that point to it).',
+    risk: 'high',
+    reversible: true,
+    consequence: 'The change of visibility takes effect at once. The previous version is kept and can be put back.',
+    spendsMoney: false,
+  },
+  wordpress_upload_media: {
+    rationale: 'Adds a file to the site’s Media Library, where it gets a public address. It can be deleted afterwards.',
+    risk: 'high',
+    reversible: true,
+    consequence: 'The image gets a public address on the site at once; it shows on a page only when a page uses it. It can be deleted from Media Library.',
+    spendsMoney: false,
+  },
+  wordpress_restore_backup: {
+    rationale: 'Puts a saved earlier version of a page, post or product back. Public at once if it is published.',
+    risk: 'high',
+    reversible: true,
+    consequence: 'Visitors see the restored version at once if it is published. The version it replaces is kept too.',
+    spendsMoney: false,
+  },
+  woocommerce_update_product: {
+    rationale:
+      'Changes a product’s name, text or prices. Buyers see a new price at once and orders placed ' +
+      'at it keep it. The previous version is saved first.',
+    risk: 'high',
+    reversible: false,
+    consequence: 'Buyers see this at once, and orders placed at a new price keep that price even if it is changed back. The previous version is kept and can be put back.',
+    spendsMoney: false,
+  },
+
+  /**
    * Ads. Every one of these can cost money, which is why they are listed rather
    * than left to the high-risk default — the default protects, but says nothing
    * useful about why.

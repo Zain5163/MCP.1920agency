@@ -10,6 +10,8 @@ import type { PostingDeps } from './publishing.ts'
 import { registerHostedShopifyTools } from './shopify-hosted.ts'
 import { registerSkillsLibrary } from './skills-library.ts'
 import { registerTools } from './tools.ts'
+import { hostedWordPressAccess } from './wordpress-access.ts'
+import { registerWordPressTools } from './wordpress-tools.ts'
 
 /**
  * The hosted (HTTP) tool set for one request's identity, on a metered server.
@@ -45,6 +47,8 @@ export function buildHostedServer(
   // Playbooks only: static text, no credentials. Ads tools stay local (decision 0005).
   // Each user's own Shopify stores, with their own encrypted tokens (shopify-hosted.ts).
   registerHostedShopifyTools(server, identity.tenantId)
+  // Each user's own WordPress sites, with their own encrypted Application Passwords.
+  registerWordPressTools(server, hostedWordPressAccess(identity.tenantId))
   registerPlaybooks(server)
   registerSkillsLibrary(server)
   return server

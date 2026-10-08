@@ -15,6 +15,8 @@ import { registerShopifyThemeTools } from './shopify-theme-tools.ts'
 import { registerShopifyTools, registerShopifyWriteTools } from './shopify-tools.ts'
 import { registerPlaybooks } from './playbooks.ts'
 import { registerSkillsLibrary } from './skills-library.ts'
+import { localWordPressAccess } from './wordpress-access.ts'
+import { registerWordPressTools } from './wordpress-tools.ts'
 import { currentScope, loadConnections, postingDeps } from './context.ts'
 import { buildDraft, callFailure, formatPostList, publishPost } from './publishing.ts'
 import { createAdsPilotServer } from './mcp-server.ts'
@@ -269,6 +271,8 @@ export function buildLocalServer(meter: MeterOptions): McpServer {
   registerShopifyBuildTools(server)
   // Phase 2b: theme changes through the Shopify CLI, on a hidden copy, published only on approval.
   registerShopifyThemeTools(server)
+  // WordPress and WooCommerce: the same tools as hosted, sites stored in the local vault.
+  registerWordPressTools(server, localWordPressAccess())
 
   // Expertise is served on both transports; it is static text and holds no secrets.
   registerPlaybooks(server)
