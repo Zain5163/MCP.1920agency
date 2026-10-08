@@ -63,6 +63,20 @@ for (const [label, build] of transports) {
       assert.ok(names.includes('publish_post'))
     })
 
+    test('serves the WordPress and WooCommerce tools, metered like every other', () => {
+      // Named here so that dropping them from a transport fails loudly, and the
+      // metering check below then covers each of them on this transport.
+      for (const name of [
+        'wordpress_connect_site', 'wordpress_disconnect_site', 'list_wordpress_sites', 'wordpress_site_overview',
+        'wordpress_list_content', 'wordpress_read_content', 'wordpress_site_audit', 'wordpress_save_content',
+        'wordpress_publish_content', 'wordpress_upload_media', 'wordpress_list_backups', 'wordpress_restore_backup',
+        'woocommerce_products', 'woocommerce_update_product',
+      ]) {
+        assert.ok(names.includes(name), `${label} is missing ${name}`)
+        assert.equal(markOf(tools[name]!.handler), 'counted', `${label}: ${name} is not counted`)
+      }
+    })
+
     test('has the free account tools', () => {
       for (const name of FREE_TOOLS) assert.ok(names.includes(name), `${label} is missing ${name}`)
     })

@@ -3,8 +3,20 @@
 **Updated 2026-10-08** (WooCommerce 11.2). Page-level conversion advice is shared with
 Shopify stores and lives in one place: `get_skill store-builder`, references
 `conversion-checklists.md` and `cash-on-delivery.md`. This file adds only what is specific
-to WooCommerce. AdsPilot cannot change a WooCommerce store; every step below is done by
-the owner or developer, on staging first.
+to WooCommerce.
+
+**What AdsPilot can do here** (every change with the user's approval on an exact summary,
+the previous version saved first, the result read back): read products with
+`woocommerce_products`; change a product's name, descriptions, regular and sale price and
+sale dates with `woocommerce_update_product` (variable products are priced per variation);
+put an earlier version back with `wordpress_restore_backup`. The approval summary states
+the store currency and whether WooCommerce prices are entered including or excluding tax
+(the `woocommerce_prices_include_tax` setting): before approving a price, check it against
+the market's rule in `selling-by-country` (tax-inclusive shelf prices in the UK, EU,
+Australia, New Zealand and the Gulf; a "was" price that was really charged, in the EU the
+lowest of the last 30 days). Product changes need a Shop Manager or Administrator login.
+Everything in the settings table below (checkout, payments, tax, shipping, coupons) is
+done by the owner or developer, on staging first; AdsPilot gives the steps.
 
 ## Settings that decide whether ad traffic buys
 
@@ -30,8 +42,10 @@ the owner or developer, on staging first.
   combination with its own price, stock and image.
 - Gallery: 4–6 photos including scale and detail; the main image not lazy-loaded.
 - Short description (next to the price) carries the delivery, payment and exchange line;
-  the long description carries materials, fit and care.
-- Size guide: a page linked next to the variation selector.
+  the long description carries materials, fit and care (`woocommerce_update_product`, with
+  `copywriting`; never invent specifications).
+- Size guide: a page linked next to the variation selector (`wordpress_save_content` as a
+  draft, then `wordpress_publish_content`).
 - Reviews: WooCommerce's built-in product reviews, "verified owner" label on; real only.
 - Related products and cross-sells set by hand for best sellers.
 
@@ -75,6 +89,8 @@ the owner or developer, on staging first.
 - Policies, legal notice and returns wording per market: `selling-by-country`.
 
 ## Sources (checked 2026-10-08; cited, not copied)
+
+- AdsPilot connector research (WooCommerce REST v3 with Application Passwords, the tax setting): research/2026-10-08-wordpress-connector.md in the AdsPilot repository
 
 - WooCommerce 11.0 release: https://developer.woocommerce.com/2026/08/04/woocommerce-11-0/
 - Cart and Checkout blocks default since 8.3, HPOS default since 8.2: https://developer.woocommerce.com/2023/10/10/woocommerce-8-2-0-released/

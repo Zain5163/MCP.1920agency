@@ -27,7 +27,7 @@ own pricing page before quoting a number, and never quote one from memory.
 | Option | Fits when | Watch out for | AdsPilot today |
 |---|---|---|---|
 | **Shopify** | Most product businesses that want a store working quickly, with little maintenance; good themes, checkout and apps; scales well | Monthly plan plus app costs; Shopify Payments is not available in every country (on 2026-10-08 not in Pakistan, India or Saudi Arabia; available in the US, Canada, UK, much of the EU, Australia, New Zealand and the UAE; check the official list), and Shopify charges an extra transaction fee on orders paid through third-party gateways when Shopify Payments is not used (not on cash on delivery or other manual methods); theme code changes need care | **Connected**: store audit, sales, products, pages, collections, menus, policies, discounts, and theme drafts with preview and approved publish (theme tools in the local app). Skills: store-builder, shopify-theme-developer |
-| **WooCommerce on WordPress** | A business that already has a WordPress site or content; wants full control and ownership; has a developer or a good managed host | Hosting, updates, backups and security are the owner's job; plugin quality varies (most WordPress vulnerabilities are in plugins); speed depends on hosting and theme | **Guidance only**: no WordPress tools. Skill: wordpress-site-builder |
+| **WooCommerce on WordPress** | A business that already has a WordPress site or content; wants full control and ownership; has a developer or a good managed host | Hosting, updates, backups and security are the owner's job; plugin quality varies (most WordPress vulnerabilities are in plugins); speed depends on hosting and theme | **Connected** (self-hosted, with an Application Password): site audit, pages and posts (drafts, publish on approval), media, WooCommerce product text and prices, backups and restore (`wordpress_connect_site`). Plugins, themes, settings and checkout stay with the owner or developer. Skill: wordpress-site-builder |
 | **Wix, Squarespace and similar** | Small catalogue, a brochure site with a few products, an owner who wants to do everything visually | Fewer e-commerce features and integrations; harder to move away later | Guidance only (landing-page-builder, web-ui-design) |
 | **Marketplace** (Amazon in many countries; regional ones such as Daraz in Pakistan, Flipkart in India, noon in the Gulf, Zalando in Europe, Etsy for handmade) | Testing demand without a store; reaching buyers who search marketplaces | Commission per sale, marketplace rules, no customer list, price competition next to rivals | Ads and content only |
 | **Social selling** (Instagram or Facebook shop, WhatsApp Business catalogue, orders by chat) | Very small catalogue, made-to-order items, or the first weeks of a business | Manual order handling, no checkout, hard to measure sales from ads | Social posting and messaging-objective ads (campaign-setup) |
@@ -39,9 +39,12 @@ regular, and keep the marketplace as an extra channel.
 ## 3. Recommendation rules
 
 - **No site yet, product business, runs ads:** Shopify, unless a clear reason points elsewhere.
-  It is the platform AdsPilot can build and improve directly.
+  It is the platform AdsPilot can build and improve most completely (themes, menus,
+  collections, policies, discounts as well as content).
 - **Existing WordPress site with traffic and a developer:** add WooCommerce rather than
-  starting over, and keep the content and search rankings.
+  starting over, and keep the content and search rankings. AdsPilot can connect to it
+  (`wordpress_connect_site`) to audit it and improve pages and products, each change with the
+  user's approval.
 - **Existing store that works:** do not switch platforms to fix conversion; fix the pages,
   offer and speed first (store-builder, landing-page-builder). Switching costs months.
 - **Any market:** the choice often depends on which payment gateways, couriers and tax

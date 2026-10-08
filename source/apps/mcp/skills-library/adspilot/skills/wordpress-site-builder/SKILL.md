@@ -1,6 +1,6 @@
 ---
 name: wordpress-site-builder
-description: "Plan, build, fix and speed up a WordPress site or WooCommerce store for a business that runs ads: block themes versus classic themes and page builders, theme.json and patterns, landing pages, WooCommerce product, cart and checkout (block checkout, payments and tax display per country, cash on delivery, cookie consent, Meta pixel and Conversions API), plugins to keep or avoid, caching and Core Web Vitals, security and backups, and WP-CLI / REST API basics for developers. AdsPilot has no WordPress tools: this skill guides the AI and the owner, and every change is made by the owner or their developer. Use when the site is on WordPress or WooCommerce, or the user asks to build one."
+description: "Plan, build, fix and speed up a WordPress site or WooCommerce store for a business that runs ads: block themes versus classic themes and page builders, theme.json and patterns, landing pages, WooCommerce product, cart and checkout (block checkout, payments and tax display per country, cash on delivery, cookie consent, Meta pixel and Conversions API), plugins to keep or avoid, caching and Core Web Vitals, security and backups, and WP-CLI / REST API basics for developers. AdsPilot connects to a self-hosted WordPress site with an Application Password (wordpress_connect_site) and can read, audit and, with the user's approval for each change, edit pages, posts, media and WooCommerce products; theme, plugin and settings changes stay with the owner or developer. Use when the site is on WordPress or WooCommerce, or the user asks to build one."
 ---
 
 # WordPress site builder
@@ -10,15 +10,52 @@ description: "Plan, build, fix and speed up a WordPress site or WooCommerce stor
 
 ## 0. What AdsPilot can and cannot do here
 
-AdsPilot has **no WordPress or WooCommerce tools**. It cannot log in to a WordPress site,
-edit pages, install plugins or change settings. Say so at the start, then work as the
-expert who writes the plan, the page content, the code snippets and the click-by-click
-steps, which the owner or their developer carries out. Never claim a change was made on a
-WordPress site, and never ask the user to paste a password or application password into
-the chat.
+**Every change needs the user's approval.** Each change tool first returns an exact
+summary (before and after) and an approval token; show the summary, and call again with the
+token only after the user says yes. Never supply a token the user did not give. Each change
+saves the current version first and reads the result back; report a read-back mismatch as a
+mismatch, never as done.
 
-What AdsPilot does help with on a WordPress business: ads (`get_playbook`), the pixel
-(`check_ad_setup`, `create_pixel` where available), social posts, and the marketing skills.
+**Connecting** (`wordpress_connect_site`): self-hosted WordPress 5.6 or newer on `https://`.
+It takes the site address, the WordPress username and an **Application Password**, never
+the user's own login password. Tell the user how to make one: log in to WordPress as the
+user AdsPilot should act as, go to **Users > Profile**, scroll to **Application Passwords**,
+type "AdsPilot", click **Add New Application Password**, and copy the password it shows
+once. An Application Password has the full rights of its user, so suggest a dedicated
+**Editor** account for content only, or an **Administrator** (or **Shop Manager** for
+WooCommerce) when plugins, settings and products are needed. It can be revoked on the same
+screen at any time; `wordpress_disconnect_site` revokes it on the site and deletes AdsPilot's
+encrypted copy. If the section is missing, a security plugin (Wordfence turns it off by
+default: Wordfence > All Options > Brute Force Protection) or a missing HTTPS setting has
+turned Application Passwords off; the connect tool says which fix applies.
+WordPress.com-hosted sites are not supported yet.
+
+| Tool | What it does | Approval |
+|---|---|---|
+| `list_wordpress_sites`, `wordpress_site_overview` | Connected sites; name, tagline, theme, plugins (administrators), permalinks, counts, WooCommerce currency and tax display | No (reads) |
+| `wordpress_list_content`, `wordpress_read_content` | Pages and posts with status and address; one in full | No (reads) |
+| `wordpress_site_audit` | Findings from what the site returns: SEO basics, mobile viewport, alt text, scripts and caching signs, missing contact, privacy, returns and FAQ pages, inactive or duplicate plugins, WooCommerce products without photos or text. No invented score | No (reads) |
+| `woocommerce_products` | Products, prices, sale prices, stock, photos, variations | No (reads) |
+| `wordpress_save_content` | Create a page or post (always a **draft**) or change title, content, excerpt, slug | Yes |
+| `wordpress_publish_content` | Make a draft public, or take a page back to draft | Yes |
+| `wordpress_upload_media` | Add an image from a public https address to the Media Library, with alt text | Yes |
+| `woocommerce_update_product` | Product name, descriptions, regular and sale price and sale dates (per variation for variable products) | Yes |
+| `wordpress_list_backups`, `wordpress_restore_backup` | Earlier versions AdsPilot saved, and WordPress revisions; put one back | Restore: yes |
+
+AdsPilot does **not** install or update plugins or themes, edit theme files or
+`theme.json`, or change settings, menus, checkout, payments, shipping or tax: give the owner
+or developer the steps (sections below). Core WordPress has no SEO title or meta description
+field: AdsPilot sets the **excerpt** (many themes and SEO plugins use it) and gives the owner
+the exact SEO title and description to paste into their SEO plugin.
+
+Work order on a site: `wordpress_site_audit`, then plan the fixes with the user (`cro`,
+`copywriting`, `seo-audit`, and `selling-by-country` for the market), then draft new pages
+with `wordpress_save_content`; the user checks the draft in wp-admin (the result gives the
+edit link), then `wordpress_publish_content` on approval. For a page that is already live,
+say plainly that visitors see the change as soon as it is saved.
+
+Also on a WordPress business: ads (`get_playbook`), the pixel (`check_ad_setup`,
+`create_pixel` where available), social posts, and the marketing skills.
 Related skills: `landing-page-builder` (ad pages), `web-ui-design` (look and layout),
 `cro` and `copywriting`, `seo-audit`, `schema` and `site-architecture` (search and
 structure), `core-web-vitals` and `performance` (speed), `accessibility`.
@@ -140,7 +177,8 @@ From the official hardening guide (developer.wordpress.org, Advanced Administrat
 
 ## 7. For developers: WP-CLI and the REST API
 
-Give these to the owner's developer; AdsPilot does not run them.
+AdsPilot's own tools use the REST API (section 0). The commands below are for the owner's
+developer; AdsPilot does not run them.
 
 - **WP-CLI** (on the server, after a backup): `wp core update`, `wp plugin list --update=available`,
   `wp plugin update --all`, `wp theme list`, `wp search-replace 'http://old' 'https://new' --dry-run`,
@@ -153,15 +191,23 @@ Give these to the owner's developer; AdsPilot does not run them.
 ## 8. Check three times
 
 1. **Plan**: every change tied to a finding and the ad goal; prices, terms and claims from the owner.
-2. **Staging**: the owner or developer applies it on staging; check phone and desktop, a
-   test order or form, the pixel events in Events Manager, page speed.
-3. **Live**: after the owner pushes it live (with a fresh backup), repeat the test order or
-   form and the event check.
+2. **Draft or staging**: new pages go in as drafts (`wordpress_save_content`); the user
+   previews them on a phone and a computer from wp-admin. Theme, plugin and checkout changes
+   go to staging, done by the owner or developer; check a test order or form, the pixel
+   events in Events Manager, page speed.
+3. **Live**: after publishing (`wordpress_publish_content`, approved) or the owner's push
+   from staging (with a fresh backup), open the live page, repeat the test order or form
+   and the event check. AdsPilot's read-back confirms what WordPress saved, not how the page
+   looks: check that too.
 
 ## Never
 
-- Claim AdsPilot changed a WordPress site, or invent a WordPress tool.
-- Ask for passwords, application passwords or database credentials in the chat.
+- Make a change without the user's approval on the exact summary, or call a change done
+  when its read-back did not match. Never invent a WordPress tool or claim a change the
+  tools did not make (plugins, themes, settings, checkout).
+- Ask for the user's own login password or database or hosting credentials. The only login
+  AdsPilot takes is an Application Password, given to `wordpress_connect_site`; never repeat
+  it back or write it anywhere else.
 - Recommend nulled themes or plugins, or editing a live site without a backup.
 - Invent reviews, prices or delivery promises, or legal text (legal notice, VAT numbers,
   withdrawal terms): the owner supplies the facts, and a local adviser checks anything binding.
@@ -174,6 +220,7 @@ unlicensed, so it is cited and paraphrased, never copied)
 - Registering patterns: https://developer.wordpress.org/themes/patterns/registering-patterns/
 - Hardening guide: https://developer.wordpress.org/advanced-administration/security/hardening/
 - Application Passwords: https://developer.wordpress.org/advanced-administration/security/application-passwords/
+- AdsPilot connector research (Application Passwords, REST endpoints, WooCommerce, blockers): research/2026-10-08-wordpress-connector.md in the AdsPilot repository
 - Image performance in 6.3 (fetchpriority): https://make.wordpress.org/core/2023/07/13/image-performance-enhancements-in-wordpress-6-3/
 - AVIF in 6.5: https://make.wordpress.org/core/2024/02/23/wordpress-6-5-adds-avif-support/
 - Speculative loading in 6.8: https://make.wordpress.org/core/2025/03/06/speculative-loading-in-6-8/

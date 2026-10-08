@@ -196,7 +196,7 @@ describe('the skills library', () => {
    * exist sends it looking for something it cannot do, or worse, makes it
    * claim it did. Every shopify_ name in our skills must be a registered tool.
    */
-  test('our own skills name only Shopify tools that really exist', async () => {
+  test('our own skills name only Shopify, WordPress and WooCommerce tools that really exist', async () => {
     const { readFileSync, readdirSync } = await import('node:fs')
     const { join } = await import('node:path')
     const srcDir = new URL('../src/', import.meta.url)
@@ -205,11 +205,13 @@ describe('the skills library', () => {
       const code = readFileSync(new URL(file, srcDir), 'utf8')
       for (const [, name] of code.matchAll(/server\.tool\(\s*'([a-z_]+)'/g)) registered.add(name!)
     }
-    assert.ok(registered.has('shopify_theme_publish') && registered.has('list_skills'), 'tool scan found nothing')
+    assert.ok(registered.has('shopify_theme_publish') && registered.has('wordpress_save_content') && registered.has('list_skills'), 'tool scan found nothing')
     for (const skill of [...library.values()].filter((s) => s.library.own === true)) {
       for (const file of ['SKILL.md', ...skill.references]) {
         const text = readFileSync(join(skill.dir, ...file.split('/')), 'utf8')
-        for (const [name] of text.matchAll(/(?<![.\w])shopify_[a-z_]+/g)) {
+        for (const [name] of text.matchAll(/(?<![.\w/-])(shopify|wordpress|woocommerce)_[a-z_]+|list_(shopify_stores|wordpress_sites)/g)) {
+          // WooCommerce's own option and filter names share the prefix; they are not tools.
+          if (/^woocommerce_(checkout|checkout_fields|prices_include_tax|calc_taxes|currency|tax_display_shop|tax_display_cart)$/.test(name)) continue
           assert.ok(registered.has(name), `${skill.name}/${file} names ${name}, which is not a tool`)
         }
       }
@@ -260,12 +262,19 @@ describe('the skills library', () => {
     }
   })
 
-  /** AdsPilot has no WordPress tools; the skill must say so before anything else. */
-  test('the WordPress skill says AdsPilot cannot change a WordPress site', async () => {
+  /**
+   * AdsPilot has WordPress tools since 2026-10-08. Before anything else the skill
+   * must name them and say that every change waits for the user's approval, and
+   * that the login is an Application Password, never the user's own password.
+   */
+  test('the WordPress skill names its tools and the approval rule first', async () => {
     const server = new McpServer({ name: 't', version: '1' })
     registerSkillsLibrary(server)
-    const text = await callTool(server, 'get_skill', { name: 'wordpress-site-builder' })
-    assert.match(text.slice(0, 3000), /AdsPilot has \*\*no WordPress or WooCommerce tools\*\*/)
+    const text = (await callTool(server, 'get_skill', { name: 'wordpress-site-builder' })).slice(0, 4000)
+    assert.match(text, /wordpress_connect_site/)
+    assert.match(text, /Every change needs the user['’]s approval/i)
+    assert.match(text, /Application Password/)
+    assert.match(text, /never\s+the user['’]s own login password/i)
   })
 
   test('the framing tells the AI our playbooks win where both apply', () => {

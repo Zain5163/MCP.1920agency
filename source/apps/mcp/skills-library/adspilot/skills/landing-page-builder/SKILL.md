@@ -172,9 +172,15 @@ For a single product, the product page itself, improved (`shopify_update_product
 An offer that needs a code or bundle: `shopify_create_discount` (always with an end date).
 
 **WordPress.** A page built with the block editor and patterns, on a template without the
-full menu, or a landing-page plugin already on the site. AdsPilot has no WordPress tools:
-write the content and the steps, and the owner or developer builds it. See
-`get_skill wordpress-site-builder`.
+full menu, or a landing-page plugin already on the site. With the site connected
+(`wordpress_connect_site`), AdsPilot writes the page as block editor HTML and saves it as a
+**draft** (`wordpress_save_content`, approved), adds images with alt text
+(`wordpress_upload_media`, approved), and publishes it only on a separate approval
+(`wordpress_publish_content`) after the user has checked the draft on a phone. Choosing a
+template without the menu, a page builder layout or a landing-page plugin stays with the
+owner or developer: give the steps. A WooCommerce product page improved with
+`woocommerce_update_product` is often the best landing page for one product. Every change
+needs the user's approval. See `get_skill wordpress-site-builder`.
 
 **Plain HTML.** One file, inline critical CSS, system or one self-hosted font, images in
 WebP or AVIF with fallbacks, the form posting to a service the owner controls. Hosting and
