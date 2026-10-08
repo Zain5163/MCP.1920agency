@@ -279,6 +279,17 @@ timers (after A7, so monitor/refresh do not run twice), A9 connecting an AI
 client to the hosted URL (needs a dashboard token). Then: the hosted OAuth
 callback (Meta Live mode, Google, and the Shopify connector all need it).
 
+**~07:25 PKT: OAuth over https LIVE** (owner approved): Raptor's Caddyfile
+(`d00ef47`, pushed) written in place (backup `Caddyfile.bak-<time>`), validated
+and `caddy reload`ed with no downtime. Checked: GET on the 7 callback paths →
+302 to `http://localhost:8787<same path and query>` with `Cache-Control:
+no-store`; `/callbackx` and POST `/callback` → 404; `/health` 200; `/mcp` 401
+without a token; Raptor's site and API 200. The owner added the https addresses
+in the Meta (Facebook Login for Business, Instagram business login) and Google
+consoles, keeping the localhost ones, and switched `META_`, `INSTAGRAM_`,
+`THREADS_` and `GOOGLE_REDIRECT_URI` in the PC `.env`. Not yet verified: a real
+reconnect through the bounce (owner runs `pnpm connect` etc. in `source/apps/cli`).
+
 Earlier the same day (kept for the record): the plan, costs, risks and every step are in
 `deploy/README.md`: Stage A moves the MCP, the worker (as a loop) and the
 timers to the server with Supabase kept as the database; Stage B moves the data
