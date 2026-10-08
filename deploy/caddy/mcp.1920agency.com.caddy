@@ -7,8 +7,10 @@
 # that exists only on the server. Raptor's own blocks stay exactly as they are.
 #
 # Prerequisites: DNS mcp.1920agency.com -> 37.27.148.217 (live, 2026-10-08),
-# and the AdsPilot "mcp" container running on Raptor's network (deploy_internal)
-# under the alias adspilot-mcp (deploy/docker-compose.yml does that). Caddy
+# the AdsPilot "mcp" container on the edge network adspilot_edge under the alias
+# adspilot-mcp (deploy/docker-compose.yml), and Raptor's Caddy attached to that
+# network too (Raptor's deploy/docker-compose.yml: caddy networks + the external
+# network declaration). Caddy
 # obtains and renews the certificate itself, as it does for Raptor's domains.
 
 mcp.1920agency.com {

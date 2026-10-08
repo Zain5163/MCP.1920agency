@@ -110,7 +110,7 @@ Two stages, so each can be checked before the next:
 | Disk | 38 GB, 17 GB used, 20 GB free. Docker: images 10.1 GB, **build cache 11.5 GB (9.7 GB reclaimable)** |
 | Docker | 29.1.3, Compose 2.40.3 |
 | Running | `deploy-api-1` (Raptor API, 68 MB), `deploy-caddy-1` (Caddy 2, 21 MB), project `deploy` from `/opt/raptor/site/deploy` |
-| Network | `deploy_internal` 172.30.0.0/24 (api .2, caddy .3), covered by Raptor's egress firewall |
+| Network | `deploy_internal` 172.30.0.0/24 (api .2, caddy .3), covered by Raptor's egress firewall. AdsPilot uses its own `adspilot_edge` (Caddy + MCP only) |
 | Caddyfile | identical to Raptor's committed `site/deploy/Caddyfile` (sha256 matched); no `mcp.` block |
 | Firewall | ufw: 22, 80, 443/tcp, 443/udp only |
 | Tools | gpg, logrotate, systemd, curl, git present; `age` and `pg_dump` not installed (the kit needs neither: pg_dump runs in the postgres image) |
@@ -201,9 +201,11 @@ ENVPC="$(cygpath -u "$USERPROFILE")/.social-publisher/.env"
 
 **A0. Approvals needed** (owner): this plan; adding the `mcp.1920agency.com`
 block to Raptor's Caddyfile and recreating Caddy (seconds of Raptor downtime);
-the AdsPilot MCP container joining Raptor's network `deploy_internal`.
-Optional, separate: a 2 GB swap file; `docker builder prune --filter until=168h`
-to reclaim Raptor's old build cache.
+a separate edge network `adspilot_edge` shared only by Raptor's Caddy and the
+MCP (chosen over joining Raptor's `deploy_internal`, so the MCP cannot reach
+Raptor's API). Optional, separate: a 2 GB swap file; `docker builder prune
+--filter until=168h` to reclaim Raptor's old build cache. **All approved by the
+owner on 2026-10-08.**
 
 **A1. Merge and push.** Merge `phase3-deploy` into `master`; push to GitHub.
 
@@ -241,14 +243,18 @@ status`; it stops if migrations are pending), starts `mcp` and `worker`, prints
 the health answer. From here the PC worker and the server worker both run; that
 is safe (see above).
 
-**A5. Caddy.** Append `deploy/caddy/mcp.1920agency.com.caddy` to
-`Websites/FreeVideoDownloaderOnline/site/deploy/Caddyfile` and commit it **in
-Raptor's repo** (otherwise Raptor's next release removes it). Then upload only
-that file, validate, and recreate Caddy:
+**A5. Caddy.** In **Raptor's repo** (otherwise Raptor's next release removes
+it), commit two changes: append `deploy/caddy/mcp.1920agency.com.caddy` to
+`site/deploy/Caddyfile`, and in `site/deploy/docker-compose.yml` attach the
+caddy service to the edge network (`networks: [internal, adspilot_edge]`, plus
+`adspilot_edge: {external: true, name: adspilot_edge}` under `networks:`).
+setup.sh (A4) has already created that network. Check first that the server's
+two files still match the repo (sha256), then upload only those files,
+validate, and recreate Caddy:
 
 ```bash
 cd "/d/My AI Works/Websites/FreeVideoDownloaderOnline/site"
-git -c core.autocrlf=false archive HEAD deploy/Caddyfile | $S 'tar -x -C /opt/raptor/site'
+git -c core.autocrlf=false archive HEAD deploy/Caddyfile deploy/docker-compose.yml | $S 'tar -x -C /opt/raptor/site'
 $S 'cd /opt/raptor/site/deploy \
   && docker run --rm -v "$PWD/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2 caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile \
   && docker compose up -d --force-recreate caddy'

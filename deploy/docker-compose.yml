@@ -79,7 +79,9 @@ services:
     networks:
       adspilot: {}
       edge:
-        # Raptor's Caddy reaches the MCP by this name on Raptor's network.
+        # Raptor's Caddy reaches the MCP by this name on the shared edge network.
+        # Only Caddy and the MCP are on it (owner's choice, 2026-10-08): the MCP
+        # cannot reach Raptor's API, and is outside the subnet Raptor trusts.
         aliases:
           - adspilot-mcp
 
@@ -180,9 +182,10 @@ secrets:
 networks:
   adspilot: {}
   edge:
-    # Raptor's compose network, where its Caddy runs (project "deploy").
+    # A small network of its own, joined by Raptor's Caddy (declared in Raptor's
+    # deploy/docker-compose.yml) and the MCP only. setup.sh creates it.
     external: true
-    name: ${EDGE_NETWORK:-deploy_internal}
+    name: ${EDGE_NETWORK:-adspilot_edge}
 
 volumes:
   pgdata:

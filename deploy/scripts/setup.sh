@@ -109,7 +109,7 @@ if [ ! -f "$COMPOSE_ENV" ]; then
   {
     echo "# AdsPilot compose settings. No secrets in this file."
     echo "ADSPILOT_HOME=$ADSPILOT_HOME"
-    echo "EDGE_NETWORK=deploy_internal"
+    echo "EDGE_NETWORK=adspilot_edge"
     echo "ADSPILOT_TAG=latest"
     echo "COMPOSE_PROFILES="
   } > "$COMPOSE_ENV"
@@ -138,14 +138,14 @@ if [ "$DB" = supabase ] && [ "$mode" = local ]; then
   die "--db supabase, but DATABASE_URL points at the postgres service on this server."
 fi
 
-# --- 3. the edge network (Raptor's Caddy) ------------------------------------------------
+# --- 3. the edge network (shared only by Raptor's Caddy and the MCP) --------------------
+# Created here; Raptor's compose file declares it external and attaches its Caddy.
+# Its own network rather than Raptor's (owner, 2026-10-08), so the MCP cannot reach
+# Raptor's API and is outside the subnet the API trusts for forwarded addresses.
 edge=$(sed -n 's/^EDGE_NETWORK=//p' "$COMPOSE_ENV")
 if ! docker network inspect "$edge" >/dev/null 2>&1; then
-  if [ "$LOCAL_EDGE" = 1 ]; then
-    docker network create "$edge" >/dev/null
-  else
-    die "network $edge not found. On the Hetzner server it is Raptor's (deploy_internal); is Raptor running?"
-  fi
+  say "creating the edge network $edge"
+  docker network create "$edge" >/dev/null
 fi
 
 # --- 4. build ----------------------------------------------------------------------------------
