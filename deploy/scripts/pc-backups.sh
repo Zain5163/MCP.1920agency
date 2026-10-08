@@ -44,7 +44,8 @@ case $cmd in
     mkdir -p "$LOCAL_DIR"
     chmod 700 "$LOCAL_DIR" 2>/dev/null || true
     got=0
-    for name in $(rs "cd $REMOTE_DIR && ls -1 adspilot-*.dump.gpg 2>/dev/null" || true); do
+    # database dumps and the store-backups archives (adspilot-files-*)
+    for name in $(rs "cd $REMOTE_DIR && ls -1 adspilot-*.gpg 2>/dev/null" || true); do
       [ -f "$LOCAL_DIR/$name" ] && continue
       scp -q -i "$KEY" -o BatchMode=yes "$HOST:$REMOTE_DIR/$name" "$LOCAL_DIR/$name.partial"
       mv "$LOCAL_DIR/$name.partial" "$LOCAL_DIR/$name"
@@ -52,8 +53,11 @@ case $cmd in
       got=$((got + 1))
     done
     # keep the newest KEEP_LOCAL here
-    ls -1t "$LOCAL_DIR"/adspilot-*.dump.gpg 2>/dev/null | tail -n +"$((KEEP_LOCAL + 1))" | while IFS= read -r f; do
-      rm -f -- "$f"; echo "removed old local copy $(basename "$f")"
+    for kind in 'adspilot-*.dump.gpg' 'adspilot-files-*.tar.gz.gpg'; do
+      # shellcheck disable=SC2086
+      ls -1t "$LOCAL_DIR"/$kind 2>/dev/null | tail -n +"$((KEEP_LOCAL + 1))" | while IFS= read -r f; do
+        rm -f -- "$f"; echo "removed old local copy $(basename "$f")"
+      done
     done
     echo "$got new backup(s); folder: $LOCAL_DIR"
     [ -n "$(newest_local)" ] || { echo "STOPPED: no backup on this PC." >&2; exit 1; }

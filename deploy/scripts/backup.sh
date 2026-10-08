@@ -36,7 +36,7 @@ notify_failure() {
 on_exit() {
   local rc=$?
   [ "$rc" -eq 0 ] || notify_failure
-  rm -f "${tmp:-}"
+  rm -f "${tmp:-}" "${ftmp:-}"
   exit "$rc"
 }
 trap on_exit EXIT
@@ -58,6 +58,12 @@ mode=$(db_mode)
 stamp=$(date -u +%Y-%m-%dT%H%MZ)
 out="$BACKUP_DIR/adspilot-${mode}-${stamp}.dump.gpg"
 tmp="$out.partial"
+# Earlier versions of users' Shopify products/pages and WordPress pages/posts
+# (shopify_restore_backup, wordpress_restore_backup) live in files, not in the
+# database, so they get their own encrypted archive next to the dump.
+FILE_DIRS=(shopify-backups wordpress-backups)
+fout="$BACKUP_DIR/adspilot-files-${stamp}.tar.gz.gpg"
+ftmp="$fout.partial"
 
 step="pg_dump"
 say "dumping ($mode database) and encrypting to $(basename "$out")"
@@ -78,17 +84,40 @@ chmod 600 "$out"
 ln -sfn "$(basename "$out")" "$BACKUP_DIR/latest.dump.gpg"
 say "kept $(basename "$out") ($size bytes)"
 
+step="store backups (files)"
+present=()
+for d in "${FILE_DIRS[@]}"; do
+  if [ -d "$ADSPILOT_HOME/data/$d" ]; then present+=("$d"); else warn "$ADSPILOT_HOME/data/$d does not exist; skipped"; fi
+done
+if [ "${#present[@]}" -gt 0 ]; then
+  say "archiving ${present[*]} and encrypting to $(basename "$fout")"
+  # The plaintext archive only ever exists in the pipe. pipefail (common.sh)
+  # makes a tar error fail the step.
+  tar -czf - -C "$ADSPILOT_HOME/data" "${present[@]}" \
+    | gpg --batch --yes --quiet --no-tty --trust-model always \
+          --recipient-file "$BACKUP_PUBKEY" --encrypt --output "$ftmp"
+  [ -s "$ftmp" ] || die "the encrypted files archive is empty."
+  mv "$ftmp" "$fout"
+  chmod 600 "$fout"
+  ln -sfn "$(basename "$fout")" "$BACKUP_DIR/latest.files.tar.gz.gpg"
+  say "kept $(basename "$fout") ($(stat -c %s "$fout") bytes)"
+fi
+
 step="retention"
-# newest first; never touch the KEEP_MIN newest, delete older ones past KEEP_DAYS
-i=0
-while IFS= read -r f; do
-  i=$((i + 1))
-  [ "$i" -le "$KEEP_MIN" ] && continue
-  if [ -n "$(find "$f" -maxdepth 0 -mtime +"$((KEEP_DAYS - 1))")" ]; then
-    rm -f -- "$f"
-    say "removed old backup $(basename "$f")"
-  fi
-done < <(find "$BACKUP_DIR" -maxdepth 1 -type f -name 'adspilot-*.dump.gpg' -printf '%T@ %p\n' | sort -rn | cut -d' ' -f2-)
+# Per kind, newest first: never touch the KEEP_MIN newest, delete older ones past KEEP_DAYS.
+prune() {
+  local i=0 f
+  while IFS= read -r f; do
+    i=$((i + 1))
+    [ "$i" -le "$KEEP_MIN" ] && continue
+    if [ -n "$(find "$f" -maxdepth 0 -mtime +"$((KEEP_DAYS - 1))")" ]; then
+      rm -f -- "$f"
+      say "removed old backup $(basename "$f")"
+    fi
+  done < <(find "$BACKUP_DIR" -maxdepth 1 -type f -name "$1" -printf '%T@ %p\n' | sort -rn | cut -d' ' -f2-)
+}
+prune 'adspilot-*.dump.gpg'
+prune 'adspilot-files-*.tar.gz.gpg'
 
 step="disk check"
 used=$(df -P "$BACKUP_DIR" | awk 'NR==2 {gsub("%","",$5); print $5}')
