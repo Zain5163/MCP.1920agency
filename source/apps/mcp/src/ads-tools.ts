@@ -737,7 +737,11 @@ export function registerAdsTools(server: McpServer): void {
           `${r.name}`,
           `  spent ${money(r.spendMinor)}, ${r.results} ${resultLabel(r.resultAction)}` +
             (r.costPerResultMinor !== undefined ? `, ${money(r.costPerResultMinor)} each` : '') +
-            `, frequency ${r.frequency.toFixed(1)}, link CTR ${r.linkCtr.toFixed(2)}%`,
+            `, ${r.impressions.toLocaleString('en-US')} impressions, frequency ${r.frequency.toFixed(1)}, link CTR ${r.linkCtr.toFixed(2)}%` +
+            (r.untested ? ' · UNTESTED' : ''),
+          ...(r.rankings !== undefined
+            ? [`  Meta's rankings: quality ${(r.rankings.quality ?? '–').toLowerCase()}, engagement ${(r.rankings.engagement ?? '–').toLowerCase()}, conversion rate ${(r.rankings.conversion ?? '–').toLowerCase()}`]
+            : []),
           ...r.suggestions.map((s) => `  → ${s}`),
           '',
         ])

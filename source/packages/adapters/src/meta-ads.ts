@@ -392,9 +392,20 @@ export interface AdPerformance {
   readonly results: number
   readonly resultAction: string
   readonly costPerResultMinor?: number
+  /**
+   * Meta's ad relevance diagnostics (after ~500 impressions): quality, engagement rate and
+   * conversion rate rankings against ads competing for the same audience, e.g. "AVERAGE",
+   * "BELOW_AVERAGE_35", "ABOVE_AVERAGE". Absent when Meta has not ranked the ad yet.
+   */
+  readonly rankings?: { quality?: string | undefined; engagement?: string | undefined; conversion?: string | undefined }
+  /** True when Meta has barely shown the ad: it is untested, not failed. */
+  readonly untested: boolean
   /** Plain-language suggestions. Never executed by this code. */
   readonly suggestions: readonly string[]
 }
+
+const RANKED = (v: unknown) => (typeof v === 'string' && v !== '' && v !== 'UNKNOWN' ? v : undefined)
+const below = (v: string | undefined) => v !== undefined && v.startsWith('BELOW_AVERAGE')
 
 /**
  * Lead actions Meta reports under different names depending on where the lead
@@ -447,6 +458,23 @@ export function assessPerformance(
     suggestions.push('No delivery at all. Check it is active and that its ads passed review before judging anything else.')
   }
 
+  // Low delivery is Meta preferring a sibling ad, not proof this one fails (owner's question,
+  // 2026-10-09: "we stop an ad Meta never properly showed?"). Say so, and do not judge it on cost.
+  const untested = impressions > 0 && impressions < 1000 && (options.targetCostMinor === undefined || spendMinor < options.targetCostMinor)
+  if (untested) {
+    suggestions.push(
+      `Untested: Meta has shown it only ${impressions} times. Do not switch it off for cost; it spends little while idle. For a real test, give it its own budget (a test ad set).`,
+    )
+  }
+  const rankings = {
+    quality: RANKED(row.quality_ranking),
+    engagement: RANKED(row.engagement_rate_ranking),
+    conversion: RANKED(row.conversion_rate_ranking),
+  }
+  if (below(rankings.quality) && below(rankings.engagement) && below(rankings.conversion)) {
+    suggestions.push('Meta ranks it below average on quality, engagement and conversion rate against competing ads: a strong sign to replace it.')
+  }
+
   if (frequency > 4) {
     suggestions.push(
       `Frequency ${frequency.toFixed(1)}: people have seen this more than four times. It is worn out — replace it with a fresh version of the same idea.`,
@@ -463,7 +491,7 @@ export function assessPerformance(
     )
   }
 
-  if (target !== undefined && target > 0) {
+  if (target !== undefined && target > 0 && !untested) {
     const enough = spendMinor >= target * 3
     if (!enough) {
       suggestions.push(
@@ -491,6 +519,8 @@ export function assessPerformance(
     results,
     resultAction,
     ...(costPerResultMinor !== undefined ? { costPerResultMinor } : {}),
+    ...(rankings.quality !== undefined || rankings.engagement !== undefined || rankings.conversion !== undefined ? { rankings } : {}),
+    untested,
     suggestions,
   }
 }
@@ -1120,7 +1150,7 @@ export class MetaAdsClient {
       level: 'ad',
       date_preset: options.datePreset ?? 'last_7d',
       fields:
-        'ad_id,ad_name,spend,impressions,reach,frequency,inline_link_clicks,inline_link_click_ctr,cpm,actions,cost_per_action_type',
+        'ad_id,ad_name,spend,impressions,reach,frequency,inline_link_clicks,inline_link_click_ctr,cpm,actions,cost_per_action_type,quality_ranking,engagement_rate_ranking,conversion_rate_ranking',
       limit: '200',
     })) as { data?: Array<Record<string, unknown>> }
 

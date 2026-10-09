@@ -165,3 +165,24 @@ describe('a sales campaign is judged on purchases, never on clicks', () => {
     assert.equal(p.costPerResultMinor, 115_065)
   })
 })
+
+describe('an ad Meta has barely shown is untested, not failed', () => {
+  test('under 1,000 impressions and under one target spent: no cost verdict, a clear "untested"', async () => {
+    const { assessPerformance } = await import('../src/meta-ads.ts')
+    const p = assessPerformance({ spend: '186.44', impressions: '507', frequency: '1.1', inline_link_click_ctr: '0.79', actions: [] }, { targetCostMinor: 60_000 })
+    assert.equal(p.untested, true)
+    assert.ok(p.suggestions.some((s) => /Untested/.test(s)))
+    assert.ok(!p.suggestions.some((s) => /Not enough data|Replace the angle|not working/.test(s)))
+  })
+
+  test('Meta’s rankings are reported, and all three below average says replace it', async () => {
+    const { assessPerformance } = await import('../src/meta-ads.ts')
+    const row = { spend: '5000', impressions: '20000', frequency: '1.3', inline_link_click_ctr: '1.1', actions: [], quality_ranking: 'BELOW_AVERAGE_20', engagement_rate_ranking: 'BELOW_AVERAGE_35', conversion_rate_ranking: 'BELOW_AVERAGE_10' }
+    const p = assessPerformance(row, { targetCostMinor: 60_000 })
+    assert.equal(p.untested, false)
+    assert.equal(p.rankings?.conversion, 'BELOW_AVERAGE_10')
+    assert.ok(p.suggestions.some((s) => /below average on quality, engagement and conversion/.test(s)))
+    const unranked = assessPerformance({ ...row, quality_ranking: 'UNKNOWN', engagement_rate_ranking: 'UNKNOWN', conversion_rate_ranking: 'UNKNOWN' })
+    assert.equal(unranked.rankings, undefined)
+  })
+})
