@@ -76,3 +76,29 @@ relying on a UI detail: Meta changed the flexible format in 2026.
 
 Sources and links: the AdsPilot repository's research notes for the client account that prompted this
 (2026-10-09), and the citations in the original report.
+
+## When to switch an ad off (and when not to)
+
+**Judge an ad only after Meta has given it a fair chance.** In one ad set Meta sends most spend to the
+ad it predicts will do best, so a new ad can get almost nothing. Low impressions mean "Meta prefers a
+sibling", not "this ad does not sell".
+
+| Situation | Meaning | Action |
+|---|---|---|
+| Low spend (under ~1× target CPA) and under ~1,000 impressions | Untested | Do **not** switch off for cost; it costs little while idle. For a real test, move it to an ad-set-budget test campaign (or Meta's Creative Testing tool) |
+| ≥ 2× target CPA spent, or several thousand impressions | Tested | Judge with the order below |
+
+Order of evidence:
+1. **Purchases and CPA**, only after 2× target spend (below that, one sale is luck).
+2. **Early signals** after ~1,000–2,000 impressions: link CTR (< ~1%, or half its siblings, = the hook
+   or image does not stop people); video hook rate (3-s plays ÷ impressions; < 25% weak, > 35% strong);
+   CPC and CPM against siblings.
+3. **Where the funnel breaks**: clicks but no add-to-cart = the product page or offer, not the ad;
+   add-to-cart but no purchase = checkout, delivery terms or price. Do not kill the ad for a page problem.
+4. **Meta's quality, engagement and conversion-rate rankings** (after ~500 impressions): below average
+   on all three is a strong signal.
+5. **Timing**: the last 48 hours are provisional (purchases credited to the click date, up to ~72 h late).
+
+Switch off when: 0 purchases at 2× target (test ads); over break-even CPA after 3–4× target spend; weak
+CTR after real spend; a wrong price, false discount or expired offer (immediately). Never the last ad in an
+ad set; the account's proven ad only on 3-day numbers.
