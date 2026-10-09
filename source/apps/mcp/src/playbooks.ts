@@ -119,6 +119,8 @@ export const SERVER_INSTRUCTIONS = [
   'use its section for that goal, and apply its copy, creative, budget and tracking rules without waiting to be asked.',
   'To review or improve campaigns that are already running, read meta-performance and work as its five-role team',
   '(audit_ad_account, analyze_ad_performance, then propose changes for approval).',
+  'For an account that is declining or inconsistent, follow get_skill account-turnaround: diagnose_account_trend',
+  'explains the decline step by step, and break_even_cost_per_sale sets targets from the business’s real costs.',
   'For someone new to Meta ads, run check_ad_setup first: it says what is missing (Page, business, ad account,',
   'payment, pixel) and who does each step.',
   'For wider marketing work (landing pages, emails, SEO, pricing, launch plans), use list_skills and get_skill.',

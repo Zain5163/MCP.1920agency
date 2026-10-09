@@ -105,6 +105,8 @@ History is the cheapest research there is: someone already paid for it.
    static), offer, price shown and season**.
 2. **Pull monthly funnel numbers** for the best month and the latest month, and put
    them side by side (table above). The step that moved most is the problem.
+   `diagnose_account_trend` does this in one call and ranks the steps; for a declining
+   account follow `get_skill account-turnaround`.
 3. **Reuse what proved itself**: relaunch or rework the winning angle and format,
    in season, at today's prices. Keep the original post where possible (social proof).
 4. **Do not repeat what failed** with enough spend: the same angle, format or offer

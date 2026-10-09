@@ -817,7 +817,8 @@ export class MetaAdsClient {
     since?: string
     until?: string
     breakdowns?: string
-    timeIncrement?: number
+    /** Days per row, or 'monthly' for calendar months. */
+    timeIncrement?: number | 'monthly'
     maxRows?: number
   }): Promise<Array<Record<string, unknown>>> {
     const id = options.objectId ?? `act_${this.#account.adAccountId}`

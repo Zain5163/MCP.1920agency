@@ -9,6 +9,7 @@ import type { ClientInfo, MeterOptions } from './metering.ts'
 import { registerPlaybooks } from './playbooks.ts'
 import type { PostingDeps } from './publishing.ts'
 import { registerHostedShopifyTools } from './shopify-hosted.ts'
+import { registerBreakEvenTool } from './turnaround-tools.ts'
 import { registerSkillsLibrary } from './skills-library.ts'
 import { registerTools } from './tools.ts'
 import { hostedWordPressAccess } from './wordpress-access.ts'
@@ -53,6 +54,8 @@ export function buildHostedServer(
   registerHostedShopifyTools(server, identity.tenantId)
   // Each user's own WordPress sites, with their own encrypted Application Passwords.
   registerWordPressTools(server, hostedWordPressAccess(identity.tenantId))
+  // Pure maths, no account access: safe on the metered server.
+  registerBreakEvenTool(server)
   registerPlaybooks(server)
   registerSkillsLibrary(server)
   return server
