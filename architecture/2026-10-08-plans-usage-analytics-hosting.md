@@ -409,6 +409,18 @@ Threads use case, unavailable on this Business-type app). Server worker: one
 post published 09:00 PKT (queue 3 â†’ 2, 0 failed), but which worker sent it is
 unknown (container logs were cleared by a recreate); the 15:30 post decides A7.
 
+**2026-10-09 ~16:20 PKT: Stage A COMPLETE (A7 + A8).** The server worker
+published both scheduled LinkedIn posts on 08 Oct by itself (15:30 PKT
+`urn:li:share:7513908579028946944`, 22:00 PKT `urn:li:share:7514006763289980929`),
+0 failed. Timers installed and enabled on the server (monitor every 30 min,
+refresh 23:00 UTC, backup 02:30 UTC, keep-alive every 3 days at 04:00 UTC — the
+owner's choice, two spare runs before Supabase's 7-day pause); monitor and
+keep-alive test-run OK. The PC tasks AdsPilot-Worker, AdsPilot-Monitor,
+AdsPilot-Refresh and Social-Publisher-Keepalive are **disabled** (not deleted;
+`Enable-ScheduledTask` brings one back). Posting no longer needs the PC awake.
+Since 09 Oct the server's front door is the shared gate (`/opt/gate`, source
+`AI-Automation/Server-Gate`); AdsPilot owns `sites/mcp.1920agency.com.caddy` there.
+
 **~10:30 PKT: backups proven restorable, hosted MCP verified.** The owner ran
 `deploy/scripts/pc-backups.sh restore-test`: the 08 Oct backup was decrypted on
 the PC and loaded into a throwaway Postgres on the server; all 10 migrations
