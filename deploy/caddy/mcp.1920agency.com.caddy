@@ -1,7 +1,7 @@
 # AdsPilot hosted MCP: the site block to ADD to Raptor's Caddyfile.
 #
 # Where it goes: append this block to
-#   Websites/FreeVideoDownloaderOnline/site/deploy/Caddyfile   (Raptor's repo, committed)
+#   Websites/Raptor-Downloader/site/deploy/Caddyfile   (Raptor's repo, committed)
 # NOT only to the copy on the server: Raptor's release.sh uploads its committed
 # deploy/ folder with every API release, which would silently remove a block
 # that exists only on the server. Raptor's own blocks stay exactly as they are.

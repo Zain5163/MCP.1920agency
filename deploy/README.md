@@ -305,7 +305,7 @@ two files still match the repo (sha256), then upload only those files,
 validate, and recreate Caddy:
 
 ```bash
-cd "/d/My AI Works/Websites/FreeVideoDownloaderOnline/site"
+cd "/d/My AI Works/Websites/Raptor-Downloader/site"
 git -c core.autocrlf=false archive HEAD deploy/Caddyfile deploy/docker-compose.yml | $S 'tar -x -C /opt/raptor/site'
 $S 'cd /opt/raptor/site/deploy \
   && docker run --rm -v "$PWD/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2 caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile \
@@ -417,7 +417,7 @@ and remove the block from Raptor's Caddyfile (revert the commit, A5 again).
 1. **Media.** Images and PDFs stay in Supabase Storage. After the move nothing
    writes to the Supabase database, so the free project may pause after 7 days
    and the media links would stop working. Either move media first (decision
-   0010 §5: a folder served by Caddy, or Hetzner Object Storage / R2), or keep a
+   0010 Â§5: a folder served by Caddy, or Hetzner Object Storage / R2), or keep a
    weekly keep-alive pointed at Supabase. Which activity Supabase counts is not
    verified (RULES R7).
 2. **How the PC reaches the data.** The PC's own AdsPilot (VS Code MCP with the
@@ -511,7 +511,7 @@ $S 'docker stats --no-stream'
 - The OAuth bounce: merge `https-callbacks`, reload Caddy with the `@oauth`
   block, then the owner checklist below. Not exercised live yet (R4).
 - Monitor wording that still mentions Task Scheduler (R1).
-- Media storage choice (decision 0010 §5) before or with Stage B.
+- Media storage choice (decision 0010 Â§5) before or with Stage B.
 - Pin the Node and Postgres images by digest after the first good build.
 - Rate limiting on `/mcp` (stock Caddy has none; every unauthenticated request
   costs one token lookup in the database).
@@ -529,7 +529,7 @@ URL"), because the address is not registered yet.
    run from `source/apps/cli/src`, so nothing has to be rebuilt for them.
 2. The `@oauth` block live in Raptor's Caddy. The block from
    `deploy/caddy/mcp.1920agency.com.caddy` goes into Raptor's repo
-   (`Websites/FreeVideoDownloaderOnline/site/deploy/Caddyfile`, between the
+   (`Websites/Raptor-Downloader/site/deploy/Caddyfile`, between the
    AdsPilot marker and the end of the file), committed there, then uploaded and
    **reloaded** (no restart, no downtime for raptordownloader.com). Caddy's
    Caddyfile is a single-file bind mount, so the file on the server must be
@@ -537,7 +537,7 @@ URL"), because the address is not registered yet.
    the running container would keep reading the old one:
 
    ```bash
-   cd "/d/My AI Works/Websites/FreeVideoDownloaderOnline/site"
+   cd "/d/My AI Works/Websites/Raptor-Downloader/site"
    git -c core.autocrlf=false archive HEAD deploy/Caddyfile | tar -xO \
      | $S 'cp /opt/raptor/site/deploy/Caddyfile /opt/raptor/site/deploy/Caddyfile.bak-$(date +%Y%m%d-%H%M) \
            && cat > /opt/raptor/site/deploy/Caddyfile'
@@ -685,7 +685,7 @@ All in Git Bash on the PC, with `S` and `ENVPC` as above.
    copy is still the previous commit's, then upload, validate, recreate:
 
    ```bash
-   cd "/d/My AI Works/Websites/FreeVideoDownloaderOnline/site"
+   cd "/d/My AI Works/Websites/Raptor-Downloader/site"
    git show cffbb2e~1:deploy/Caddyfile | sha256sum; $S 'sha256sum /opt/raptor/site/deploy/Caddyfile'   # must match
    git -c core.autocrlf=false archive HEAD deploy/Caddyfile | $S 'tar -x -C /opt/raptor/site'
    $S 'cd /opt/raptor/site/deploy \
@@ -703,8 +703,8 @@ All in Git Bash on the PC, with `S` and `ENVPC` as above.
    ```
 
    Then end to end, from an AI app connected to the hosted AdsPilot:
-   `shopify_connect_store` with `1920-agency-test-store.myshopify.com` → open the
-   link → Install → the page says "connected" → `list_shopify_stores` and
+   `shopify_connect_store` with `1920-agency-test-store.myshopify.com` â†’ open the
+   link â†’ Install â†’ the page says "connected" â†’ `list_shopify_stores` and
    `shopify_store_audit` work. `shopify_disconnect_store` afterwards if wanted.
 
 **Rollback**: `deploy/scripts/release.sh --rollback`; for Caddy, re-upload

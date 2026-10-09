@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-08. **Status:** agreed direction; phases below are the build
 order. Owner's request in his words: the product should sell itself, and "if we
-don't have analytics … customer logs, what they are doing, what they're calling,
+don't have analytics â€¦ customer logs, what they are doing, what they're calling,
 we cannot enhance our product". Decisions: `decisions/0009-free-and-premium-plans.md`.
 
 ## Owner's decisions (2026-10-08)
@@ -14,20 +14,20 @@ we cannot enhance our product". Decisions: `decisions/0009-free-and-premium-plan
 - **Everything lives in the workspace and in a private GitHub repo**, never only
   in temporary folders.
 
-## Phase 0 — Safety first (now)
+## Phase 0 â€” Safety first (now)
 
 | Item | Detail |
 |---|---|
 | **GitHub backup** | The repo has **no remote** today: one laptop holds everything. Owner creates a **private** GitHub repository; it is added as `origin` and pushed (Git Credential Manager opens the browser login). Push after every session. Later: the other non-git folders (LinkedIn-Content-Ops, Social-Render, LinkedIn-Content-System) go into a second private "ops" repo |
 | **Nothing only in temp** | Review evidence and research that lived in the scratchpad is copied into `reviews/` and `research/` in this repo |
 
-## Phase 1 — Plans and usage metering (MCP side)
+## Phase 1 â€” Plans and usage metering (MCP side)
 
 - **Data (one additive migration, applied only with the owner's approval):**
   - `tenants.plan` (`free` / `premium`), `plan_renews_at`.
-  - `tool_calls`: one row per MCP call — tenant, user, tool, ok/error, error
+  - `tool_calls`: one row per MCP call â€” tenant, user, tool, ok/error, error
     code, duration ms, MCP client name and version (from the MCP `initialize`
-    request: Claude Code, Claude Desktop, ChatGPT, Cursor…), transport, created at.
+    request: Claude Code, Claude Desktop, ChatGPT, Cursorâ€¦), transport, created at.
     **Never** the call's content, tokens or personal data.
   - `usage_months`: tenant, month, calls, the notice thresholds already shown.
 - **Metering:** one wrapper around every tool registration (both transports),
@@ -90,7 +90,7 @@ memory; after a restart it is unknown until the client next initializes.
 **Left:** set `UPGRADE_URL` once the Polar checkout exists (until then the
 texts say checkout is not open yet).
 
-## Phase 2 — Analytics and troubleshooting
+## Phase 2 â€” Analytics and troubleshooting
 
 - **PostHog Cloud EU**, server-side events from the MCP server and the worker:
   `mcp_call` (tool, ok, error code, duration, client, plan, industry),
@@ -98,8 +98,8 @@ texts say checkout is not open yet).
   `connect_started` / `connect_completed` / `connect_failed` (per platform),
   `publish_failed` (with the resolution code). Person = tenant id (no email to
   PostHog). Key in `.env` only.
-- **Where users get stuck:** funnels in PostHog (signup → first connect → first
-  post → first ad → upgrade); the `tool_calls` table answers "which tool fails,
+- **Where users get stuck:** funnels in PostHog (signup â†’ first connect â†’ first
+  post â†’ first ad â†’ upgrade); the `tool_calls` table answers "which tool fails,
   for whom, with which error" directly, and the existing error catalogue codes
   make every failure countable.
 - **Error logs:** the existing telemetry logger keeps writing redacted JSON;
@@ -114,7 +114,7 @@ texts say checkout is not open yet).
 ### Phase 2 status: LIVE and verified 2026-10-08
 
 Merged into master (`989def3`), running after the VS Code reload. The owner
-confirmed in PostHog (EU) → Activity an `mcp_call` with `plan: premium` and
+confirmed in PostHog (EU) â†’ Activity an `mcp_call` with `plan: premium` and
 `industry: agency` after `set_business_type` + one counted call (~05:30 PKT).
 The hosted MCP and server worker (Phase 3, Stage A) carry the same key.
 
@@ -126,7 +126,7 @@ CHECK `tenants_industry_known` = `INDUSTRIES`, a core test keeps the SQL and TS
 lists equal) in migration `20261008160000_add_tenant_industry`, **not applied**;
 `TenantScope.usage()` returns it and `setIndustry(code)` writes it; the free
 tool `set_business_type` (enum of the codes; "ask the user, never guess") sets
-it; `check_usage` shows "Business type: …" or "not set"; one line in
+it; `check_usage` shows "Business type: â€¦" or "not set"; one line in
 `SERVER_INSTRUCTIONS` tells the AI to ask once when it is not set. From the next
 counted call after it is set, `mcp_call` carries `industry` and `$set` holds it
 (fake-fetch test). The new Prisma client selects the column, so the migration
@@ -178,7 +178,7 @@ identifies a person.
 |---|---|---|
 | `mcp_call` | every MCP tool call, metered or free, both transports, next to the `tool_calls` row (sent even if that write fails) | `tool`, `ok`, `error_code` (catalogue code, failures only), `duration_ms`, `client_name`, `client_version`, `transport` (`stdio`/`http`), `plan` (absent for the free tools, which skip the plan read), `industry` (once it exists) |
 | `limit_reached` | a Free call is refused at 200 | `tool`, `transport`, `plan`, `industry` |
-| `limit_notice_shown` | a call's result carries a usage notice | `threshold` (the one said: 25…99), `plan`, `industry` |
+| `limit_notice_shown` | a call's result carries a usage notice | `threshold` (the one said: 25â€¦99), `plan`, `industry` |
 | `upgrade_clicked` | the `upgrade` tool is called (sent even if the plan cannot be read) | `plan`, `industry`, `transport`, `client_name`, `client_version` |
 | `publish_failed` | a target fails: publish now (MCP) or a scheduled attempt (worker) | `platform`, `resolution_code` (catalogue code, or `adspilot:attachments_not_stored`), `source` (`publish_now`/`scheduled`), `will_retry` |
 
@@ -215,14 +215,14 @@ Every event: `distinct_id` = tenant id, `$lib` = `adspilot-server`,
 4. Reload VS Code (restarts the stdio MCP), call `check_usage` and one counted
    tool (e.g. `list_accounts`). Events go out within 10 seconds or when the MCP
    disconnects.
-5. In PostHog (EU project) → Activity: an `mcp_call` with `tool` =
+5. In PostHog (EU project) â†’ Activity: an `mcp_call` with `tool` =
    `list_accounts`, `distinct_id` = the owner's tenant id, `plan` = `premium`,
    and no other custom properties. Only then is Phase 2 "verified live" (R4).
 
-### Phase 2b — PostHog MCP Analytics (`$mcp_tool_call`)
+### Phase 2b â€” PostHog MCP Analytics (`$mcp_tool_call`)
 
 **VERIFIED LIVE 2026-10-08 ~13:00 PKT:** the owner's screenshot of PostHog
-project 297949 → MCP analytics shows Users 1, Sessions 2, Tool calls 17, error rate
+project 297949 â†’ MCP analytics shows Users 1, Sessions 2, Tool calls 17, error rate
 0%, p95 latency 30 s (some tool calls are slow; to look into).
 
 **Deployed 2026-10-08 ~11:45 PKT (owner asked for it).**
@@ -253,8 +253,8 @@ it is contained by the two allow-list filters below.
 
 **Composition with metering.** Metering wraps each handler at registration;
 the SDK then wraps the stored registry entry (around the metered handler) and
-the `tools/call` request handler. A call runs: SDK capture → MCP argument
-validation → metered handler → tool, so it is counted once and captured once.
+the `tools/call` request handler. A call runs: SDK capture â†’ MCP argument
+validation â†’ metered handler â†’ tool, so it is counted once and captured once.
 With a key, the stored handler is the SDK's wrapper and the `METERED` mark is
 one level in; the existing registration test builds without a key and is
 unchanged, and the new test calls every stored handler on both transports with
@@ -262,7 +262,7 @@ instrumentation and checks each is recorded exactly once.
 
 **Identity.** `distinct_id` = the tenant id from the meter's `account()`:
 stdio, the owner's tenant (`currentScope`); hosted, the tenant behind the
-request's API token (`identifyToken` in `http-server.ts` → `identity.scope`).
+request's API token (`identifyToken` in `http-server.ts` â†’ `identity.scope`).
 No `$set` (plan and industry already reach the same person through
 `mcp_call`). If the account cannot be resolved the event goes out under the
 SDK's random session id with `$process_person_profile: false`.
@@ -362,14 +362,14 @@ content of your posts, ads or requests either.
 deleted in PostHog (by the account id) along with its rows in our database.
 (Done by hand today; there is no self-service deletion yet.)
 
-## Phase 3 — Hosting on Hetzner
+## Phase 3 â€” Hosting on Hetzner
 
 **Status 2026-10-08 ~05:55 PKT: Stage A DEPLOYED (owner approved A, swap +
 build-cache prune, own edge network).** Release `cd6e265b3f94` in
 `/opt/adspilot/releases/`, `app` linked to it; `setup.sh` built the image,
 confirmed Supabase is current (read-only) and started `adspilot-mcp-1` and
-`adspilot-worker-1`, both healthy. `https://mcp.1920agency.com/health` → 200
-(`database: reachable`, ~1.3 s to Singapore), `POST /mcp` without a token → 401,
+`adspilot-worker-1`, both healthy. `https://mcp.1920agency.com/health` â†’ 200
+(`database: reachable`, ~1.3 s to Singapore), `POST /mcp` without a token â†’ 401,
 Let's Encrypt certificate issued. Raptor: Caddy attached to the new network
 `adspilot_edge` (shared only with the MCP; the MCP cannot resolve Raptor's
 `api`, checked), committed in Raptor's repo (`4188797`), previous files kept as
@@ -386,9 +386,9 @@ callback (Meta Live mode, Google, and the Shopify connector all need it).
 
 **~07:25 PKT: OAuth over https LIVE** (owner approved): Raptor's Caddyfile
 (`d00ef47`, pushed) written in place (backup `Caddyfile.bak-<time>`), validated
-and `caddy reload`ed with no downtime. Checked: GET on the 7 callback paths →
+and `caddy reload`ed with no downtime. Checked: GET on the 7 callback paths â†’
 302 to `http://localhost:8787<same path and query>` with `Cache-Control:
-no-store`; `/callbackx` and POST `/callback` → 404; `/health` 200; `/mcp` 401
+no-store`; `/callbackx` and POST `/callback` â†’ 404; `/health` 200; `/mcp` 401
 without a token; Raptor's site and API 200. The owner added the https addresses
 in the Meta (Facebook Login for Business, Instagram business login) and Google
 consoles, keeping the localhost ones, and switched `META_`, `INSTAGRAM_`,
@@ -406,7 +406,7 @@ server worker can refresh YouTube access. Meta app stays in Development mode:
 Live needs Business Verification (public_profile advanced access for Facebook
 Login for Business), which belongs with Phase 4. Threads: not set up (needs the
 Threads use case, unavailable on this Business-type app). Server worker: one
-post published 09:00 PKT (queue 3 → 2, 0 failed), but which worker sent it is
+post published 09:00 PKT (queue 3 â†’ 2, 0 failed), but which worker sent it is
 unknown (container logs were cleared by a recreate); the 15:30 post decides A7.
 
 **~10:30 PKT: backups proven restorable, hosted MCP verified.** The owner ran
@@ -435,7 +435,7 @@ the Stage B move. Only compiled and smoke-started locally (no Docker on this
 PC): the image has not been built yet.
 
 - Server: Hetzner Cloud CX23, Helsinki, `37.27.148.217`, Docker Compose behind
-  Caddy, already running Raptor Downloader (`Websites/FreeVideoDownloaderOnline/site/deploy/README.md`).
+  Caddy, already running Raptor Downloader (`Websites/Raptor-Downloader/site/deploy/README.md`).
 - Add the hosted MCP (`apps/mcp/src/http-server.ts`) and the worker as two more
   containers; Caddy routes `mcp.1920agency.com` to the MCP. Owner adds one DNS
   `A` record for the subdomain.
@@ -448,19 +448,19 @@ PC): the image has not been built yet.
   code, deployed by `git archive` as Raptor is.
 - 4 GB is enough for MCP + worker + Raptor at first; watch memory.
 
-## Phase 4 — Accounts and the website
+## Phase 4 â€” Accounts and the website
 
 - Signup and login (the auth package already has users, password hashing and API
   tokens), plan and billing state in the database, the per-user MCP token shown
   in the account page.
 - Checkout through a merchant of record (Stripe does not onboard Pakistani
-  businesses directly) — research first (0009 "Open").
+  businesses directly) â€” research first (0009 "Open").
 - **Website:** TREG/Zernio style (ROADMAP "Website"); **guides/docs** on the
   Raptor Downloader pattern (`/docs`); **daily articles** and SEO on the
   SimpleOnlineCounter / SEO-Ops pattern (daily monitor + article queue +
   gated publisher), as a site registered in `AI-Automation/SEO-Ops`.
 
-## Phase 5 — Expertise that improves itself
+## Phase 5 â€” Expertise that improves itself
 
 - Playbooks for every ad platform are refreshed on a schedule (the 90-day
   freshness warning already exists): a monthly job checks each platform's
@@ -482,6 +482,6 @@ PC): the image has not been built yet.
 
 ## Order and dependencies
 
-Phase 0 → 1 → 2 can run on this PC against the live database (one migration,
+Phase 0 â†’ 1 â†’ 2 can run on this PC against the live database (one migration,
 approved). Phase 3 needs the DNS record. Phase 4 needs the payment-provider
 decision and the product name for the final domain.
