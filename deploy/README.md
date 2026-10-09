@@ -1,5 +1,11 @@
 # AdsPilot on the Hetzner server: deployment plan (Phase 3)
 
+> **2026-10-09: the server has a front gate.** Raptor's Caddy no longer serves other sites: `/opt/gate`
+> (source: `AI-Automation/Server-Gate`) serves every domain. AdsPilot owns `/opt/gate/sites/mcp.1920agency.com.caddy`
+> (this repo's `caddy/mcp.1920agency.com.caddy`); to change it, upload the file there and reload the gate. The steps
+> below that edit `/opt/raptor/site/deploy/Caddyfile` are history.
+
+
 **Status (2026-10-08): kit built, NOTHING deployed.** No file on the server has
 been changed, nothing installed, no DNS or credential touched. Every step below
 waits for the owner's approval (AGENTS.md). The server was looked at read-only
@@ -129,7 +135,7 @@ validation of the new block, reaching Supabase from a container (IPv4 pooler).
 | `Dockerfile` | one image for all roles. Node 22 slim, pnpm 12.5.1, built from committed `source/` only. Packages are compiled to `dist/` (their `main`), apps run their `.ts` with `--experimental-strip-types`, as on the PC. Prisma's Linux engines are downloaded at build and checked. The dashboard is not included. Non-root (`node`, uid 1000), no secrets |
 | `Dockerfile.dockerignore` | only `source/` and `deploy/docker/` enter the build; never `.env*`, `node_modules`, `dist` |
 | `docker-compose.yml` | `mcp`, `worker`, optional `postgres` (profile `db`), one-shot `migrate` and `tasks` (profile `tools`). Memory caps, restart policies, healthchecks, json-file logs 10 MB x 5 |
-| `caddy/mcp.1920agency.com.caddy` | the site block for Raptor's Caddyfile |
+| `caddy/mcp.1920agency.com.caddy` | AdsPilot's site file for the server's **front gate** (since 2026-10-09: `/opt/gate/sites/mcp.1920agency.com.caddy`, see `AI-Automation/Server-Gate`). Upload it there and run `cd /opt/gate && docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile`; never edit Raptor's files again |
 | `.env.example` | every variable name the server needs, and the ones it must NOT have |
 | `scripts/setup.sh` | one command: checks, folders, build, database (roles + `migrate deploy`, or a read-only `migrate status` on Supabase), optional restore, timers, start |
 | `scripts/backup.sh` | nightly pg_dump, checked, gpg-encrypted to a public key, 14 days |
