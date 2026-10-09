@@ -1,8 +1,12 @@
 [Unit]
-Description=AdsPilot: keep-alive Sundays 04:00 UTC (09:00 PKT, as Social-Publisher-Keepalive)
+Description=AdsPilot: keep-alive every 3 days, 04:00 UTC (09:00 PKT)
 
 [Timer]
-OnCalendar=Sun *-*-* 04:00:00 UTC
+# Every 3 days (days 1, 4, 7 ... of each month; at most 3 days apart, 1 day at a
+# month end). Supabase pauses a free project after 7 idle days, so a missed run
+# still leaves two more chances before that (owner, 2026-10-09). The monitor
+# warns when the beat is 5 days old.
+OnCalendar=*-*-1/3 04:00:00 UTC
 Persistent=true
 
 [Install]
