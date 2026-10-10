@@ -25,7 +25,7 @@ Docker Desktop on Windows requires WSL2, ~2 GB, and a reboot, and it would only 
 giving us local Postgres and Redis. We need neither:
 
 - **Postgres** — Supabase free tier. This is already the direction recorded in
-  `..\..\Ads-Platform\research\03-security-architecture.md`, so we stay consistent, and
+  `AI-Automation\_archive\Ads-Platform\research\03-security-architecture.md`, so we stay consistent, and
   it is the same database we would deploy to anyway. No local/prod drift.
 - **Redis** — not needed at Wave 1. A `jobs` table plus a polling worker with
   `SELECT ... FOR UPDATE SKIP LOCKED` handles scheduled publishing correctly, including

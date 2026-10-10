@@ -172,7 +172,7 @@ and others. One prompt, ads live, same as posts.
 _Recorded as tier 5b in `docs/product/roadmap.md`. It is deliberately a tier of its own rather
 than more adapters: ads spend real money, the object model is campaign → ad set →
 creative → ad rather than content → targets, and approval is stricter everywhere.
-`..\..\Meta-Ads-Publisher` already exists and publishes paused with a separate
+`AI-Automation\_archive\Meta-Ads-Publisher` (archived 2026-10-10) already exists and publishes paused with a separate
 activation step — connect it rather than rebuild it._
 
 ---

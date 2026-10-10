@@ -3,7 +3,7 @@ import { createCipheriv, createDecipheriv, randomBytes, timingSafeEqual } from '
 /**
  * Envelope encryption for stored OAuth credentials.
  *
- * Scheme, per `..\..\..\Ads-Platform\research\03-security-architecture.md`:
+ * Scheme, per `AI-Automation\_archive\Ads-Platform\research\03-security-architecture.md`:
  *   - a fresh per-row DEK (AES-256-GCM) encrypts the secret
  *   - the DEK is wrapped by a master KEK held outside the database
  *   - `tenantId` and `keyVersion` are bound into the AEAD Additional Authenticated

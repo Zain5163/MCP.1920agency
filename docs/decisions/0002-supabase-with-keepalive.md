@@ -20,7 +20,7 @@ functions.
 
 **Stay on Supabase.** The owner already has a working Supabase connection, and it keeps
 this project consistent with the direction recorded in
-`..\..\Ads-Platform\research\03-security-architecture.md`.
+`AI-Automation\_archive\Ads-Platform\research\03-security-architecture.md`.
 
 ## Mitigating the pause — this is mandatory, not optional
 

@@ -34,8 +34,8 @@ import { graphError, type GraphErrorBody } from './meta-errors.ts'
  * 2026-05-21, v20 on 2026-09-24), so recheck the changelog periodically:
  * https://developers.facebook.com/docs/graph-api/changelog/versions/
  *
- * Note: `..\..\..\..\Meta-Ads-Publisher` pins v23.0, which is now two versions
- * behind. Worth bumping there too.
+ * Note: `AI-Automation\_archive\Meta-Ads-Publisher` (archived) pinned v23.0, which is now two versions
+ * behind; it is archived, so nothing needs bumping there.
  */
 
 export const DEFAULT_API_VERSION = 'v25.0'

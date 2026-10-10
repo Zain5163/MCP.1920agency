@@ -362,7 +362,7 @@ TikTok, Amazon, and others._
 | # | Item | Notes |
 |---|---|---|
 | 5b.0 | **Merge `Meta-Ads-Publisher` into this MCP server** | Owner's decision, 2026-09-25: do not rebuild. That project is already account-agnostic, validated, and publishes paused. The work is porting its Python publishing logic into an adapter behind this engine's interfaces, so ads inherit the vault, tenant scoping, audit log and error catalogue rather than carrying their own. |
-| 5b.1 | **Meta Ads** | `..\..\Meta-Ads-Publisher` already exists, is account-agnostic, and publishes paused with a separate activation step. **Connect it rather than rebuild it.** Its API version is pinned at v23.0 and needs bumping to v25.0. |
+| 5b.1 | **Meta Ads** | `AI-Automation\_archive\Meta-Ads-Publisher` (archived 2026-10-10) already exists, is account-agnostic, and publishes paused with a separate activation step. **Connect it rather than rebuild it.** Its API version is pinned at v23.0 and needs bumping to v25.0. |
 | 5b.1a | **LinkedIn Ads** | **Advertising API Development Tier GRANTED 2026-09-27** on the personal app. This is the first ads platform with access already in hand, so it is the cheapest place to prove the ads object model — campaign → ad set → creative → ad — against a real API. Standard Tier needs a working implementation first, so building is the path to more access rather than the other way round. |
 | 5b.2 | **Google Ads** | **Updated 2026-10-01:** developer tokens were retired 2026-09-09; access levels now sit on the Google Cloud project. Basic needs brand verification (2–3 business days), then is often granted within hours; Keyword Planner needs Basic. **Google's 2026-08-31 policy bans MCP servers that solely re-expose Google Ads to others ('programmatic proxies').** The owner's own accounts are exempt; customer-facing Google Ads waits for Google's written answer. Plan: `docs/architecture/google-suite-plan.md`. |
 | 5b.3 | **TikTok Ads** | Audit plus business verification. 3–8 weeks. |
@@ -387,7 +387,7 @@ decide the design:
 mandatory paused creation, explicit activation, a spend ceiling, and an audit entry
 for anything that could cost money. Those belong in the deterministic layer, never
 in an AI decision. This is the single place where the "AI proposes, a deterministic
-validator authorises" principle from `..\..\Ads-Platform` matters most.
+validator authorises" principle from `AI-Automation\_archive\Ads-Platform` matters most.
 
 _Sits at 5b rather than earlier because it inherits everything below it — accounts,
 scheduling, error handling, tenant isolation, audit. Building it before those are
