@@ -126,6 +126,43 @@ describe('video / reels', () => {
     assert.equal(calls[0]!.params.media_type, 'REELS')
   })
 
+  test('a 9:16 vertical video with known dimensions publishes as a Reel', async () => {
+    // Regression (2026-10-11): the 4:5 to 1.91:1 feed-image range was applied
+    // to video, so the most common Reel shape was refused before any call.
+    // Meta documents Reels as 0.01:1 to 10:1, 9:16 recommended.
+    const { ig, calls } = make([{ body: { id: 'c' } }, FINISHED, { body: { id: 'm' } }])
+    const reel = draft({ media: [vid({ width: 1080, height: 1920 })] })
+    const result = await ig.publish(ctx(), reel)
+
+    assert.equal(calls[0]!.params.media_type, 'REELS')
+    assert.equal(result.platformPostId, 'm')
+    assert.ok(!ig.validate(reel).issues.some((i) => i.code === 'aspect_ratio_unsupported'))
+  })
+
+  test('a Reel wider than 1920 pixels is refused before anything is sent', async () => {
+    const { ig, calls } = make([{ body: { id: 'c' } }])
+    await assert.rejects(
+      () => ig.publish(ctx(), draft({ media: [vid({ width: 2160, height: 3840 })] })),
+      (error: unknown) => error instanceof PublishError && /1920/.test(error.message),
+    )
+    assert.equal(calls.length, 0)
+  })
+
+  test('a Reel over 15 minutes is refused before anything is sent', async () => {
+    const { ig, calls } = make([{ body: { id: 'c' } }])
+    await assert.rejects(() => ig.publish(ctx(), draft({ media: [vid({ durationSeconds: 901 })] })), PublishError)
+    assert.equal(calls.length, 0)
+  })
+
+  test('a 9:16 IMAGE is still refused: the feed-image range has not moved', async () => {
+    const { ig, calls } = make([{ body: { id: 'c' } }])
+    await assert.rejects(
+      () => ig.publish(ctx(), draft({ media: [img({ width: 1080, height: 1920 })] })),
+      (error: unknown) => error instanceof PublishError && error.platformCode === 'aspect_ratio_unsupported',
+    )
+    assert.equal(calls.length, 0)
+  })
+
   test('polls until processing finishes rather than publishing early', async () => {
     // Publishing an IN_PROGRESS container fails with a misleading error, so the
     // wait is required for correctness, not just politeness.

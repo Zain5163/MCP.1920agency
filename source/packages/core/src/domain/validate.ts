@@ -307,7 +307,20 @@ export function validateAgainstCapabilities(
       )
     }
     if (caps.maxVideoBytes !== undefined && video.bytes > caps.maxVideoBytes) {
-      add('error', 'video_too_large', `Video exceeds the ${caps.maxVideoBytes} byte limit.`)
+      add(
+        'error',
+        'video_too_large',
+        `The video is ${megabytes(video.bytes)}, over this platform's ${megabytes(caps.maxVideoBytes)} limit. ` +
+          'Export it at a lower bitrate or shorten it.',
+      )
+    }
+    if (caps.videoMaxWidth !== undefined && video.width !== undefined && video.width > caps.videoMaxWidth) {
+      add(
+        'error',
+        'video_too_wide',
+        `The video is ${video.width} pixels wide, over this platform's ${caps.videoMaxWidth}-pixel limit. ` +
+          `Export it at most ${caps.videoMaxWidth} pixels wide (1080x1920 for a vertical video).`,
+      )
     }
   }
 
@@ -318,41 +331,56 @@ export function validateAgainstCapabilities(
   }
 
   /**
-   * Aspect ratio.
+   * Aspect ratio, per kind of media.
    *
-   * Instagram rejects anything outside 4:5 to 1.91:1 when the container is
+   * Instagram rejects a feed image outside 4:5 to 1.91:1 when the container is
    * created, and the error it returns reads like a permissions problem rather
    * than a shape problem. Catching it here turns a confusing platform failure
    * into a clear instruction before anything is queued.
    *
+   * WHY per kind (2026-10-11): a video is checked against the video range
+   * only, never the image range. Applying Instagram's image range to every
+   * kind refused a 9:16 Reel (0.56:1), which Meta accepts: Reels take 0.01:1 to
+   * 10:1 (developers.facebook.com/docs/instagram-platform/instagram-graph-api/
+   * reference/ig-user/media, checked 2026-10-11). A kind with no declared range
+   * is not checked.
+   *
    * Only checked when dimensions are known — an unknown size warns rather than
    * blocking, because a wrongly-rejected valid post is worse than a late failure.
    */
-  if (caps.aspectRatioMin !== undefined || caps.aspectRatioMax !== undefined) {
-    for (const item of media) {
-      if (item.width === undefined || item.height === undefined || item.height === 0) {
-        if (media.length > 0) {
-          add(
-            'warning',
-            'unknown_dimensions',
-            'Image dimensions are unknown, so the aspect ratio could not be checked before publishing.',
-          )
-        }
-        break
-      }
+  let unknownDimensionsWarned = false
+  for (const item of media) {
+    const isVideo = item.kind === 'video'
+    const declaredMin = isVideo ? caps.videoAspectRatioMin : caps.aspectRatioMin
+    const declaredMax = isVideo ? caps.videoAspectRatioMax : caps.aspectRatioMax
+    if (declaredMin === undefined && declaredMax === undefined) continue
 
-      const ratio = item.width / item.height
-      const min = caps.aspectRatioMin ?? 0
-      const max = caps.aspectRatioMax ?? Infinity
-
-      if (ratio < min || ratio > max) {
+    if (item.width === undefined || item.height === undefined || item.height === 0) {
+      if (!unknownDimensionsWarned) {
+        unknownDimensionsWarned = true
         add(
-          'error',
-          'aspect_ratio_unsupported',
-          `${item.width}x${item.height} is ${ratio.toFixed(2)}:1, outside this platform's accepted range ` +
-            `(${min.toFixed(2)}:1 to ${max.toFixed(2)}:1). Crop it to square, portrait 4:5, or landscape 1.91:1.`,
+          'warning',
+          'unknown_dimensions',
+          `${isVideo ? 'Video' : 'Image'} dimensions are unknown, so the aspect ratio could not be checked before publishing.`,
         )
       }
+      continue
+    }
+
+    const ratio = item.width / item.height
+    const min = declaredMin ?? 0
+    const max = declaredMax ?? Infinity
+
+    if (ratio < min || ratio > max) {
+      add(
+        'error',
+        'aspect_ratio_unsupported',
+        `${item.width}x${item.height} is ${ratio.toFixed(2)}:1, outside this platform's accepted ${isVideo ? 'video' : 'image'} range ` +
+          `(${min.toFixed(2)}:1 to ${max.toFixed(2)}:1). ` +
+          (isVideo
+            ? 'Re-export the video within that range.'
+            : 'Crop it to square, portrait 4:5, or landscape 1.91:1.'),
+      )
     }
   }
 

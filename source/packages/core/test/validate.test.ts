@@ -286,6 +286,59 @@ describe('aspect ratio', () => {
     assert.ok(result.issues.some((i) => i.code === 'unknown_dimensions'))
   })
 
+  test('a 9:16 vertical video is accepted on Instagram as a Reel', () => {
+    // Regression (2026-10-11): the image range was applied to video, so a 9:16
+    // Reel (0.56:1) was refused. Reels take 0.01:1 to 10:1 (Meta, ig-user/media).
+    const result = validateAgainstCapabilities(
+      draft({ body: 'hi', media: [video({ width: 1080, height: 1920 })] }),
+      'instagram',
+      capabilitiesFor('instagram'),
+    )
+    assert.deepEqual(errorCodes(result), [])
+  })
+
+  test('a video is held to the video range, not the image range', () => {
+    const tooWide = validateAgainstCapabilities(
+      draft({ body: 'hi', media: [video({ width: 1920, height: 100 })] }),
+      'instagram',
+      capabilitiesFor('instagram'),
+    )
+    assert.ok(errorCodes(tooWide).includes('aspect_ratio_unsupported'))
+    const issue = tooWide.issues.find((i) => i.code === 'aspect_ratio_unsupported')!
+    assert.match(issue.message, /video range/)
+    assert.match(issue.message, /10\.00:1/)
+  })
+
+  test('a Reel wider than 1920 pixels or over 300 MB is refused, with the limit named', () => {
+    const caps = capabilitiesFor('instagram')
+    const wide = validateAgainstCapabilities(
+      draft({ body: 'hi', media: [video({ width: 2160, height: 3840 })] }),
+      'instagram',
+      caps,
+    )
+    assert.ok(errorCodes(wide).includes('video_too_wide'))
+    assert.match(wide.issues.find((i) => i.code === 'video_too_wide')!.message, /1920/)
+
+    const big = validateAgainstCapabilities(
+      draft({ body: 'hi', media: [video({ bytes: 300_000_001, width: 1080, height: 1920 })] }),
+      'instagram',
+      caps,
+    )
+    assert.ok(errorCodes(big).includes('video_too_large'))
+    assert.match(big.issues.find((i) => i.code === 'video_too_large')!.message, /300 MB/)
+  })
+
+  test('the unknown-dimensions warning names the kind of media', () => {
+    const result = validateAgainstCapabilities(
+      draft({ body: 'hi', media: [video()] }),
+      'instagram',
+      capabilitiesFor('instagram'),
+    )
+    const warning = result.issues.find((i) => i.code === 'unknown_dimensions')
+    assert.ok(warning !== undefined)
+    assert.match(warning.message, /^Video dimensions/)
+  })
+
   test('does not apply to platforms with no declared range', () => {
     const result = validateAgainstCapabilities(
       draft({ media: [sized(4000, 200)] }),

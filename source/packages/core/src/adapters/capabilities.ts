@@ -54,12 +54,26 @@ export const CAPABILITIES: Readonly<Record<Platform, CapabilityRecord>> = {
     mediaKinds: ['image', 'video'],
     maxMediaCount: 10,
     minMediaCount: 1,
+    // Reels (a single video goes out as REELS): "Duration: 15 mins maximum, 3
+    // seconds minimum" (ig-user/media reference, checked 2026-10-11).
     videoMinSeconds: 3,
     videoMaxSeconds: 900,
-    // 4:5 portrait (0.8) to 1.91:1 landscape. Outside this, container creation
-    // fails with an error that reads like a permissions problem.
+    // FEED IMAGES ONLY: 4:5 portrait (0.8) to 1.91:1 landscape. Outside this,
+    // container creation fails with an error that reads like a permissions
+    // problem.
     aspectRatioMin: 0.8,
     aspectRatioMax: 1.91,
+    // WHY a separate video range (2026-10-11): the image range above was
+    // applied to video too, which refused a 9:16 Reel (0.56:1). Meta's
+    // ig-user/media reference, Reels specifications (checked 2026-10-11):
+    // "Required aspect ratio is between 0.01:1 and 10:1 but we recommend 9:16
+    // to avoid cropping or blank space."; "Maximum columns (horizontal pixels):
+    // 1920"; "File size: 300MB maximum" (read as 300,000,000 bytes, the
+    // stricter reading). https://developers.facebook.com/docs/instagram-platform/instagram-graph-api/reference/ig-user/media
+    videoAspectRatioMin: 0.01,
+    videoAspectRatioMax: 10,
+    videoMaxWidth: 1_920,
+    maxVideoBytes: 300_000_000,
     requiresPublicMediaUrl: true,
     supportsNativeScheduling: false,
     allowsMixedMedia: true,
@@ -81,6 +95,12 @@ export const CAPABILITIES: Readonly<Record<Platform, CapabilityRecord>> = {
       'flow; the media URL must stay reachable across both steps. Rate limit is 100 published ' +
       'posts per 24h (NOT 50 — that figure is stale), and a carousel counts as one. Reels up ' +
       'to 15 minutes. ' +
+      'REELS (checked 2026-10-11 against the ig-user/media reference): 3 s to 15 min, 300 MB, ' +
+      'aspect 0.01:1 to 10:1 (9:16 recommended), at most 1920 px wide, 23-60 fps, MOV/MP4 with ' +
+      'the moov atom first, H.264/HEVC, AAC. The 4:5 to 1.91:1 range is for FEED IMAGES only. ' +
+      'Frame rate and codec are not checked here: the media record does not carry them. ' +
+      'The reference states no separate aspect range for a carousel video item, so carousel ' +
+      'video is held to the Reels range. ' +
       'DOCS SAY JPEG ONLY — PNG, WebP and GIF are listed as unsupported. In practice a PNG ' +
       'published successfully on 2026-09-25, so the restriction is not enforced as documented. ' +
       'Not blocking PNG here, because rejecting something that demonstrably works would be ' +

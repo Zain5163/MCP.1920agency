@@ -54,12 +54,31 @@ export interface Capabilities {
   readonly videoMaxSeconds?: number
   readonly videoMinSeconds?: number
   /**
-   * Accepted width/height range. Instagram rejects anything outside 4:5 (0.8)
-   * to 1.91:1 at container creation, with an error that reads like a permissions
-   * problem rather than a shape problem.
+   * Accepted width/height range for IMAGES (and any other non-video kind).
+   * Instagram rejects a feed image outside 4:5 (0.8) to 1.91:1 at container
+   * creation, with an error that reads like a permissions problem rather than a
+   * shape problem.
+   *
+   * WHY images only (2026-10-11): a platform's video range is usually a
+   * different one. Instagram's feed-image range was applied to every kind, so a
+   * 9:16 Reel with known dimensions (0.56:1) was refused, while Meta documents
+   * Reels as 0.01:1 to 10:1 (ig-user/media reference, checked 2026-10-11).
+   * Video has its own `videoAspectRatioMin`/`videoAspectRatioMax`; a video is
+   * never held to this range.
    */
   readonly aspectRatioMin?: number
   readonly aspectRatioMax?: number
+  /**
+   * Accepted width/height range for VIDEO. Absent means the aspect ratio of a
+   * video is not checked here, whatever the image range says.
+   */
+  readonly videoAspectRatioMin?: number
+  readonly videoAspectRatioMax?: number
+  /**
+   * Widest video accepted, in pixels, where the platform documents one
+   * (Instagram Reels: 1920 columns). Checked only when the width is known.
+   */
+  readonly videoMaxWidth?: number
   readonly maxImageBytes?: number
   readonly maxVideoBytes?: number
   /** Largest document accepted, in bytes. Only meaningful where `mediaKinds` lists documents. */
