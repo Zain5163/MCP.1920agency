@@ -11,7 +11,9 @@ Three levels, kept apart on purpose:
 - ⏸ **Blocked**: built or ready, waiting on someone else (see `WAITING-LIST.md`).
 
 Working name: **AdsPilot**. It is being renamed because the name is taken (see
-`research/2026-10-01-product-name.md`).
+`research/2026-10-01-product-name.md`). The name, company and domain are each
+written in one place (`START-HERE.md`, "Where settings live"), so the rename is
+a one-line change.
 
 ---
 
@@ -98,6 +100,7 @@ Around the posting:
 | Product analytics to PostHog Cloud EU: `mcp_call`, `limit_reached`, `limit_notice_shown`, `upgrade_clicked`, `publish_failed` (Phase 2) | ✅ 2026-10-08 Live: owner saw `mcp_call` with plan premium and industry agency in PostHog EU. Connect/signup events wait for Phase 4 |
 | Connect and signup events (`connect_*`, `signup`) | ⬜ Not built: three separate connect flows and no signup yet; to be emitted from Phase 4's single connect service |
 | Hosting on the Hetzner server (Phase 3): hosted MCP at `mcp.1920agency.com`, worker as a loop, timers, nightly encrypted backups, optional Postgres (decision 0010) | ✅ 2026-10-09 **Stage A complete**: hosted MCP, worker and all timers run on the server (posts published by the server since 08 Oct, 0 failed); PC tasks disabled; nightly encrypted backups (database + store backups) with PC copies and a proven restore. Stage B (database onto the server) not started |
+| Central configuration: product name, slug and company once in `source/packages/config/src/product.ts`; domain, server, SSH key and server paths once in `deploy/site.env`; own skills write `{{PRODUCT_NAME}}`; gate site file rendered from `deploy/caddy/site.caddy.template`; a guard test refuses the literals anywhere else (`architecture/2026-10-10-central-config.md`) | 🟡 2026-10-10 Built and tested on branch `central-config` (not merged). Not yet exercised by a release (`PUBLIC_BASE_URL` now comes from compose) or by `caddy-site.sh --upload` |
 | Industry categories (dentist, education, real_estate, ecommerce, tool_website, agency, other) | ✅ 2026-10-08 Live: column `tenants.industry` (migration 20261008160000, owner-approved, live SQL test 10/10), free tool `set_business_type` (the AI asks, never guesses), carried on every analytics event once set |
 | Tests | ✅ 827 passing on 2026-10-03 in the eight suites that need no database (after the package-side review fixes); 13 workspaces typecheck clean. The auth and db suites (89 more at their last run, 2026-10-02) use the live database, so they are run only at quiet times until they have a test database (`FUTURE-PLANS.md`) |
 
