@@ -260,6 +260,10 @@ async function main(): Promise<void> {
   console.log('  Authorised. Exchanging tokens…')
 
   const credential = await provider.exchangeCode(code)
+  // Which login the provider actually signed in. With Google this is the
+  // identity that owns the YouTube channel found next; a Brand Account shows a
+  // different address from the personal login (2026-10-10, The Unsealed World).
+  if (credential.accountLabel !== undefined) console.log(`  Signed in as: ${credential.accountLabel}`)
 
   // Before discovery and before anything is stored: a channel found through a
   // sign-in that cannot upload would be listed as ready and fail every post.
