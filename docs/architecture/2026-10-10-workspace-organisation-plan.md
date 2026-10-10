@@ -1,8 +1,9 @@
 # Workspace organisation plan: AdsPilot and the folders around it
 
-**Date:** 2026-10-10 · **Status:** PROPOSAL. Nothing has been moved, renamed or deleted.
-Every step below waits for the owner's approval. (AGENTS.md: preserve active source; destructive
-and production changes need explicit approval.)
+**Date:** 2026-10-10 · **Status:** APPROVED by the owner 2026-10-10 (D1–D10 as recommended; D7
+adjusted). **Phases 0–4 done 2026-10-10**; phases 5–6 wait for a quiet window with the owner.
+Outcome and follow-ups: section 8. Paths in sections 1–7 describe the layout BEFORE the
+move (for example `architecture/` is now `docs/architecture/`); decision 0011 records the result.
 
 ---
 
@@ -732,3 +733,57 @@ Nothing on the server or GitHub changed, so nothing there needs undoing.
 | 5.3 LinkedIn ops | MEDIUM | one live task | 45 min + next 07:00 run |
 | 6 Product home move | HIGH | local MCP, 4 disabled tasks, 2 live scripts, 2 repos, worktrees, pnpm, memory | 2 h in a quiet window + 14 days with the junction |
 | 7 Public name | n/a | product work | later |
+
+---
+
+## 8. Outcome (2026-10-10) and follow-ups
+
+**Done (phases 0–4 and D2, D3, D5, D6, D7, D10):**
+
+- Phase 0: tag `pre-reorg-2026-10-10` on both repos (pushed); `sync.sh` run first.
+- Phase 1: `START-HERE.md` (map, names, read order), `STATUS.md`, `docs/` shelves by `git mv`,
+  pointer `PROJECT-CONTEXT.md`, `docs/README.md`, `docs/product/glossary.md`,
+  `docs/runbooks/README.md`, `docs/brand/README.md`, decision 0011. References updated in docs,
+  deploy, playbooks, the skills README, code comments, one test message, memory
+  `adspilot-project.md` and `MEMORY.md`, `WORKSPACE-INDEX.md`, LinkedIn-Content-System
+  `AUTOMATION-SPEC.md` and `PROJECT-CONTEXT.md`, PSX-Email-Outreach `DESIGN.md`. Empty
+  `checkpoints/` removed. Build, typecheck and the non-database suites pass apart from the
+  skill count (71 vs 70) caused by another session's uncommitted `prospect-research` skill.
+- Phase 2: LinkedIn-Content-Ops `PROJECT-CONTEXT.md` (the server publishes), Meta-Ads-Publisher
+  and Ads-Platform marked superseded, `AI-Automation/_WHAT-IS-THIS.md` lists every folder,
+  `WORKSPACE-INDEX.md`. The Caddy header item was already correct: `deploy/caddy/` now holds
+  `site.caddy.template`, whose header describes the gate (central-config work).
+- Phase 3: `MCP-Tooling/sync.sh` mirrors `Muzaree-Paid-Media` (no `logs/`), the two Muzaree task
+  XMLs and the memory notes `server-front-gate.md`, `ads-objective-and-qa-rule.md`; README
+  updated; secret scan passed; pushed. Branches: 11 merged local and 2 merged remote deleted.
+  D6: both predecessors moved to `AI-Automation\_archive\` after a check found no live reference.
+- Phase 4 / D7 (adjusted): `Marketing-and-Content\Brands\README.md` indexes the kits, which
+  live in `source/packages/brands/brands/<slug>/` (the schema is
+  `2026-10-10-brand-design-systems.md`, so no separate brand-kits doc was needed).
+- D10: `AGENTS.md` accepts `START-HERE.md` + `STATUS.md` as a project's context file.
+
+**Follow-ups:**
+
+1. **When the other session commits `WAITING-LIST.md`:** fold its rows into `STATUS.md` §4
+   (one row each: what, waiting on whom, what unblocks it, what is built; long background to
+   the relevant `docs/architecture/` plan), then `git mv WAITING-LIST.md
+   docs/archive/2026-10-xx-waiting-list.md` and update the references (`START-HERE.md`,
+   `STATUS.md`, `SETUP.md` "WAITING-LIST #17", `docs/product/*`, memory `adspilot-project.md`,
+   `WORKSPACE-INDEX.md`). Its own text still cites the old paths (`research/…`,
+   `decisions/0003`, `architecture/google-suite-plan.md`, `IDEAS.md`, `ROADMAP.md`); fix them in
+   the same pass.
+2. **When the other session commits `PROJECT-LOG.md`:** add one line at its top: "paths
+   before 2026-10-10 use the old layout: `architecture/` is now `docs/architecture/`, and so on".
+3. `own-skills` was **not** deleted: `git branch --merged master` does not list it. Its one
+   commit (`a340a27`) has a patch-identical twin on master (`1f1f697`, `git cherry` shows `-`),
+   so deleting it with `git branch -D own-skills` loses nothing; the owner decides.
+4. **D4:** the owner creates a private GitHub repo for `Server-Gate`; then `git remote add
+   origin …` and `git push -u origin master`.
+5. Release tags from the server's `releases/` folder names (step 3.3) need a read-only server
+   listing; left for a session that is cleared to touch the server.
+6. History left with old paths on purpose: `PROJECT-LOG.md`, `docs/reviews/`, `docs/archive/`,
+   applied migrations (Prisma checksums them), `Server-Gate/rename-raptor-folder.ps1` (one-time
+   script, done), PSX-Growth-OS `inventory/*.json`, `INVENTORY-DIGEST.md` and `workflows/*.js`
+   and PSX-Email-Outreach's research file (dated evidence of what was read on 2026-10-02/03).
+7. Phases 5 and 6 (Muzaree inbox, Social-Render and LinkedIn-Content-Ops into the ops repo,
+   product home move, D1) as written above, in a quiet window with the owner.
