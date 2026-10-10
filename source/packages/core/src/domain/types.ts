@@ -55,6 +55,18 @@ export interface MediaRef {
   readonly width?: number
   readonly height?: number
   readonly durationSeconds?: number
+  /**
+   * The still image shown before a video plays, where the platform takes one:
+   * YouTube's custom thumbnail (`thumbnails.set`, after the upload), Pinterest's
+   * video cover (`cover_image_url`, or the image's bytes). Only meaningful on a
+   * video, and itself an image: JPEG or PNG, with a public URL or a local file.
+   *
+   * Optional everywhere. A platform that takes no thumbnail ignores it, and
+   * one that does falls back to its own frame without it; the adapter says so
+   * in the result rather than failing. Not stored with a scheduled post: the
+   * media tables keep no thumbnail, so a scheduled video goes out without it.
+   */
+  readonly thumbnail?: MediaRef
 }
 
 /**

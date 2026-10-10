@@ -365,6 +365,17 @@ export const CAPABILITIES: Readonly<Record<Platform, CapabilityRecord>> = {
     maxMediaCount: 1,
     // There is no text-only pin at all.
     minMediaCount: 1,
+    // Video, from Pinterest's product specs (help.pinterest.com/en/business/
+    // article/pinterest-product-specs, standard video, checked 2026-10-11):
+    // "Minimum 4 seconds, maximum 15 minutes", "Up to 2GB" (read as
+    // 2,000,000,000 bytes, the stricter reading), aspect "Shorter than 1:2
+    // (width:height), taller than 1.91:1"; MP4, MOV or M4V. The page lists these
+    // under ads; no separate organic figure is published.
+    videoMinSeconds: 4,
+    videoMaxSeconds: 900,
+    maxVideoBytes: 2_000_000_000,
+    videoAspectRatioMin: 0.5,
+    videoAspectRatioMax: 1.91,
     requiresPublicMediaUrl: true,
     supportsNativeScheduling: false,
     allowsMixedMedia: false,
@@ -385,6 +396,13 @@ export const CAPABILITIES: Readonly<Record<Platform, CapabilityRecord>> = {
       'WARNING: under Trial access, pins are sandbox entities visible only to their creator. ' +
       'Everything reports success — an id comes back and the URL resolves — while nobody ' +
       'else can see the pin. Standard Access needs a submitted video of the app in use. ' +
+      'VIDEO PINS (rebuilt 2026-10-11 from the v5 OpenAPI 5.28.0): register POST /v5/media ' +
+      '(media_type video) → multipart POST of upload_parameters + file to upload_url (no ' +
+      'Pinterest token sent there) → poll GET /v5/media/{id} until succeeded → POST /v5/pins ' +
+      'with media_source { source_type: video_id, media_id, and a cover }. The cover is the ' +
+      'video\'s thumbnail (cover_image_url, or cover_image_data for a local JPEG/PNG); without ' +
+      'one, cover_image_key_frame_time 1 s is sent and the result says so. Reported: the sandbox ' +
+      '(Trial) does not support video pins. Never run against the real API yet. ' +
       'Tokens expire and are renewed with a separate refresh token, unlike Threads which ' +
       'refreshes using the access token itself. Limits here are unverified.',
   },

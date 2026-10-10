@@ -27,6 +27,13 @@ import { PublishError, classifyHttpStatus, classifyNetworkError, type MediaRef }
  */
 export interface MediaSource {
   readonly size: number
+  /**
+   * Where the bytes are on disk: the caller's own file, or the temporary
+   * download. For an upload that sends the whole file as one form part
+   * (Pinterest's media upload), which `openAsBlob` reads lazily from here
+   * rather than holding it in memory. Valid until `close`.
+   */
+  readonly path: string
   read(start: number, endInclusive: number): Promise<Uint8Array>
   close(): Promise<void>
 }
@@ -42,6 +49,7 @@ export async function fileSource(path: string, owned: boolean): Promise<MediaSou
 
   return {
     size,
+    path,
     async read(start, endInclusive) {
       const length = endInclusive - start + 1
       const buffer = Buffer.allocUnsafe(length)
