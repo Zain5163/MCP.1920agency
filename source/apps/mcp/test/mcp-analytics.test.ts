@@ -11,6 +11,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import { z } from 'zod'
 
+import { productSlug } from '@social-publisher/config'
 import { FREE_TOOLS } from '@social-publisher/core'
 import { TenantScope, type CountedMonth, type ToolCallInput, type UsageSnapshot } from '@social-publisher/db'
 import { Logger } from '@social-publisher/telemetry'
@@ -234,7 +235,7 @@ describe('a tool call', () => {
     assert.equal(ok.$mcp_error_type, undefined)
     assert.equal(ok.$mcp_client_name, 'test-client')
     assert.equal(ok.$mcp_client_version, '1.2.3')
-    assert.equal(ok.$mcp_server_name, 'adspilot')
+    assert.equal(ok.$mcp_server_name, productSlug())
     assert.equal(ok.$mcp_server_version, '9.9.9')
     assert.equal(ok.$mcp_server_build, BUILD)
     assert.equal(typeof ok.$mcp_duration_ms, 'number')

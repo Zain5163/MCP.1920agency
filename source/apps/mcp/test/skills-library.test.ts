@@ -3,6 +3,7 @@ import { test, describe } from 'node:test'
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 
+import { productName } from '@social-publisher/config'
 import { COVERED_ELSEWHERE, LIBRARIES, framing, loadLibrary, readSkillText, registerSkillsLibrary } from '../src/skills-library.ts'
 import { PLAYBOOKS, registerPlaybooks } from '../src/playbooks.ts'
 
@@ -168,7 +169,7 @@ describe('the skills library', () => {
     const server = new McpServer({ name: 't', version: '1' })
     registerSkillsLibrary(server)
     const text = await callTool(server, 'get_skill', { name: 'meta-account-manager' })
-    assert.ok(text.startsWith('[AdsPilot skill: "meta-account-manager"'))
+    assert.ok(text.startsWith(`[${productName()} skill: "meta-account-manager"`))
     assert.doesNotMatch(text.slice(0, 600), /Third-party guidance/)
     assert.match(text, /references\/field-notes\.md/)
     assert.match(text, /references\/research-2026-10\.md/)

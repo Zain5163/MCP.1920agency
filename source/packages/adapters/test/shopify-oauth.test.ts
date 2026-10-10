@@ -13,6 +13,7 @@ import {
   verifyState,
 } from '../src/shopify-oauth.ts'
 
+import { productName } from '@social-publisher/config'
 const KEY = 'server-only-secret'
 const SHOP = 'example-store.myshopify.com'
 
@@ -29,8 +30,8 @@ describe('the connect link state', () => {
     const token = signState({ tenantId: 't1', shop: SHOP, expiresAt: 9e15 }, KEY)
     const [body, mac] = token.split('.')
     const forged = Buffer.from(JSON.stringify({ ...JSON.parse(Buffer.from(body!, 'base64url').toString()), tenantId: 't2' })).toString('base64url')
-    assert.match((verifyState(`${forged}.${mac}`, KEY) as { error: string }).error, /not issued by AdsPilot/)
-    assert.match((verifyState(token, 'other-key') as { error: string }).error, /not issued by AdsPilot/)
+    assert.match((verifyState(`${forged}.${mac}`, KEY) as { error: string }).error, new RegExp(`not issued by ${productName()}`))
+    assert.match((verifyState(token, 'other-key') as { error: string }).error, new RegExp(`not issued by ${productName()}`))
     assert.ok('error' in verifyState('garbage', KEY))
   })
 })
