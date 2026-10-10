@@ -20,6 +20,7 @@ import {
   eventForObjective,
   goalForObjective,
   isDynamicCreative,
+  usesTextVariations,
   type MetaCheckContext,
 } from './meta-ads-guardrails.ts'
 import { adLinks, verifyCampaignSnapshot, type VerifyCheck } from './meta-ads-verify.ts'
@@ -1516,6 +1517,30 @@ export class MetaAdsClient {
         }
       }
       body.object_story_spec = JSON.stringify(storySpec)
+      return body
+    }
+
+    // Several texts on one image: Meta's "text variations". The ad keeps an ordinary link_data
+    // (first text, headline, description, image) and the variants ride in an asset feed marked
+    // DEGREES_OF_FREEDOM. Unlike a dynamic creative this needs no special ad set and an ad set may
+    // hold many such ads (verified live on 2026-10-11; a dynamic-creative ad was refused there).
+    if (usesTextVariations(ad)) {
+      const asset = assets[0]
+      storySpec.link_data = {
+        link,
+        message: texts.bodies[0],
+        name: texts.headlines[0],
+        ...(texts.descriptions[0] !== undefined ? { description: texts.descriptions[0] } : {}),
+        call_to_action: callToAction,
+        ...(asset !== undefined ? { image_hash: await this.#uploadImage(asset.localPath) } : {}),
+      }
+      body.object_story_spec = JSON.stringify(storySpec)
+      body.asset_feed_spec = JSON.stringify({
+        bodies: texts.bodies.map((text) => ({ text })),
+        titles: texts.headlines.map((text) => ({ text })),
+        ...(texts.descriptions.length > 0 ? { descriptions: texts.descriptions.map((text) => ({ text })) } : {}),
+        optimization_type: 'DEGREES_OF_FREEDOM',
+      })
       return body
     }
 

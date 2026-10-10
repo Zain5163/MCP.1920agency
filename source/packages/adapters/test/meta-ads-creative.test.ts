@@ -336,13 +336,17 @@ describe('dynamic creative, which the real account enforces', () => {
   // A function, because `dir` is only set once the before() hook has run.
   const multiText = () => ({ ...base, ...texts, assets: [{ kind: 'image' as const, localPath: join(dir, 'sq.png'), aspectRatio: '1:1' as const }] })
 
-  test('an ad set holding a multi-text ad is marked for dynamic creative', async () => {
-    // Real account, 2026-09-30: "Dynamic creative ads can only be created under
-    // dynamic creative ad sets." The sandbox never showed it.
+  test('a multi-text IMAGE ad is built as text variations, in an ordinary ad set', async () => {
+    // Real account, 2026-10-11: a dynamic-creative ad was refused in an ordinary ad set, while
+    // link_data + asset_feed_spec { bodies, titles, optimization_type: DEGREES_OF_FREEDOM } was accepted.
     const { fetchImpl, calls } = meta()
     await client(fetchImpl).create(planWith([multiText()]))
-    const adset = calls.find((c) => c.url.endsWith('/adsets'))!.body
-    assert.equal(adset.is_dynamic_creative, 'true')
+    assert.equal(calls.find((c) => c.url.endsWith('/adsets'))!.body.is_dynamic_creative, undefined)
+    const sent = sentCreative(calls)
+    assert.match(sent.object_story_spec!, /"link_data"/)
+    const feed = JSON.parse(sent.asset_feed_spec!)
+    assert.equal(feed.optimization_type, 'DEGREES_OF_FREEDOM')
+    assert.ok(feed.bodies.length > 1)
   })
 
   test('an ordinary ad set is not', async () => {
@@ -352,19 +356,25 @@ describe('dynamic creative, which the real account enforces', () => {
     assert.equal(calls.find((c) => c.url.endsWith('/adsets'))!.body.is_dynamic_creative, undefined)
   })
 
-  test('a second ad beside a dynamic creative is refused before anything is created', async () => {
-    const { fetchImpl, calls } = meta()
-    await assert.rejects(
-      () => client(fetchImpl).create(planWith([multiText(), { ...base, name: 'b', body: 'x', headline: 'y' }])),
-      /only ONE such ad per ad set/,
-    )
-    assert.equal(calls.length, 0)
+  test('several multi-text image ads may share one ad set', () => {
+    const { fetchImpl } = meta()
+    const review = client(fetchImpl).review(planWith([multiText(), { ...multiText(), name: 'b' }]))
+    assert.equal(review.errors.some((e) => /only ONE such ad/.test(e)), false)
   })
 
-  test('one multi-text ad is judged by its variants, not by the ad count', () => {
+  test('a multi-text VIDEO is still a dynamic creative (text variations on video not yet verified)', async () => {
+    const { isDynamicCreative, usesTextVariations } = await import('../src/meta-ads-guardrails.ts')
+    const video = { ...base, ...texts, assets: [{ kind: 'video' as const, localPath: 'v.mp4', aspectRatio: '9:16' as const }] }
+    assert.equal(isDynamicCreative(video as never), true)
+    assert.equal(usesTextVariations(video as never), false)
+    assert.equal(isDynamicCreative(multiText() as never), false)
+    assert.equal(usesTextVariations(multiText() as never), true)
+  })
+
+  test('one multi-text ad is judged by its angles, not by the ad count', () => {
     const { fetchImpl } = meta()
     const review = client(fetchImpl).review(planWith([multiText()]))
-    assert.equal(review.warnings.some((w) => /Only 1 ad/.test(w)), false)
+    assert.equal(review.warnings.some((w) => /Only 1 angle/.test(w)), false)
   })
 
   test('a single description is an ordinary field, not a reason for dynamic creative', async () => {

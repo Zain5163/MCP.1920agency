@@ -319,23 +319,16 @@ export function checkMetaAdPlan(plan: AdPlan, context: MetaCheckContext = {}): A
       })
     }
 
-    // With a dynamic creative the variants inside it are the test, so "fewer
-    // than three ads" measures the wrong thing. Count the variants instead.
-    const variantCount = dynamic.length === 1 ? effectiveTexts(dynamic[0]!).bodies.length : 0
-    if (dynamic.length === 1 && variantCount < guards.minAdsPerAdSet) {
+    // An ad that rotates several texts (dynamic creative, or text variations on an image) tests
+    // each text as an angle, so count angles rather than ads.
+    const rotating = (ad: (typeof ads)[number]) => isDynamicCreative(ad) || usesTextVariations(ad)
+    const angles = ads.reduce((n, ad) => n + (rotating(ad) ? Math.max(1, effectiveTexts(ad).bodies.length) : 1), 0)
+    if (ads.length > 0 && angles < guards.minAdsPerAdSet) {
       issues.push({
         severity: 'warning',
         message:
-          `Only ${variantCount} primary text(s) in this ad. Fewer than ${guards.minAdsPerAdSet} is not a real ` +
-          'creative test — you learn nothing about which angle works.',
-        path: `${at}.ads`,
-      })
-    } else if (dynamic.length === 0 && ads.length > 0 && ads.length < guards.minAdsPerAdSet) {
-      issues.push({
-        severity: 'warning',
-        message:
-          `Only ${ads.length} ad(s). Fewer than ${guards.minAdsPerAdSet} is not a real creative test — ` +
-          'you learn nothing about which angle works.',
+          `Only ${angles} angle(s) across ${ads.length} ad(s). Fewer than ${guards.minAdsPerAdSet} is not a real creative test — ` +
+          'you learn nothing about which angle works. Add primary texts with different angles, or more ads.',
         path: `${at}.ads`,
       })
     }
@@ -470,8 +463,27 @@ export function checkMetaAdPlan(plan: AdPlan, context: MetaCheckContext = {}): A
 export function isDynamicCreative(ad: AdPlan['adSets'][number]['ads'][number]): boolean {
   const texts = effectiveTexts(ad)
   const shapes = new Set((ad.assets ?? []).map((a) => a.aspectRatio))
+  // Since 2026-10-11 an IMAGE ad (or one without a file) with several texts is built as Meta's
+  // "text variations" (asset_feed_spec optimization_type DEGREES_OF_FREEDOM with link_data),
+  // which ordinary ad sets accept, several per ad set (verified live). Only a VIDEO with several
+  // texts still needs a dynamic-creative ad set: text variations on video are not yet verified.
+  const video = (ad.assets ?? []).some((a) => a.kind === 'video')
+  return (
+    video &&
+    shapes.size < 2 &&
+    (texts.bodies.length > 1 || texts.headlines.length > 1 || texts.descriptions.length > 1)
+  )
+}
+
+/** An image ad (or no file) with several texts and one shape: built as Meta's text variations. */
+export function usesTextVariations(ad: AdPlan['adSets'][number]['ads'][number]): boolean {
+  const texts = effectiveTexts(ad)
+  const assets = ad.assets ?? []
+  const shapes = new Set(assets.map((a) => a.aspectRatio))
   return (
     shapes.size < 2 &&
+    assets.length <= 1 &&
+    !assets.some((a) => a.kind === 'video') &&
     (texts.bodies.length > 1 || texts.headlines.length > 1 || texts.descriptions.length > 1)
   )
 }
