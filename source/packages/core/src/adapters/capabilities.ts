@@ -388,14 +388,35 @@ export const CAPABILITIES: Readonly<Record<Platform, CapabilityRecord>> = {
     mediaKinds: ['image', 'video'],
     maxMediaCount: 4,
     minMediaCount: 0,
-    videoMaxSeconds: 140,
+    // WHY not 140 s (2026-10-11): 140 s / 512 MB is now the DIRECT MESSAGE
+    // limit. X's media upload best practices (docs.x.com/x-api/media/quickstart/
+    // best-practices, checked 2026-10-11) give post video (tweet_video) as 0.5 s
+    // to 20 minutes and 8 GB for a default account, 125 minutes and 16 GB for a
+    // Premium / verified one, and say "Post-video caps match the X app" — the API
+    // and the app share these. Which tier an account is cannot be known here, so
+    // the default account's caps are encoded: the stricter, always-true reading.
+    // 8 GB is read as 8,000,000,000 bytes, the stricter reading.
+    videoMinSeconds: 0.5,
+    videoMaxSeconds: 1_200,
+    maxVideoBytes: 8_000_000_000,
+    // "Aspect ratio: must be between 1:3 and 3:1" (same page).
+    videoAspectRatioMin: 1 / 3,
+    videoAspectRatioMax: 3,
     requiresPublicMediaUrl: false,
     supportsNativeScheduling: false,
     allowsMixedMedia: false,
     verified: false,
     notes:
       'Pay-per-use billing: a post containing a link costs materially more than a plain post. ' +
-      'Surface the per-post cost in the UI before publishing.',
+      'Surface the per-post cost in the UI before publishing. ' +
+      'VIDEO (checked 2026-10-11, docs.x.com media upload best practices; no adapter yet): post ' +
+      'video 0.5 s to 20 min and 8 GB for a default account, 125 min and 16 GB for Premium / ' +
+      'verified, the same as the X app; the old 140 s / 512 MB now applies to DMs only. The ' +
+      'default caps are encoded because the tier is not known before posting. Aspect 1:3 to ' +
+      '3:1; H.264 High, AAC-LC, at most 60 fps, YUV 4:2:0, no open GOP, progressive. The page ' +
+      'also says "Dimensions: must be between 32x32 and 1280x1024" yet lets subscribed users ' +
+      'upload 1080p, so no width limit is encoded. Upload with media_category tweet_video: a DM ' +
+      'category on a post is a documented cause of an upload that succeeds and a post that fails.',
   },
 }
 

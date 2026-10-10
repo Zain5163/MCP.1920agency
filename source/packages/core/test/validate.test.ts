@@ -349,6 +349,38 @@ describe('aspect ratio', () => {
   })
 })
 
+describe('video limits checked against the 2026-10 platform docs', () => {
+  test('X: a post video of 10 minutes passes; 140 s is the DM limit, not the post limit', () => {
+    // Regression (2026-10-11): capabilities said 140 s, which X now documents as
+    // the direct-message limit. Post video is 20 minutes for a default account.
+    const result = validateAgainstCapabilities(
+      draft({ body: 'hi', media: [video({ durationSeconds: 600, localPath: 'C:/v.mp4' })] }),
+      'x',
+      capabilitiesFor('x'),
+    )
+    assert.ok(!errorCodes(result).includes('video_too_long'))
+  })
+
+  test('X: over 20 minutes is refused, because the account tier is unknown', () => {
+    const result = validateAgainstCapabilities(
+      draft({ body: 'hi', media: [video({ durationSeconds: 1_201 })] }),
+      'x',
+      capabilitiesFor('x'),
+    )
+    assert.ok(errorCodes(result).includes('video_too_long'))
+    assert.equal(capabilitiesFor('x').videoMaxSeconds, 1_200)
+    assert.equal(capabilitiesFor('x').maxVideoBytes, 8_000_000_000)
+  })
+
+  test('X: video aspect 1:3 to 3:1, so 9:16 passes and 4:1 does not', () => {
+    const caps = capabilitiesFor('x')
+    const vertical = validateAgainstCapabilities(draft({ body: 'hi', media: [video({ width: 1080, height: 1920 })] }), 'x', caps)
+    assert.ok(!errorCodes(vertical).includes('aspect_ratio_unsupported'))
+    const banner = validateAgainstCapabilities(draft({ body: 'hi', media: [video({ width: 1600, height: 400 })] }), 'x', caps)
+    assert.ok(errorCodes(banner).includes('aspect_ratio_unsupported'))
+  })
+})
+
 describe('per-platform overrides end to end', () => {
   test('each platform validates against its own text', () => {
     // The point of overrides: a long Facebook caption must not make an Instagram
