@@ -15,7 +15,7 @@ import {
   registerThreadsProvider,
   type Provider,
 } from '@social-publisher/adapters'
-import { optional, required } from '@social-publisher/config'
+import { companyName, oauthRedirectUri, optional, required } from '@social-publisher/config'
 import {
   db,
   disconnect,
@@ -48,7 +48,6 @@ import { partialGrantRefusal } from './grant-check.ts'
  * working, and replacing a verified path is a separate decision from adding one.
  */
 
-const TENANT_NAME = '1920 Agency'
 
 /**
  * Bridges the core Platform union to Prisma's generated enum.
@@ -80,7 +79,7 @@ function registerConfigured(): void {
     registerMetaProvider({
       appId: metaId,
       appSecret: metaSecret,
-      redirectUri: optional('META_REDIRECT_URI', 'http://localhost:8787/callback')!,
+      redirectUri: oauthRedirectUri('META_REDIRECT_URI'),
       apiVersion: optional('META_API_VERSION', 'v25.0')!,
     })
   }
@@ -98,7 +97,7 @@ function registerConfigured(): void {
     registerInstagramProvider({
       appId: igId,
       appSecret: igSecret,
-      redirectUri: optional('INSTAGRAM_REDIRECT_URI', 'http://localhost:8787/instagram/callback')!,
+      redirectUri: oauthRedirectUri('INSTAGRAM_REDIRECT_URI'),
     })
   }
 
@@ -108,7 +107,7 @@ function registerConfigured(): void {
     registerThreadsProvider({
       appId: threadsId,
       appSecret: threadsSecret,
-      redirectUri: optional('THREADS_REDIRECT_URI', 'http://localhost:8787/threads/callback')!,
+      redirectUri: oauthRedirectUri('THREADS_REDIRECT_URI'),
     })
   }
 
@@ -118,7 +117,7 @@ function registerConfigured(): void {
     registerPinterestProvider({
       appId: pinId,
       appSecret: pinSecret,
-      redirectUri: optional('PINTEREST_REDIRECT_URI', 'http://localhost:8787/pinterest/callback')!,
+      redirectUri: oauthRedirectUri('PINTEREST_REDIRECT_URI'),
     })
   }
 
@@ -136,7 +135,7 @@ function registerConfigured(): void {
     registerLinkedInProvider({
       appId: liId,
       appSecret: liSecret,
-      redirectUri: optional('LINKEDIN_REDIRECT_URI', 'http://localhost:8787/linkedin/callback')!,
+      redirectUri: oauthRedirectUri('LINKEDIN_REDIRECT_URI'),
       apiVersion: optional('LINKEDIN_API_VERSION', '202601')!,
     })
   }
@@ -147,10 +146,7 @@ function registerConfigured(): void {
     registerLinkedInProvider({
       appId: pageId,
       appSecret: pageSecret,
-      redirectUri: optional(
-        'LINKEDIN_PAGE_REDIRECT_URI',
-        'http://localhost:8787/linkedin-page/callback',
-      )!,
+      redirectUri: oauthRedirectUri('LINKEDIN_PAGE_REDIRECT_URI'),
       apiVersion: optional('LINKEDIN_API_VERSION', '202601')!,
       // What makes this the organisation app: organisation scopes only, no OIDC.
       organizationAccess: true,
@@ -414,7 +410,7 @@ async function main(): Promise<void> {
 
 async function ensureTenant() {
   const existing = await db().tenant.findFirst({ orderBy: { createdAt: 'asc' } })
-  return existing ?? (await db().tenant.create({ data: { name: TENANT_NAME } }))
+  return existing ?? (await db().tenant.create({ data: { name: companyName() } }))
 }
 
 /**

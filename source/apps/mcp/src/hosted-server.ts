@@ -5,7 +5,7 @@ import type { Analytics, Logger } from '@social-publisher/telemetry'
 
 import { optional } from '@social-publisher/config'
 
-import { DEFAULT_PUBLIC_BASE_URL, productSettings, registerBrandTools } from './brand-tools.ts'
+import { productSettings, registerBrandTools, viewerBaseUrl } from './brand-tools.ts'
 import type { McpAnalyticsSetup } from './mcp-analytics.ts'
 import { createAdsPilotServer } from './mcp-server.ts'
 import type { ClientInfo, MeterOptions } from './metering.ts'
@@ -66,7 +66,7 @@ export function buildHostedServer(
     viewer: async () => ({ tenantId: identity.tenantId, ownerTenantId: optional('BRANDS_OWNER_TENANT_ID') }),
     settings: productSettings,
     viewerSecret: () => optional('BRAND_VIEW_SECRET'),
-    publicBaseUrl: () => optional('PUBLIC_BASE_URL', DEFAULT_PUBLIC_BASE_URL)!,
+    publicBaseUrl: viewerBaseUrl,
   })
   return server
 }

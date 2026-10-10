@@ -165,7 +165,7 @@ Depth: `get_skill core-web-vitals` and `get_skill performance`.
    `templates/product.<name>.json` in a theme draft (`shopify_theme_start_draft`,
    `shopify_theme_edit`, `shopify_theme_preview` with `?view=<name>`, publish on approval).
    The owner then assigns the template to the page or product in the admin. Theme tools
-   run only in the local AdsPilot app; on the hosted connector, give the owner the
+   run only in the local {{PRODUCT_NAME}} app; on the hosted connector, give the owner the
    theme-editor steps. Method: `get_skill shopify-theme-developer`.
 
 For a single product, the product page itself, improved (`shopify_update_product`,
@@ -174,7 +174,7 @@ An offer that needs a code or bundle: `shopify_create_discount` (always with an 
 
 **WordPress.** A page built with the block editor and patterns, on a template without the
 full menu, or a landing-page plugin already on the site. With the site connected
-(`wordpress_connect_site`), AdsPilot writes the page as block editor HTML and saves it as a
+(`wordpress_connect_site`), {{PRODUCT_NAME}} writes the page as block editor HTML and saves it as a
 **draft** (`wordpress_save_content`, approved), adds images with alt text
 (`wordpress_upload_media`, approved), and publishes it only on a separate approval
 (`wordpress_publish_content`) after the user has checked the draft on a phone. Choosing a
@@ -185,7 +185,7 @@ needs the user's approval. See `get_skill wordpress-site-builder`.
 
 **Plain HTML.** One file, inline critical CSS, system or one self-hosted font, images in
 WebP or AVIF with fallbacks, the form posting to a service the owner controls. Hosting and
-publishing are the owner's; AdsPilot does not host pages.
+publishing are the owner's; {{PRODUCT_NAME}} does not host pages.
 
 ## 10. Check three times, then test
 

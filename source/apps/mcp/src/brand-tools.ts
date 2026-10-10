@@ -24,7 +24,7 @@ import {
   type SectionId,
   type ViewerDeps,
 } from '@social-publisher/brands'
-import { optional } from '@social-publisher/config'
+import { optional, productName, publicBaseUrl } from '@social-publisher/config'
 
 import { callFailure } from './publishing.ts'
 
@@ -55,8 +55,6 @@ export function allBrands(): ReadonlyMap<string, LoadedBrand> {
   return cache
 }
 
-export const DEFAULT_PUBLIC_BASE_URL = 'https://mcp.1920agency.com'
-
 /** Everything read from configuration is read per call, never at registration, so building the tool set reads nothing. */
 export interface BrandToolOptions {
   /** Who is asking: hosted, the token's tenant; local, the owner. */
@@ -64,8 +62,8 @@ export interface BrandToolOptions {
   readonly settings: () => BrandSettings
   /** BRAND_VIEW_SECRET. */
   readonly viewerSecret: () => string | undefined
-  /** Where the viewer is served: PUBLIC_BASE_URL. */
-  readonly publicBaseUrl: () => string
+  /** Where the viewer is served: publicBaseUrl() (PUBLIC_BASE_URL; the server's comes from deploy/site.env). */
+  readonly publicBaseUrl: () => string | undefined
   /** Local transport only: give file paths on this machine, so the AI can use the logo files directly. */
   readonly localPaths?: boolean
   readonly brands?: () => ReadonlyMap<string, LoadedBrand>
@@ -73,12 +71,17 @@ export interface BrandToolOptions {
 }
 
 /**
- * The product's name. TODO: read it from the central settings module
- * (packages/config, branch central-config) once that is merged; until then the
- * PRODUCT_NAME setting, and without it the brand's own "name not final" label.
+ * The product's name, from the central settings module (product.ts). While it
+ * is the working name (listed in the product brand's neverOnCreative), the
+ * brand keeps its "name not final" label and placeholder: load.ts decides.
  */
 export function productSettings(): BrandSettings {
-  return { productName: optional('PRODUCT_NAME') }
+  return { productName: productName() }
+}
+
+/** The viewer's public address, for registering the tools on either transport. */
+export function viewerBaseUrl(): string | undefined {
+  return publicBaseUrl()
 }
 
 /** The viewer route's configuration, read per request (http-server.ts). */
@@ -196,7 +199,7 @@ export function registerBrandTools(server: McpServer, options: BrandToolOptions)
     'get_brand',
     'Read a brand design system: the rules for using it, then its guidelines and machine-readable tokens (colours with roles and contrast, type scale and fonts, logo files and clear space, spacing, components, imagery, voice, ad placements and safe zones, social templates). Use it before any creative, post, page or store work for that brand, and follow it exactly.',
     {
-      brand: z.string().describe('The brand slug from list_brands, e.g. "1920-agency".'),
+      brand: z.string().describe('The brand slug, exactly as list_brands shows it.'),
       section: z
         .enum(SECTION_IDS as [SectionId, ...SectionId[]])
         .optional()
@@ -245,7 +248,15 @@ export function registerBrandTools(server: McpServer, options: BrandToolOptions)
       const at = now()
       const expires = expiryFor(at, hours ?? DEFAULT_LINK_HOURS)
       const token = signViewerToken({ brand: brand ?? '*', tenant: viewer.tenantId, expires }, secret)
-      const base = options.publicBaseUrl().replace(/\/+$/, '')
+      const base = options.publicBaseUrl()?.replace(/\/+$/, '')
+      if (base === undefined || base === '') {
+        return text(
+          callFailure(
+            'CONFIG_MISSING',
+            'PUBLIC_BASE_URL is not set, so this machine does not know the viewer’s public address. On the server it comes from deploy/site.env; on a PC, set PUBLIC_BASE_URL=https://<the server domain> in the .env file.',
+          ),
+        )
+      }
       const url = `${base}/brands${brand === undefined ? '' : `/${brand}`}?t=${encodeURIComponent(token)}`
       const settings = options.settings()
       const what = brand === undefined ? `all ${mine.length} of this account's brands` : displayName(brandFor(brands(), brand, viewer)!.brand, settings)

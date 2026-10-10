@@ -1,5 +1,5 @@
 [Unit]
-Description=AdsPilot: renew expiring platform tokens (Threads, Google)
+Description=Renew expiring platform tokens (Threads, Google)
 After=docker.service network-online.target
 Requires=docker.service
 

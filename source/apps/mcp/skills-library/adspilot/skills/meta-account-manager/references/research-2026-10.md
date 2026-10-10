@@ -1,6 +1,6 @@
 # Meta e-commerce strategy research, 8 Oct 2026
 
-_AdsPilot reference for the meta-account-manager skill. Researched online 2026-10-08 for a real account (a Pakistani footwear store, named here only as "the example store"). Re-check anything older than about three months._
+_{{PRODUCT_NAME}} reference for the meta-account-manager skill. Researched online 2026-10-08 for a real account (a Pakistani footwear store, named here only as "the example store"). Re-check anything older than about three months._
 
 **Purpose:** find out how expert Meta buyers run and scale e-commerce accounts in 2025–2026, applied to an example store. The example is a Pakistani men's footwear store on Shopify. It sells cash on delivery (COD) at an average order of about PKR 7,000. It spends PKR 4,000–9,000 a day and gets about 4–8 purchases a day at about PKR 1,350 per purchase. The target is PKR 500–700.
 

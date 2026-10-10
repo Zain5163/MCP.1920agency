@@ -7,7 +7,7 @@ import {
   type SafeFetch,
   type WordPressLogin,
 } from '@social-publisher/adapters'
-import { CONFIG_DIR, optional } from '@social-publisher/config'
+import { CONFIG_DIR, optional, productName } from '@social-publisher/config'
 import { TenantScope, listProviderAuths, markProviderAuthNeedsReauth, providerAuthCredentialStore, saveProviderAuth } from '@social-publisher/db'
 import { TokenVault, parseKey } from '@social-publisher/vault'
 
@@ -105,7 +105,7 @@ let vaultInstance: TokenVault | undefined
 function vault(): TokenVault {
   if (vaultInstance === undefined) {
     const key = optional('VAULT_MASTER_KEY')
-    if (key === undefined) throw new Error('VAULT_MASTER_KEY is not set, so AdsPilot cannot store or read site logins. Add it to the server configuration (SETUP.md).')
+    if (key === undefined) throw new Error(`VAULT_MASTER_KEY is not set, so ${productName()} cannot store or read site logins. Add it to the server configuration (SETUP.md).`)
     vaultInstance = new TokenVault({ kek: parseKey(key, 'VAULT_MASTER_KEY'), keyVersion: 1, store: providerAuthCredentialStore() })
   }
   return vaultInstance

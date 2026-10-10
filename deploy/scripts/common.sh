@@ -9,7 +9,11 @@
 set -Eeuo pipefail
 umask 077
 
-ADSPILOT_HOME=${ADSPILOT_HOME:-/opt/adspilot}
+# Domain, server and fixed server names come from deploy/site.env, the one place
+# for them (ADSPILOT_HOME, COMPOSE_PROJECT, EDGE_NETWORK, DOMAIN, ...).
+# shellcheck source=site.sh
+. "$(dirname "${BASH_SOURCE[0]}")/site.sh"
+
 DEPLOY_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 COMPOSE_FILE="$DEPLOY_DIR/docker-compose.yml"
 COMPOSE_ENV="$ADSPILOT_HOME/compose.env"
@@ -18,19 +22,21 @@ PG_PASSWORD_FILE="$ADSPILOT_HOME/env/postgres_password"
 BACKUP_DIR="$ADSPILOT_HOME/backups"
 BACKUP_PUBKEY="$ADSPILOT_HOME/env/backup-public.asc"
 PG_IMAGE=${PG_IMAGE:-postgres:17-alpine}
-# Compose names its network <project>_<network>: project "adspilot", network "adspilot".
-APP_NETWORK=adspilot_adspilot
+# Compose names its network <project>_<network>: project $COMPOSE_PROJECT, network "adspilot".
+APP_NETWORK=${COMPOSE_PROJECT}_adspilot
 
 say()  { printf '== %s\n' "$*"; }
 warn() { printf 'WARNING: %s\n' "$*" >&2; }
 die()  { printf 'STOPPED: %s\n' "$*" >&2; exit 1; }
 
-# docker compose with this deployment's settings file.
+# docker compose with this deployment's settings file. The project name comes
+# from site.env (the same "adspilot" the compose file names itself), and DOMAIN is
+# exported by site.sh, so compose builds the MCP's PUBLIC_BASE_URL from it.
 dc() {
   if [ -f "$COMPOSE_ENV" ]; then
-    docker compose --env-file "$COMPOSE_ENV" -f "$COMPOSE_FILE" "$@"
+    docker compose -p "$COMPOSE_PROJECT" --env-file "$COMPOSE_ENV" -f "$COMPOSE_FILE" "$@"
   else
-    ADSPILOT_HOME="$ADSPILOT_HOME" docker compose -f "$COMPOSE_FILE" "$@"
+    docker compose -p "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" "$@"
   fi
 }
 

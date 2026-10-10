@@ -1,6 +1,6 @@
 ---
 name: wordpress-site-builder
-description: "Plan, build, fix and speed up a WordPress site or WooCommerce store for a business that runs ads: block themes versus classic themes and page builders, theme.json and patterns, landing pages, WooCommerce product, cart and checkout (block checkout, payments and tax display per country, cash on delivery, cookie consent, Meta pixel and Conversions API), plugins to keep or avoid, caching and Core Web Vitals, security and backups, and WP-CLI / REST API basics for developers. AdsPilot connects to a self-hosted WordPress site with an Application Password (wordpress_connect_site) and can read, audit and, with the user's approval for each change, edit pages, posts, media and WooCommerce products; theme, plugin and settings changes stay with the owner or developer. Use when the site is on WordPress or WooCommerce, or the user asks to build one."
+description: "Plan, build, fix and speed up a WordPress site or WooCommerce store for a business that runs ads: block themes versus classic themes and page builders, theme.json and patterns, landing pages, WooCommerce product, cart and checkout (block checkout, payments and tax display per country, cash on delivery, cookie consent, Meta pixel and Conversions API), plugins to keep or avoid, caching and Core Web Vitals, security and backups, and WP-CLI / REST API basics for developers. {{PRODUCT_NAME}} connects to a self-hosted WordPress site with an Application Password (wordpress_connect_site) and can read, audit and, with the user's approval for each change, edit pages, posts, media and WooCommerce products; theme, plugin and settings changes stay with the owner or developer. Use when the site is on WordPress or WooCommerce, or the user asks to build one."
 ---
 
 # WordPress site builder
@@ -8,7 +8,7 @@ description: "Plan, build, fix and speed up a WordPress site or WooCommerce stor
 **Updated 2026-10-08.** Versions at that date: **WordPress 7.1.3** (security release,
 6 Oct 2026), **WooCommerce 11.2**, PHP **8.3+** recommended. Re-check before quoting a version.
 
-## 0. What AdsPilot can and cannot do here
+## 0. What {{PRODUCT_NAME}} can and cannot do here
 
 **Every change needs the user's approval.** Each change tool first returns an exact
 summary (before and after) and an approval token; show the summary, and call again with the
@@ -19,12 +19,12 @@ mismatch, never as done.
 **Connecting** (`wordpress_connect_site`): self-hosted WordPress 5.6 or newer on `https://`.
 It takes the site address, the WordPress username and an **Application Password**, never
 the user's own login password. Tell the user how to make one: log in to WordPress as the
-user AdsPilot should act as, go to **Users > Profile**, scroll to **Application Passwords**,
-type "AdsPilot", click **Add New Application Password**, and copy the password it shows
+user {{PRODUCT_NAME}} should act as, go to **Users > Profile**, scroll to **Application Passwords**,
+type "{{PRODUCT_NAME}}", click **Add New Application Password**, and copy the password it shows
 once. An Application Password has the full rights of its user, so suggest a dedicated
 **Editor** account for content only, or an **Administrator** (or **Shop Manager** for
 WooCommerce) when plugins, settings and products are needed. It can be revoked on the same
-screen at any time; `wordpress_disconnect_site` revokes it on the site and deletes AdsPilot's
+screen at any time; `wordpress_disconnect_site` revokes it on the site and deletes {{PRODUCT_NAME}}'s
 encrypted copy. If the section is missing, a security plugin (Wordfence turns it off by
 default: Wordfence > All Options > Brute Force Protection) or a missing HTTPS setting has
 turned Application Passwords off; the connect tool says which fix applies.
@@ -40,12 +40,12 @@ WordPress.com-hosted sites are not supported yet.
 | `wordpress_publish_content` | Make a draft public, or take a page back to draft | Yes |
 | `wordpress_upload_media` | Add an image from a public https address to the Media Library, with alt text | Yes |
 | `woocommerce_update_product` | Product name, descriptions, regular and sale price and sale dates (per variation for variable products) | Yes |
-| `wordpress_list_backups`, `wordpress_restore_backup` | Earlier versions AdsPilot saved, and WordPress revisions; put one back | Restore: yes |
+| `wordpress_list_backups`, `wordpress_restore_backup` | Earlier versions {{PRODUCT_NAME}} saved, and WordPress revisions; put one back | Restore: yes |
 
-AdsPilot does **not** install or update plugins or themes, edit theme files or
+{{PRODUCT_NAME}} does **not** install or update plugins or themes, edit theme files or
 `theme.json`, or change settings, menus, checkout, payments, shipping or tax: give the owner
 or developer the steps (sections below). Core WordPress has no SEO title or meta description
-field: AdsPilot sets the **excerpt** (many themes and SEO plugins use it) and gives the owner
+field: {{PRODUCT_NAME}} sets the **excerpt** (many themes and SEO plugins use it) and gives the owner
 the exact SEO title and description to paste into their SEO plugin.
 
 Work order on a site: `wordpress_site_audit`, then plan the fixes with the user (`cro`,
@@ -177,8 +177,8 @@ From the official hardening guide (developer.wordpress.org, Advanced Administrat
 
 ## 7. For developers: WP-CLI and the REST API
 
-AdsPilot's own tools use the REST API (section 0). The commands below are for the owner's
-developer; AdsPilot does not run them.
+{{PRODUCT_NAME}}'s own tools use the REST API (section 0). The commands below are for the owner's
+developer; {{PRODUCT_NAME}} does not run them.
 
 - **WP-CLI** (on the server, after a backup): `wp core update`, `wp plugin list --update=available`,
   `wp plugin update --all`, `wp theme list`, `wp search-replace 'http://old' 'https://new' --dry-run`,
@@ -197,7 +197,7 @@ developer; AdsPilot does not run them.
    events in Events Manager, page speed.
 3. **Live**: after publishing (`wordpress_publish_content`, approved) or the owner's push
    from staging (with a fresh backup), open the live page, repeat the test order or form
-   and the event check. AdsPilot's read-back confirms what WordPress saved, not how the page
+   and the event check. {{PRODUCT_NAME}}'s read-back confirms what WordPress saved, not how the page
    looks: check that too.
 
 ## Never
@@ -206,7 +206,7 @@ developer; AdsPilot does not run them.
   when its read-back did not match. Never invent a WordPress tool or claim a change the
   tools did not make (plugins, themes, settings, checkout).
 - Ask for the user's own login password or database or hosting credentials. The only login
-  AdsPilot takes is an Application Password, given to `wordpress_connect_site`; never repeat
+  {{PRODUCT_NAME}} takes is an Application Password, given to `wordpress_connect_site`; never repeat
   it back or write it anywhere else.
 - Recommend nulled themes or plugins, or editing a live site without a backup.
 - Invent reviews, prices or delivery promises, or legal text (legal notice, VAT numbers,
@@ -220,7 +220,7 @@ unlicensed, so it is cited and paraphrased, never copied)
 - Registering patterns: https://developer.wordpress.org/themes/patterns/registering-patterns/
 - Hardening guide: https://developer.wordpress.org/advanced-administration/security/hardening/
 - Application Passwords: https://developer.wordpress.org/advanced-administration/security/application-passwords/
-- AdsPilot connector research (Application Passwords, REST endpoints, WooCommerce, blockers): research/2026-10-08-wordpress-connector.md in the AdsPilot repository
+- {{PRODUCT_NAME}} connector research (Application Passwords, REST endpoints, WooCommerce, blockers): research/2026-10-08-wordpress-connector.md in the {{PRODUCT_NAME}} repository
 - Image performance in 6.3 (fetchpriority): https://make.wordpress.org/core/2023/07/13/image-performance-enhancements-in-wordpress-6-3/
 - AVIF in 6.5: https://make.wordpress.org/core/2024/02/23/wordpress-6-5-adds-avif-support/
 - Speculative loading in 6.8: https://make.wordpress.org/core/2025/03/06/speculative-loading-in-6-8/

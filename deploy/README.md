@@ -1,9 +1,17 @@
 # AdsPilot on the Hetzner server: deployment plan (Phase 3)
 
+> **2026-10-10: settings live in `deploy/site.env`.** The domain, server, SSH user and key, server folder,
+> compose project, edge network and gate folder are written once, in `site.env` (no secrets), and every script
+> reads it through `scripts/site.sh`. The commands below show today's values (`mcp.1920agency.com`,
+> `37.27.148.217`) for readability; the scripts never contain them. The gate's site file is rendered from
+> `caddy/site.caddy.template`: `scripts/caddy-site.sh` prints it, `scripts/caddy-site.sh --upload` installs it as
+> `/opt/gate/sites/<DOMAIN>.caddy`, validates the gate and reloads it (puts the old file back if the gate refuses).
+> Compose gives the MCP `PUBLIC_BASE_URL=https://$DOMAIN`. Rename or move: `architecture/2026-10-10-central-config.md`.
+>
 > **2026-10-09: the server has a front gate.** Raptor's Caddy no longer serves other sites: `/opt/gate`
 > (source: `AI-Automation/Server-Gate`) serves every domain. AdsPilot owns `/opt/gate/sites/mcp.1920agency.com.caddy`
-> (this repo's `caddy/mcp.1920agency.com.caddy`); to change it, upload the file there and reload the gate. The steps
-> below that edit `/opt/raptor/site/deploy/Caddyfile` are history.
+> (rendered since 2026-10-10 from this repo's `caddy/site.caddy.template`, see above). The steps below that edit
+> `/opt/raptor/site/deploy/Caddyfile` are history.
 
 
 **Status (2026-10-08): kit built, NOTHING deployed.** No file on the server has
@@ -135,7 +143,8 @@ validation of the new block, reaching Supabase from a container (IPv4 pooler).
 | `Dockerfile` | one image for all roles. Node 22 slim, pnpm 12.5.1, built from committed `source/` only. Packages are compiled to `dist/` (their `main`), apps run their `.ts` with `--experimental-strip-types`, as on the PC. Prisma's Linux engines are downloaded at build and checked. The dashboard is not included. Non-root (`node`, uid 1000), no secrets |
 | `Dockerfile.dockerignore` | only `source/` and `deploy/docker/` enter the build; never `.env*`, `node_modules`, `dist` |
 | `docker-compose.yml` | `mcp`, `worker`, optional `postgres` (profile `db`), one-shot `migrate` and `tasks` (profile `tools`). Memory caps, restart policies, healthchecks, json-file logs 10 MB x 5 |
-| `caddy/mcp.1920agency.com.caddy` | AdsPilot's site file for the server's **front gate** (since 2026-10-09: `/opt/gate/sites/mcp.1920agency.com.caddy`, see `AI-Automation/Server-Gate`). Upload it there and run `cd /opt/gate && docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile`; never edit Raptor's files again |
+| `site.env` | the deployment's settings, the one place for them: `DOMAIN`, `SERVER_HOST`, `SERVER_USER`, `SSH_KEY`, `GATE_DIR`, `ADSPILOT_HOME`, `COMPOSE_PROJECT`, `EDGE_NETWORK`, `OAUTH_BOUNCE_PORT`. No secrets. Read by `scripts/site.sh` (the environment wins) |
+| `caddy/site.caddy.template` | AdsPilot's site file for the server's **front gate** (`/opt/gate/sites/<DOMAIN>.caddy`, see `AI-Automation/Server-Gate`), with the domain and bounce port as placeholders. `scripts/caddy-site.sh` renders it from `site.env`; `--upload` installs it, validates and reloads the gate. Never edit Raptor's files again |
 | `.env.example` | every variable name the server needs, and the ones it must NOT have |
 | `scripts/setup.sh` | one command: checks, folders, build, database (roles + `migrate deploy`, or a read-only `migrate status` on Supabase), optional restore, timers, start |
 | `scripts/backup.sh` | nightly pg_dump, checked, gpg-encrypted to a public key, 14 days |
@@ -240,10 +249,11 @@ ever differ.
 | volume `adspilot_pgdata` | Stage B database files |
 
 All commands below run in **Git Bash on the PC**, from the repository root,
-with:
+with (the values come from `deploy/site.env`):
 
 ```bash
-S="ssh -i ~/.ssh/raptor_hetzner -o BatchMode=yes root@37.27.148.217"
+. deploy/scripts/site.sh   # DOMAIN, SSH_TARGET, SSH_KEY_FILE, ADSPILOT_HOME ...
+s() { ssh -i "$SSH_KEY_FILE" -o BatchMode=yes "$SSH_TARGET" "$@"; }; S=s   # the key path may contain spaces
 ENVPC="$(cygpath -u "$USERPROFILE")/.social-publisher/.env"
 ```
 

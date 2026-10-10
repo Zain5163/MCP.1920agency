@@ -59,7 +59,7 @@ or returned**. Never assume them. Then `break_even_cost_per_sale`.
   campaign; purchase optimisation on both (`verify_campaign` checks it). About 60% of the
   budget to proven, 40% to test; test money stays small until an ad proves itself.
 - Few, larger ad sets; 4–6 different ads live so delivery is not resting on one.
-- **Agree a daily cap with the owner and set it as the account's AdsPilot ceiling**
+- **Agree a daily cap with the owner and set it as the account's {{PRODUCT_NAME}} ceiling**
   (`~/.social-publisher/ad-accounts.json` `dailyLimit`), so no change can exceed it.
 - Cut fast (`set_ad_delivery` off needs no approval): an ad at ~3× the target with no
   purchase; an ad with half the click-through of its siblings after meaningful spend; any
@@ -70,7 +70,7 @@ or returned**. Never assume them. Then `break_even_cost_per_sale`.
 A declining account needs eyes more than once a day while it recovers: a short check every
 few hours (today's spend against the cap, purchases, losers switched off, delivery problems)
 plus one daily report (the funnel step that is worst against baseline and the one action
-for it). On the AdsPilot desktop app this is a scheduled headless run with only read tools
+for it). On the {{PRODUCT_NAME}} desktop app this is a scheduled headless run with only read tools
 and `set_ad_delivery` off allowed; everything else goes to a waiting list for the owner.
 
 ## 6. Report like this
@@ -87,7 +87,7 @@ ad competes in every auction on its offer, creative and predicted response. The 
 history is in the **pixel / dataset**, which a new account would share anyway. New accounts
 start with low spending limits, more ad reviews and a higher risk of restriction, and split
 learning if run alongside. Keep a second account only as a **standby** (payment method,
-Page, pixel shared, low AdsPilot ceiling) for a restriction, or for ownership reasons.
+Page, pixel shared, low {{PRODUCT_NAME}} ceiling) for a restriction, or for ownership reasons.
 Check the current account's health first: `account_status` active, no `disable_reason`.
 
 ## Never

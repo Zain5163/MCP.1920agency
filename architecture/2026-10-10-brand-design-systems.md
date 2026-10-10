@@ -15,8 +15,8 @@ on the right, on our own server (`mcp.1920agency.com`), private.
 | The four brands | `source/packages/brands/brands/<slug>/` |
 | MCP tools `list_brands`, `get_brand`, `brand_viewer_link` | `source/apps/mcp/src/brand-tools.ts`, registered on both transports |
 | Viewer route `GET /brands`, `/brands/<slug>`, `/brands/<slug>/files/<name>` | `source/apps/mcp/src/http-server.ts` → `packages/brands/src/route.ts` |
-| Caddy | `deploy/caddy/mcp.1920agency.com.caddy`, `@brands` block (GET/HEAD, no-store, noindex) |
-| Settings | `deploy/.env.example`: `BRAND_VIEW_SECRET`, `BRANDS_OWNER_TENANT_ID`, `PRODUCT_NAME` |
+| Caddy | `deploy/caddy/site.caddy.template` (rendered by `deploy/scripts/caddy-site.sh` from `deploy/site.env`), `@brands` block (GET/HEAD, no-store, noindex) |
+| Settings | `deploy/.env.example`: `BRAND_VIEW_SECRET`, `BRANDS_OWNER_TENANT_ID`. The product's name and the public address come from the central settings (`productName()`, `publicBaseUrl()` in `packages/config/src/product.ts`) |
 
 ## The format: one folder per brand
 
@@ -176,13 +176,15 @@ is a new file with a new checksum, added only with the brand owner's approval.
 
 ## Not done / next
 
-- **Not deployed.** Go-live: set `BRAND_VIEW_SECRET` (and the same value in the PC's `.env`),
-  `BRANDS_OWNER_TENANT_ID` and optionally `PRODUCT_NAME` in `/opt/adspilot/env/adspilot.env`;
-  release the image (`deploy/scripts/release.sh`); upload `deploy/caddy/mcp.1920agency.com.caddy`
-  to `/opt/gate/sites/` and reload the gate (`cd /opt/gate && docker compose exec -T caddy caddy
-  reload --config /etc/caddy/Caddyfile`); then check `/brands` is 404 without a link and a link
-  from the hosted `brand_viewer_link` opens on a phone.
-- `PRODUCT_NAME` moves to the central settings module (branch `central-config`) once merged
-  (TODO in `brand-tools.ts` and `load.ts`).
+- **Not deployed.** Go-live: set `BRAND_VIEW_SECRET` and `BRANDS_OWNER_TENANT_ID` in
+  `/opt/adspilot/env/adspilot.env` (and the same secret, plus `PUBLIC_BASE_URL=https://<DOMAIN>`,
+  in the PC's `.env` if links should be made locally); release the image
+  (`deploy/scripts/release.sh`); check the rendered site file (`bash deploy/scripts/caddy-site.sh`)
+  and install it with `deploy/scripts/caddy-site.sh --upload` (validates and reloads the gate);
+  then check `/brands` is 404 without a link and a link from the hosted `brand_viewer_link`
+  opens on a phone.
+- The product's name is `productName()` from the central settings. While it is the working name
+  (in the product brand's `neverOnCreative`), the brand keeps its "name not final" placeholder;
+  set a final name there and the placeholder shows it, still marked as a placeholder.
 - Social-Render could read `brand.json` instead of its own `brand.css` to render any brand.
 - Muzaree needs a larger gold logo master from the client; PSX still lacks vector/reversed logos.

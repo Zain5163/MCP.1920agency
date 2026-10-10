@@ -1,5 +1,5 @@
 [Unit]
-Description=AdsPilot: database keep-alive row (stops the free Supabase project pausing)
+Description=Database keep-alive row (stops the free Supabase project pausing)
 After=docker.service network-online.target
 Requires=docker.service
 

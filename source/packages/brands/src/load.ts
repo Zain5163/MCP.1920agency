@@ -137,9 +137,10 @@ export function loadBrands(root: string = BRANDS_ROOT): Map<string, LoadedBrand>
 /** Settings that change how a brand is shown, read from configuration by the caller. */
 export interface BrandSettings {
   /**
-   * The product's name. TODO: read from the central settings module
-   * (packages/config, branch central-config) once it is merged; until then
-   * the MCP passes the PRODUCT_NAME setting.
+   * The product's name: the MCP passes productName() from the central
+   * settings module (packages/config product.ts). This package takes it as a
+   * value rather than importing config, so it stays free of runtime
+   * dependencies and its tests need no env file.
    */
   readonly productName?: string | undefined
 }

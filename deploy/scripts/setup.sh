@@ -68,7 +68,7 @@ avail_kb=$(df -Pk "$(dirname "$ADSPILOT_HOME")" | awk 'NR==2 {print $4}')
 [ "${avail_kb:-0}" -ge $((5 * 1024 * 1024)) ] || die "less than 5 GB free disk. Free space first (docker builder prune, with approval)."
 if [ -r /proc/meminfo ]; then
   avail_mb=$(awk '/MemAvailable/ {print int($2/1024)}' /proc/meminfo)
-  [ "${avail_mb:-0}" -ge 900 ] || warn "only ${avail_mb} MB memory available; AdsPilot may need up to 1.4 GB."
+  [ "${avail_mb:-0}" -ge 900 ] || warn "only ${avail_mb} MB memory available; this stack may need up to 1.4 GB."
 fi
 
 # --- 2. folders and files --------------------------------------------------------------
@@ -116,9 +116,9 @@ chmod 400 "$PG_PASSWORD_FILE"
 if [ ! -f "$COMPOSE_ENV" ]; then
   say "writing $COMPOSE_ENV (compose settings, no secrets)"
   {
-    echo "# AdsPilot compose settings. No secrets in this file."
+    echo "# Compose settings of this deployment, written by setup.sh. No secrets in this file."
     echo "ADSPILOT_HOME=$ADSPILOT_HOME"
-    echo "EDGE_NETWORK=adspilot_edge"
+    echo "EDGE_NETWORK=$EDGE_NETWORK"
     echo "ADSPILOT_TAG=latest"
     echo "COMPOSE_PROFILES="
   } > "$COMPOSE_ENV"

@@ -1,4 +1,5 @@
 import { PublishError, classifyHttpStatus, classifyNetworkError } from '@social-publisher/core'
+import { productName } from '@social-publisher/config'
 
 /**
  * Image generation through OpenRouter, paid per image.
@@ -137,7 +138,7 @@ export class OpenRouterImages {
           Authorization: `Bearer ${this.#key}`,
           'content-type': 'application/json',
           // OpenRouter's attribution headers; they identify the app on its side.
-          'X-Title': 'AdsPilot',
+          'X-Title': productName(),
         },
         body: JSON.stringify({
           model,

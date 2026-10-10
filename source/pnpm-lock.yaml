@@ -346,6 +346,9 @@ importers:
 
   packages/adapters:
     dependencies:
+      '@social-publisher/config':
+        specifier: workspace:*
+        version: link:../config
       '@social-publisher/core':
         specifier: workspace:*
         version: link:../core
@@ -389,6 +392,10 @@ importers:
         version: 5.9.3
 
   packages/core:
+    dependencies:
+      '@social-publisher/config':
+        specifier: workspace:*
+        version: link:../config
     devDependencies:
       '@types/node':
         specifier: ^22.9.0

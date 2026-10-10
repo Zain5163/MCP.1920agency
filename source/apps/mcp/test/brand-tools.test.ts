@@ -7,7 +7,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { handleViewerRequest, verifyViewerToken, type BrandViewer } from '@social-publisher/brands'
 
 import { allBrands, registerBrandTools, type BrandToolOptions } from '../src/brand-tools.ts'
-import { SERVER_INSTRUCTIONS } from '../src/playbooks.ts'
+import { serverInstructions } from '../src/playbooks.ts'
 
 /**
  * The brand tools as an AI uses them, with fakes for who is asking: no
@@ -127,6 +127,12 @@ describe('brand_viewer_link', () => {
     }
   })
 
+  test('without a public address it says where that comes from, instead of guessing a domain', async () => {
+    const text = await call(server({ publicBaseUrl: () => undefined }), 'brand_viewer_link', { brand: 'psx-ascend' })
+    assert.match(text, /^\[CONFIG_MISSING\]/)
+    assert.match(text, /PUBLIC_BASE_URL/)
+  })
+
   test('makes a link that the viewer accepts for that brand and tenant, and nothing more', async () => {
     const text = await call(server(), 'brand_viewer_link', { brand: 'psx-ascend', hours: 2 })
     const url = new URL(/https:\/\/\S+/.exec(text)![0])
@@ -161,6 +167,6 @@ describe('brand_viewer_link', () => {
 
 describe('the AI is told to load the brand first', () => {
   test('the server instructions name all three tools', () => {
-    for (const name of ['list_brands', 'get_brand', 'brand_viewer_link']) assert.ok(SERVER_INSTRUCTIONS.includes(name), name)
+    for (const name of ['list_brands', 'get_brand', 'brand_viewer_link']) assert.ok(serverInstructions().includes(name), name)
   })
 })

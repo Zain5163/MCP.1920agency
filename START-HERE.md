@@ -70,6 +70,38 @@ mistake in `.gitignore` still cannot leak them.
 
 ---
 
+## Where settings live
+
+"AdsPilot" is a working name and `mcp.1920agency.com` a temporary domain, so each
+value that may change is written **once** (owner, 2026-10-10). A test
+(`source/packages/config/test/central-config.test.ts`) fails if one is written
+anywhere else. Full table and inventory: `architecture/2026-10-10-central-config.md`.
+
+| What | The one place |
+|---|---|
+| Product name, slug, company; OAuth and MCP ports | `PRODUCT_DEFAULTS` in `source/packages/config/src/product.ts` (env vars `PRODUCT_NAME`, `PRODUCT_SLUG`, `COMPANY_NAME` override it on one machine) |
+| Domain, server, SSH user and key, server folder, compose project, gate folder | `deploy/site.env` (committed, no secrets) |
+| Secrets | `%USERPROFILE%\.social-publisher\.env` (PC), `/opt/adspilot/env/adspilot.env` (server) |
+
+In code use `productName()`, `companyName()`, `publicBaseUrl()` and the rest from
+`@social-publisher/config`; in our own skills write `{{PRODUCT_NAME}}`; in deploy
+scripts use `$DOMAIN`, `$SSH_TARGET` and the rest from `deploy/scripts/site.sh`.
+
+**Rename the product:** change `PRODUCT_NAME` (and `PRODUCT_SLUG` / `COMPANY_NAME`
+if wanted) in `product.ts`, run the tests, commit, then `deploy/scripts/release.sh`
+(with approval) and restart the PC's dashboard and MCP. A company change also needs
+`name` in `integrations/shopify-app/shopify.app.toml` and `shopify app deploy` (the
+tests say so).
+
+**Change the domain:** DNS first; change `DOMAIN` in `deploy/site.env`; update the
+URLs in `integrations/shopify-app/shopify.app.toml` (the tests say so) and run
+`shopify app deploy`; commit; then, with approval, `deploy/scripts/caddy-site.sh
+--upload` and `deploy/scripts/release.sh`; then the provider consoles and the PC's
+`*_REDIRECT_URI` values (`deploy/README.md`, "OAuth over https"). Details and the
+server-move steps: `architecture/2026-10-10-central-config.md` §2.
+
+---
+
 ## Running it
 
 ```

@@ -1,12 +1,12 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 
-import { checkConfig, optional } from '@social-publisher/config'
+import { checkConfig, optional, productName } from '@social-publisher/config'
 import { PLATFORMS, type ErrorCode } from '@social-publisher/core'
 import { health, queueStats, type TenantScope } from '@social-publisher/db'
 
 import { registerAdsTools } from './ads-tools.ts'
-import { DEFAULT_PUBLIC_BASE_URL, productSettings, registerBrandTools } from './brand-tools.ts'
+import { productSettings, registerBrandTools, viewerBaseUrl } from './brand-tools.ts'
 import { registerImageTools } from './image-tools.ts'
 import { registerPageTools } from './page-tools.ts'
 import { registerPerformanceTools } from './performance-tools.ts'
@@ -79,7 +79,7 @@ export function buildLocalServer(meter: MeterOptions): McpServer {
 
   server.tool(
     'check_status',
-    'Check AdsPilot health: configuration, database, keep-alive age, connected accounts and queue. Run this first if anything seems wrong.',
+    `Check ${productName()} health: configuration, database, keep-alive age, connected accounts and queue. Run this first if anything seems wrong.`,
     {},
     async () => {
       try {
@@ -290,7 +290,7 @@ export function buildLocalServer(meter: MeterOptions): McpServer {
     },
     settings: productSettings,
     viewerSecret: () => optional('BRAND_VIEW_SECRET'),
-    publicBaseUrl: () => optional('PUBLIC_BASE_URL', DEFAULT_PUBLIC_BASE_URL)!,
+    publicBaseUrl: viewerBaseUrl,
     localPaths: true,
   })
 

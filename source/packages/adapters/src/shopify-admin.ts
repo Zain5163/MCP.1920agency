@@ -1,5 +1,6 @@
 import https from 'node:https'
 
+import { shopifyAppName } from '@social-publisher/config'
 /**
  * Shopify Admin API client: read a store so AdsPilot can judge ads on real sales
  * and audit the store for conversion problems.
@@ -178,7 +179,7 @@ export class ShopifyAdminClient {
     if (res.status !== 200 || parsed.access_token === undefined) {
       throw new ShopifyError(
         `Shopify refused the connector's credentials for ${this.shop} (HTTP ${res.status}). ` +
-          'Check that the "1920 Agency Store Connector" app is installed on this store and that ' +
+          `Check that the "${shopifyAppName()}" app is installed on this store and that ` +
           'SHOPIFY_CONNECTOR_CLIENT_ID / SHOPIFY_CONNECTOR_CLIENT_SECRET in ~/.social-publisher/.env match the app. ' +
           'This sign-in method works only for stores owned by the app\'s organisation (development stores).',
         'auth',

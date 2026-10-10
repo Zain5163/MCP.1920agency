@@ -1,3 +1,4 @@
+import { DEFAULT_OAUTH_CALLBACK_PORT, defaultOAuthRedirectUri, OAUTH_REDIRECT_PATHS } from '@social-publisher/config'
 import { PublishError, type Platform } from '@social-publisher/core'
 
 import {
@@ -53,8 +54,15 @@ const USERINFO_URL = 'https://openidconnect.googleapis.com/v1/userinfo'
 const CHANNELS_URL = 'https://www.googleapis.com/youtube/v3/channels'
 const YOUTUBE: Platform = 'youtube'
 
-/** Matches the `/<provider>/callback` convention every provider here uses. */
-export const DEFAULT_GOOGLE_REDIRECT_URI = 'http://localhost:8787/google/callback'
+/**
+ * Matches the `/<provider>/callback` convention every provider here uses: the
+ * PC's listener on its default port. The path and port come from packages/config
+ * (product.ts), so they are written once. When GOOGLE_REDIRECT_URI is not set the
+ * config is built with defaultOAuthRedirectUri, which also honours
+ * OAUTH_REDIRECT_BASE (the hosted bounce); this constant is that default's
+ * plain form, read at import without touching the env file.
+ */
+export const DEFAULT_GOOGLE_REDIRECT_URI = `http://localhost:${DEFAULT_OAUTH_CALLBACK_PORT}${OAUTH_REDIRECT_PATHS.GOOGLE_REDIRECT_URI}`
 
 /**
  * What each Google product asks for. `identity` is always included: it is what
@@ -598,7 +606,7 @@ export function googleProviderConfigFromEnv(
   return {
     clientId,
     clientSecret,
-    redirectUri: read('GOOGLE_REDIRECT_URI') ?? DEFAULT_GOOGLE_REDIRECT_URI,
+    redirectUri: read('GOOGLE_REDIRECT_URI') ?? defaultOAuthRedirectUri('GOOGLE_REDIRECT_URI'),
   }
 }
 

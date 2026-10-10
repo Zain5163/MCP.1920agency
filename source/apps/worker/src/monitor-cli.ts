@@ -1,5 +1,5 @@
 import { META_REQUIRED_SCOPES, inspectMetaToken } from '@social-publisher/adapters'
-import { optional, required } from '@social-publisher/config'
+import { optional, required, productName } from '@social-publisher/config'
 import { db, disconnect, prismaCredentialStore, recordHeartbeat, runHealthChecks, type HealthCheck } from '@social-publisher/db'
 import { TokenVault, parseKey } from '@social-publisher/vault'
 import { createLogger } from '@social-publisher/telemetry'
@@ -104,7 +104,7 @@ async function main(): Promise<void> {
     worst: [base.worst, ...tokenChecks.map((c) => c.severity)].reduce((a, b) => (order[b] > order[a] ? b : a)),
   }
 
-  console.log(`\n  AdsPilot health — ${report.checkedAt.toISOString()}\n`)
+  console.log(`\n  ${productName()} health — ${report.checkedAt.toISOString()}\n`)
 
   for (const check of report.checks) {
     console.log(`${ICON[check.severity]}  ${check.name.padEnd(14)} ${check.summary}`)

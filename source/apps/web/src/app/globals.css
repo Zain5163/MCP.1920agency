@@ -1,7 +1,7 @@
 @import 'tailwindcss';
 
 /**
- * AdsPilot design tokens.
+ * Design tokens.
  *
  * Tailwind v4 is CSS-first: @theme generates the utility classes, so defining a
  * colour here gives you bg-surface, text-muted, border-line and so on. One source

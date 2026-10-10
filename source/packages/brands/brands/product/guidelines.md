@@ -2,7 +2,8 @@
 
 This is the AI marketing product itself. **"AdsPilot" is a working name only**: the name is taken
 (`research/2026-10-01-product-name.md`) and is being replaced. The display name comes from the
-product setting (`PRODUCT_NAME` today; the central settings module once it is merged). Colours and
+central product settings (`productName()`); while that is the working name, this brand shows a
+placeholder. Colours and
 type are the dashboard's own; adopting them as the product's brand is **proposed**. There is
 deliberately **no logo**.
 

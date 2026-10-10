@@ -1,6 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 
+import { productName } from '@social-publisher/config'
 import {
   INDUSTRIES,
   INDUSTRY_LABELS,
@@ -34,7 +35,7 @@ export function registerAccountTools(server: McpServer, options: MeterOptions): 
 
   server.tool(
     'check_usage',
-    "Show this account's plan, how many AdsPilot calls it has used this month, how many are left and when they reset. Free to call: it never counts toward the limit.",
+    `Show this account's plan, how many ${productName()} calls it has used this month, how many are left and when they reset. Free to call: it never counts toward the limit.`,
     {},
     async () => {
       try {
@@ -50,7 +51,7 @@ export function registerAccountTools(server: McpServer, options: MeterOptions): 
         })
         // The business type rides on check_usage because the AI already calls it
         // to see where the account stands; "not set" is its cue to ask the user
-        // (SERVER_INSTRUCTIONS). A stored value off the list reads as not set.
+        // (serverInstructions in playbooks.ts). A stored value off the list reads as not set.
         return text(`${summary}\n${businessTypeLine(industryOf(usage.industry))}`)
       } catch (error) {
         options.log('mcp.check_usage.failed', 'usage could not be read', error)
@@ -95,7 +96,7 @@ export function registerAccountTools(server: McpServer, options: MeterOptions): 
 
   server.tool(
     'set_business_type',
-    'Record what kind of business this AdsPilot account is, from a fixed list: ' +
+    `Record what kind of business this ${productName()} account is, from a fixed list: ` +
       `${INDUSTRIES.join(', ')}. ` +
       'Ask the user which one fits their business best and use their answer; never guess it from their name, ' +
       'website, Page or posts. Use other when none fits. Free to call: it never counts toward the limit.',

@@ -55,7 +55,7 @@ leads campaign optimising for link clicks or landing-page views.
 | Reach / awareness | Awareness (`OUTCOME_AWARENESS`) | — | Reach, with a frequency cap (~2 per 7 days) | — |
 | App installs | App promotion | App | Installs, then an in-app event | — |
 
-AdsPilot today builds website Sales, website Leads, instant-form Leads, Traffic and
+{{PRODUCT_NAME}} today builds website Sales, website Leads, instant-form Leads, Traffic and
 Awareness on Meta. **Messaging (WhatsApp/Messenger/Instagram chats) and calls are not
 built yet:** say so plainly; never fake a WhatsApp campaign as Traffic to a wa.me link
 without telling the user that is what it is and that it will not optimise for chats.
@@ -101,10 +101,10 @@ conversion location/destination, pixel or tag, budget and schedule, countries/ci
 ages, audience, placements, every ad's text, headline, image or video, landing URL,
 call to action, prices and claims checked on the live site, and the market's consent
 set-up for the pixel or tag (selling-by-country). Then run the platform's
-review (AdsPilot: `review_ad_plan`) and resolve every error.
+review ({{PRODUCT_NAME}}: `review_ad_plan`) and resolve every error.
 
 **Assessment 2: the built campaign, read back.** Creation succeeding is not proof.
-Read the campaign back from the platform (AdsPilot: `verify_campaign`, which also
+Read the campaign back from the platform ({{PRODUCT_NAME}}: `verify_campaign`, which also
 runs automatically after `create_ad_plan`) and compare every setting with the brief:
 goal matches objective, right pixel and event, right Page and Instagram account,
 budget, countries, every ad present, every landing page loading. Look at the
@@ -112,7 +112,7 @@ previews. Real example: a Sales campaign was created optimising for link clicks
 while the plan, the review and the approval summary all said "Sales"; only reading
 it back showed the truth.
 
-**Assessment 3: immediately before activation.** Read it back again (AdsPilot's
+**Assessment 3: immediately before activation.** Read it back again ({{PRODUCT_NAME}}'s
 `activate_campaign` verifies and refuses on any failure), confirm the platform's ad
 review has passed, payment is working, the budget fits the ceiling, and show the
 user the exact approval summary. After launch, check delivery within a few hours

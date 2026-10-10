@@ -8,7 +8,7 @@
 #   deploy/scripts/release.sh --rollback    switch back to the previous release
 #
 # How (the Raptor pattern): `git archive HEAD source deploy` is unpacked into a
-# NEW folder /opt/adspilot/releases/<commit>, and /opt/adspilot/app is switched
+# NEW folder $ADSPILOT_HOME/releases/<commit> (site.env), and .../app is switched
 # to it. A fresh folder per release, so a file deleted in git (a migration, say)
 # is really gone on the server. The image is tagged with the commit, so the
 # previous one stays available for --rollback. No GitHub login on the server.
@@ -17,9 +17,12 @@
 # (`prisma migrate status`); applying them is a separate, approved step.
 
 set -Eeuo pipefail
-HOST=${ADSPILOT_HOST:-root@37.27.148.217}
-KEY=${ADSPILOT_SSH_KEY:-$HOME/.ssh/raptor_hetzner}
-H=/opt/adspilot
+# Server, SSH key, domain and server folder: deploy/site.env (the one place).
+# shellcheck source=site.sh
+. "$(dirname "${BASH_SOURCE[0]}")/site.sh"
+HOST=$SSH_TARGET
+KEY=$SSH_KEY_FILE
+H=$ADSPILOT_HOME
 rs() { ssh -i "$KEY" -o BatchMode=yes "$HOST" "$@"; }
 
 cd "$(git rev-parse --show-toplevel)"
@@ -84,10 +87,10 @@ rs "set -e
 echo "== checking the live MCP =="
 code=000
 for _ in $(seq 1 30); do
-  code=$(curl -s -o /dev/null -w '%{http_code}' -m 10 https://mcp.1920agency.com/health || true)
+  code=$(curl -s -o /dev/null -w '%{http_code}' -m 10 "https://$DOMAIN/health" || true)
   [ "$code" = 200 ] && break
   sleep 2
 done
-echo "  $code https://mcp.1920agency.com/health"
+echo "  $code https://$DOMAIN/health"
 [ "$code" = 200 ] || { echo "Live check failed. Roll back with: deploy/scripts/release.sh --rollback" >&2; exit 1; }
 echo "Released $sha."

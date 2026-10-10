@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process'
 
 import { FacebookOAuth, buildAuthUrl, createState } from '@social-publisher/adapters'
-import { checkConfig, optional, required } from '@social-publisher/config'
+import { checkConfig, companyName, oauthRedirectUri, optional, required } from '@social-publisher/config'
 import {
   db,
   disconnect,
@@ -21,7 +21,6 @@ import { waitForCallback } from './callback-server.ts'
  * the code for a long-lived token, and stores one encrypted connection per Page.
  */
 
-const TENANT_NAME = '1920 Agency'
 
 async function main(): Promise<void> {
   // Fail on configuration before opening a browser or touching the network — an
@@ -44,7 +43,7 @@ async function main(): Promise<void> {
   const oauthConfig = {
     appId: required('META_APP_ID'),
     appSecret: required('META_APP_SECRET'),
-    redirectUri: optional('META_REDIRECT_URI', 'http://localhost:8787/callback')!,
+    redirectUri: oauthRedirectUri('META_REDIRECT_URI'),
     apiVersion: optional('META_API_VERSION', 'v25.0')!,
   }
 
@@ -218,7 +217,7 @@ async function main(): Promise<void> {
 
 async function ensureTenant() {
   const existing = await db().tenant.findFirst({ orderBy: { createdAt: 'asc' } })
-  return existing ?? (await db().tenant.create({ data: { name: TENANT_NAME } }))
+  return existing ?? (await db().tenant.create({ data: { name: companyName() } }))
 }
 
 /** Adapts Prisma to the vault's storage interface. */

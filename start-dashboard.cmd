@@ -7,7 +7,7 @@ REM cannot block it. Double-click this file, or run it from any terminal.
 cd /d "%~dp0source\apps\web"
 
 echo.
-echo   Starting AdsPilot dashboard...
+echo   Starting the dashboard...
 echo   Open http://localhost:3000 once it says Ready.
 echo   Press Ctrl+C to stop.
 echo.

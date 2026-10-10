@@ -2,7 +2,7 @@
 # The plan and every step: deploy/README.md. Always run compose through
 # deploy/scripts/dc.sh, which adds the settings file ($ADSPILOT_HOME/compose.env).
 #
-#   mcp      hosted MCP at https://mcp.1920agency.com/mcp (Caddy -> adspilot-mcp:8080)
+#   mcp      hosted MCP at https://$DOMAIN/mcp (the gate's Caddy -> adspilot-mcp:8080)
 #   worker   publishes scheduled posts: a long-running loop, polling every 15 s
 #   postgres OPTIONAL (profile "db"): the database on this server, decision 0010.
 #            Phase A keeps Supabase and does not start it.
@@ -12,6 +12,10 @@
 # Memory: the server has 3.8 GB and no swap, and Raptor uses about 0.1 GB idle
 # but much more while it converts a video. Limits below add up to at most
 # 1.4 GB for AdsPilot with the database, about 0.4 GB in normal use.
+#
+# Settings: the domain, project name and server folder come from deploy/site.env
+# (dc.sh loads it and passes -p $COMPOSE_PROJECT; "name:" below is the same value,
+# kept for a bare `docker compose`).
 #
 # Secrets: none here. The app reads them from $ADSPILOT_HOME/env/adspilot.env
 # (chmod 600, on the server only); the database password from
@@ -59,6 +63,10 @@ services:
     environment:
       MCP_PORT: "8080"
       NODE_OPTIONS: "--max-old-space-size=256"
+      # The public address, from DOMAIN in deploy/site.env (exported by dc.sh), so
+      # the domain is written in one file only. Used for links users open (the
+      # Shopify connect callback). Fails loudly when compose is run without dc.sh.
+      PUBLIC_BASE_URL: "https://${DOMAIN:?DOMAIN is not set: run compose through deploy/scripts/dc.sh, which reads deploy/site.env}"
       # The image's commit (release.sh sets ADSPILOT_TAG to the 12-character SHA,
       # rollback to the previous one), sent as the server build with PostHog MCP
       # Analytics. "latest" (before the first release) is not a SHA and is ignored.

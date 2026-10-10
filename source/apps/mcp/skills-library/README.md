@@ -59,6 +59,14 @@ Written for this server's tools, served under their own framing note, and edited
 in place (unlike the vendored folders). They win over a third-party skill on the
 same ground; a `get_playbook` playbook still wins on a platform's own rules.
 
+**Write the product's name as `{{PRODUCT_NAME}}`** (and the company as
+`{{COMPANY_NAME}}`), never the name itself: the name is not final, and
+`get_skill` fills it in when serving (`readSkillText` in `src/skills-library.ts`,
+from `PRODUCT_NAME` in `source/packages/config/src/product.ts`). A test in
+`packages/config` (`central-config.test.ts`) fails if the literal name appears in
+these files. The folder name `adspilot/` is a fixed path and stays. The vendored
+folders are never rewritten: their text stays as pinned.
+
 - `meta-account-manager` (2026-10-08): daily management and scaling of a Meta
   e-commerce account. `references/research-2026-10.md` is dated online research with
   sources; `references/field-notes.md` collects lessons from real accounts, which the

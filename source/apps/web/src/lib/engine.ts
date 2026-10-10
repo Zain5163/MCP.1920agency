@@ -14,7 +14,7 @@ import {
   youTubeOptionsFromEnv,
   type Provider,
 } from '@social-publisher/adapters'
-import { optional, required } from '@social-publisher/config'
+import { oauthRedirectUri, optional, required } from '@social-publisher/config'
 import type { Connection } from '@social-publisher/core'
 import {
   TenantScope,
@@ -84,7 +84,7 @@ function ensureProviders(): void {
   registerMetaProvider({
     appId: required('META_APP_ID'),
     appSecret: required('META_APP_SECRET'),
-    redirectUri: optional('META_REDIRECT_URI', 'http://localhost:8787/callback')!,
+    redirectUri: oauthRedirectUri('META_REDIRECT_URI'),
     apiVersion: optional('META_API_VERSION', 'v25.0')!,
   })
   // Optional: only when a Google client is configured. Without it a stored

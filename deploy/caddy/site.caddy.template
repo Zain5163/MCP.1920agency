@@ -1,19 +1,20 @@
-# AdsPilot hosted MCP: the site block to ADD to Raptor's Caddyfile.
+# The hosted MCP's site file for the server's front gate (/opt/gate, source
+# AI-Automation/Server-Gate), which imports every /opt/gate/sites/*.caddy.
+# Owner: AI-Automation/Social-Publisher, deploy/caddy/site.caddy.template.
 #
-# Where it goes: append this block to
-#   Websites/Raptor-Downloader/site/deploy/Caddyfile   (Raptor's repo, committed)
-# NOT only to the copy on the server: Raptor's release.sh uploads its committed
-# deploy/ folder with every API release, which would silently remove a block
-# that exists only on the server. Raptor's own blocks stay exactly as they are.
+# Rendered from a TEMPLATE: the domain and the bounce port are filled from
+# deploy/site.env by deploy/scripts/caddy-site.sh, which prints the result or,
+# with --upload, installs it as /opt/gate/sites/<DOMAIN>.caddy and reloads the
+# gate. WHY a rendered template and not Caddy's {$VAR} placeholders: those are
+# read from the gate container's environment, which is the gate's to define
+# (one Caddy for every site on the server); this project may not change it.
 #
-# Prerequisites: DNS mcp.1920agency.com -> 37.27.148.217 (live, 2026-10-08),
-# the AdsPilot "mcp" container on the edge network adspilot_edge under the alias
-# adspilot-mcp (deploy/docker-compose.yml), and Raptor's Caddy attached to that
-# network too (Raptor's deploy/docker-compose.yml: caddy networks + the external
-# network declaration). Caddy
-# obtains and renews the certificate itself, as it does for Raptor's domains.
+# Prerequisites: DNS {{DOMAIN}} -> the server (deploy/site.env SERVER_HOST), the
+# "mcp" container on the edge network (site.env EDGE_NETWORK) under the alias
+# adspilot-mcp (deploy/docker-compose.yml), and the gate attached to that network
+# (Server-Gate's docker-compose.yml). Caddy obtains and renews the certificate.
 
-mcp.1920agency.com {
+{{DOMAIN}} {
 	header {
 		-Server
 		Strict-Transport-Security "max-age=31536000"
@@ -42,8 +43,8 @@ mcp.1920agency.com {
 
 	# OAuth callbacks: the "bounce" (deploy/README.md, "OAuth callbacks").
 	# Meta refuses http://localhost redirects while an app is Live, so the
-	# provider redirects to https://mcp.1920agency.com/<path>?code=...&state=...
-	# and this answers with a 302 to http://localhost:8787/<same path and query>.
+	# provider redirects to https://{{DOMAIN}}/<path>?code=...&state=...
+	# and this answers with a 302 to http://localhost:{{OAUTH_BOUNCE_PORT}}/<same path and query>.
 	# The owner's own browser then delivers it to the one-shot listener of
 	# `pnpm connect` / `pnpm connect:provider` on the PC
 	# (source/apps/cli/src/callback-server.ts, 127.0.0.1 only), which checks
@@ -52,26 +53,26 @@ mcp.1920agency.com {
 	# the browser that asked for it.
 	#
 	# WHY this is safe:
-	# - Not an open redirect: the target is fixed (http://localhost:8787) and
+	# - Not an open redirect: the target is fixed (http://localhost:{{OAUTH_BOUNCE_PORT}}) and
 	#   only these exact paths match; {uri} is always a path and query, so it
 	#   can never change the host. The worst a crafted link can do is send
-	#   someone's browser to their OWN localhost:8787.
+	#   someone's browser to their OWN localhost:{{OAUTH_BOUNCE_PORT}}.
 	# - The code is single-use, short-lived, bound to this app's redirect
 	#   address, and worthless without the app secret, which only the PC has.
 	#   The listener refuses any callback whose state is not the one it made.
 	# - Residual risk, unchanged from the plain localhost redirect: another
-	#   program on the PC listening on 8787 during the connect window would
+	#   program on the PC listening on {{OAUTH_BOUNCE_PORT}} during the connect window would
 	#   receive the code (it would still need the app secret to use it).
 	#
 	# Paths: exactly the callback paths the CLI uses, one per provider
-	# (connect-provider.ts and the adapters' defaults; checked by
-	# source/apps/cli/test/callback-address.test.ts against .env.example).
+	# (OAUTH_REDIRECT_PATHS in source/packages/config/src/product.ts; checked by
+	# source/apps/cli/test/callback-address.test.ts).
 	# GET only: providers redirect the browser with GET. Anything else falls
 	# through to the 404 below.
 	# Shopify: the store OWNER's browser arrives here after approving the app
 	# (source/apps/mcp/src/shopify-hosted.ts). Unlike the bounce below it is NOT
 	# sent to the owner's PC: the user is a customer, so the MCP on this server
-	# checks Shopify's signature and AdsPilot's signed state and stores the token.
+	# checks Shopify's signature and our own signed state and stores the token.
 	# GET only; no caching. /shopify is a small info page for the app's URL.
 	@shopify {
 		method GET
@@ -104,7 +105,7 @@ mcp.1920agency.com {
 	handle @oauth {
 		# The redirect carries a one-time code; no cache may keep it.
 		header Cache-Control "no-store"
-		redir http://localhost:8787{uri} 302
+		redir http://localhost:{{OAUTH_BOUNCE_PORT}}{uri} 302
 	}
 
 	handle {

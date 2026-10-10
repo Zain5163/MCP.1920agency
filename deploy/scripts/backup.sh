@@ -30,7 +30,7 @@ notify_failure() {
   [ -n "$url" ] || return 0
   # the webhook address goes to curl through stdin, never on its command line
   printf 'url = "%s"\n' "$url" | curl -fsS -m 15 -K - -H 'content-type: application/json' \
-    --data "{\"text\":\":warning: AdsPilot nightly backup FAILED on ${host} at step: ${step}. Nothing new was kept; older backups are untouched. Look at: journalctl -u adspilot-backup\"}" \
+    --data "{\"text\":\":warning: nightly database backup of ${ADSPILOT_HOME} FAILED on ${host} at step: ${step}. Nothing new was kept; older backups are untouched. Look at: journalctl -u adspilot-backup\"}" \
     >/dev/null || true
 }
 on_exit() {

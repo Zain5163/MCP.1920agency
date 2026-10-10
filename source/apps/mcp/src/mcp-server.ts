@@ -1,9 +1,10 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import { productSlug } from '@social-publisher/config'
 
 import { registerAccountTools } from './account-tools.ts'
 import { instrumentMcpAnalytics } from './mcp-analytics.ts'
 import { installMetering, type MeterOptions } from './metering.ts'
-import { SERVER_INSTRUCTIONS } from './playbooks.ts'
+import { serverInstructions } from './playbooks.ts'
 
 /**
  * The only place an AdsPilot MCP server is built, for both transports.
@@ -19,7 +20,7 @@ import { SERVER_INSTRUCTIONS } from './playbooks.ts'
  * metered handlers without changing any tool's schema (mcp-analytics.ts).
  */
 export function createAdsPilotServer(version: string, meter: MeterOptions): McpServer {
-  const server = new McpServer({ name: 'adspilot', version }, { instructions: SERVER_INSTRUCTIONS })
+  const server = new McpServer({ name: productSlug(), version }, { instructions: serverInstructions() })
   installMetering(server, meter)
   if (meter.mcpAnalytics !== undefined) instrumentMcpAnalytics(server, meter.mcpAnalytics, meter)
   registerAccountTools(server, meter)
