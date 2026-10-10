@@ -378,7 +378,7 @@ roadmap; not built.
 *Updated 2026-09-30. Informed by, and re-expressed from:
 coreyhaines31/marketingskills (MIT), Hainrixz/claude-ads (MIT),
 itallstartedwithaidea/google-ads-skills (Apache-2.0); copies in
-`reference/ad-skills/`. Limits and changes verified 2026-09-30 against Google Ads
+`docs/reference/ad-skills/`. Limits and changes verified 2026-09-30 against Google Ads
 Help and Google's blog: RSA limits support.google.com/google-ads/answer/7684791;
 PMax text 14528373, images 14530211, video 14528532; Demand Gen 17091672; match
 types 7478529; negatives 2453972; Target CPA 6268632; Quality Score 6167118;

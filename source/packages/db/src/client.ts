@@ -43,7 +43,7 @@ export interface DbHealth {
  * Supabase pauses free projects after 7 days of low activity, so a stale heartbeat
  * is an early warning, not trivia. The owner's objection to a keep-alive was that
  * it is "one more thing that can silently break" — this is what stops it being
- * silent. See decisions/0002.
+ * silent. See docs/decisions/0002.
  */
 export async function health(): Promise<DbHealth> {
   const started = Date.now()

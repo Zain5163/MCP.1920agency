@@ -47,7 +47,7 @@ import { openMedia, type MediaSource } from './media-source.ts'
  *    `content.media.title`, which LinkedIn requires for a document. The title is
  *    plain text, not little text, and is the draft's title or, failing that, the
  *    first line of the text. Checked against Microsoft Learn on 2026-10-02
- *    (research/2026-10-02-linkedin-documents.md); not yet posted for real.
+ *    (docs/research/2026-10-02-linkedin-documents.md); not yet posted for real.
  *
  * ⚠️ Posting as an organisation needs the Community Management API, which
  * LinkedIn approves sparingly. Personal profiles work with the self-serve

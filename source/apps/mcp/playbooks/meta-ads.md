@@ -355,4 +355,4 @@ this server's tools, limits and approvals.
 *Informed by, and re-expressed from: coreyhaines31/marketingskills (MIT),
 mathiaschu/meta-ads-analyzer (MIT), Hainrixz/claude-ads (MIT). API behaviour
 verified against Meta's live Marketing API on 2026-09-30. Source copies in
-`reference/ad-skills/`.*
+`docs/reference/ad-skills/`.*

@@ -1,6 +1,6 @@
 /**
  * Keep-alive entry point. Registered in Windows Task Scheduler to run weekly,
- * well inside Supabase's 7-day inactivity window. See decisions/0002.
+ * well inside Supabase's 7-day inactivity window. See docs/decisions/0002.
  */
 import { disconnect, health, keepalive } from './client.ts'
 

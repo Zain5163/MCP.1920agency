@@ -1,5 +1,5 @@
 # 1920 Agency Store Connector: lets AdsPilot read a store and, with the owner's
-# approval on each change, improve it. Plan: architecture/2026-10-08-shopify-connector-plan.md
+# approval on each change, improve it. Plan: docs/architecture/2026-10-08-shopify-connector-plan.md
 # Docs: https://shopify.dev/docs/apps/tools/cli/configuration
 
 client_id = "b92c46823075eae97fd54e2b6e4775eb"

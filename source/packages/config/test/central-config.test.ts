@@ -186,7 +186,7 @@ describe('values that change live in one place', () => {
       [],
       'A value that has one home was written out again:\n  ' +
         problems.join('\n  ') +
-        '\n\nWhere settings live: START-HERE.md and architecture/2026-10-10-central-config.md.',
+        '\n\nWhere settings live: START-HERE.md and docs/architecture/2026-10-10-central-config.md.',
     )
   })
 })

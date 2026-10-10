@@ -1,7 +1,7 @@
 # The product's brand guidelines (proposed, name not final)
 
 This is the AI marketing product itself. **"AdsPilot" is a working name only**: the name is taken
-(`research/2026-10-01-product-name.md`) and is being replaced. The display name comes from the
+(`docs/research/2026-10-01-product-name.md`) and is being replaced. The display name comes from the
 central product settings (`productName()`); while that is the working name, this brand shows a
 placeholder. Colours and
 type are the dashboard's own; adopting them as the product's brand is **proposed**. There is
@@ -78,7 +78,7 @@ business owners, not marketing jargon.
 
 Drafts only until the name and identity are final. When they are: show the real product, the
 approval step and one plain benefit, inside the usual safe areas (stories: out of the top 250px
-and bottom 340px), and claim only what `CURRENT-STATE.md` shows as verified live.
+and bottom 340px), and claim only what `docs/product/capabilities.md` shows as verified live.
 
 ## Social templates
 

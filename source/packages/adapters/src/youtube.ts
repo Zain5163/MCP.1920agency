@@ -70,7 +70,7 @@ import { openMedia, type MediaSource } from './media-source.ts'
  * disclosure is required for realistic synthetic content.
  *
  * Protocol and limits were checked against Google's documentation on
- * 2026-10-02 (research/2026-10-02-youtube-api-facts.md). Nothing here has been
+ * 2026-10-02 (docs/research/2026-10-02-youtube-api-facts.md). Nothing here has been
  * run against the real API yet.
  */
 

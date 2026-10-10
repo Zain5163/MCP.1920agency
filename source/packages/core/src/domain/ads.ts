@@ -3,7 +3,7 @@ import type { Platform } from './types.ts'
 /**
  * The advertising domain — deliberately separate from publishing.
  *
- * See `decisions/0003-ads-domain-model.md`. The short version:
+ * See `docs/decisions/0003-ads-domain-model.md`. The short version:
  *
  * **"Campaign" means different things on different platforms.** LinkedIn's
  * "Campaign" is Meta's "Ad Set", not Meta's "Campaign". Reading both sets of docs
@@ -537,7 +537,7 @@ export function totalDailyBudget(plan: AdPlan): Money | undefined {
 
   let minor = 0
   for (const budget of budgets) {
-    // Refuses rather than converting: see decisions/0003.
+    // Refuses rather than converting: see docs/decisions/0003.
     if (budget.currency !== first.currency) return undefined
     minor += budget.minor
   }

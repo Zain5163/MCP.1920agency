@@ -414,7 +414,7 @@ model AuditLog {
 
 /// One row per MCP tool call: which tool, whether it worked, how long it took
 /// and which AI client sent it. This is what answers "which tool fails, for
-/// whom, with which error" (architecture/2026-10-08-plans-usage-analytics-hosting.md).
+/// whom, with which error" (docs/architecture/2026-10-08-plans-usage-analytics-hosting.md).
 ///
 /// **Never** the call's arguments, its result, tokens or personal data: a call
 /// log that held post text or ad copy would be a second copy of customer
@@ -487,7 +487,7 @@ model ServiceHeartbeat {
 }
 
 /// Keep-alive for the Supabase free tier, which pauses after 7 days of low activity.
-/// Written weekly by a Windows Task Scheduler job. See decisions/0002.
+/// Written weekly by a Windows Task Scheduler job. See docs/decisions/0002.
 model Heartbeat {
   id     Int      @id @default(1)
   beatAt DateTime @default(now()) @map("beat_at")

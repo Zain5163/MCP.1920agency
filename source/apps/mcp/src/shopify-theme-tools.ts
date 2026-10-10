@@ -13,7 +13,7 @@ import { audit, guarded, type ToolResult } from './ads-tools.ts'
 import { findShopifyStore, readShopifyStores, type ShopifyStoreEntry } from './shopify-tools.ts'
 
 /**
- * Theme changes (phase 2b of architecture/2026-10-08-shopify-connector-plan.md).
+ * Theme changes (phase 2b of docs/architecture/2026-10-08-shopify-connector-plan.md).
  *
  * Why the Shopify CLI and not the Admin API: theme writes through an app need a
  * special exemption from Shopify, even for a private custom app (refused live on

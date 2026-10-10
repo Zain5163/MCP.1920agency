@@ -16,7 +16,7 @@ import { PublishError, type ErrorCode, type FailureClass } from '@social-publish
  * that explains it, so whoever shows the error can be precise.
  *
  * Reasons are taken from Google's error pages, checked 2026-10-02
- * (research/2026-10-02-youtube-api-facts.md, A9).
+ * (docs/research/2026-10-02-youtube-api-facts.md, A9).
  */
 
 /** The envelope every Google API error uses. */

@@ -38,7 +38,7 @@ import { META_DEFAULT_NAMING, adName, adSetName, campaignName, urlTags } from '.
  * Objects are created top down — campaign, then ad set, then creative, then ad —
  * because each needs the id of the one above it. That ordering is also the
  * weakness: a failure at step three leaves a half-built campaign, and re-running
- * creates a **second** one rather than resuming. Until that is fixed (IDEAS K3),
+ * creates a **second** one rather than resuming. Until that is fixed (`docs/product/ideas.md` K3),
  * a partial failure reports exactly what was created so it can be removed by
  * hand.
  */

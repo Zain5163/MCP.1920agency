@@ -15,7 +15,7 @@ import { createMcpAnalyticsClient, resolveServerBuild } from './mcp-analytics.ts
  * local tenant and connects the transport.
  *
  * The local tenant is the owner's and is set to Premium when the plans
- * migration is applied (CURRENT-STATE.md), so metering here records and counts
+ * migration is applied (docs/product/capabilities.md), so metering here records and counts
  * but never blocks. Nothing in this file special-cases that: an account on
  * Premium is unlimited wherever it connects from.
  */

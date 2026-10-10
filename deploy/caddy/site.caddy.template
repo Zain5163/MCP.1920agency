@@ -83,7 +83,7 @@
 		reverse_proxy adspilot-mcp:8080
 	}
 	# Private brand viewer (source/packages/brands, served by the MCP app;
-	# architecture/2026-10-10-brand-design-systems.md). GET and HEAD only:
+	# docs/architecture/2026-10-10-brand-design-systems.md). GET and HEAD only:
 	# anything else falls through to the 404 below. Every page needs a signed,
 	# expiring ?t= link made by the brand_viewer_link tool; without one the app
 	# answers the same 404 for every path, so nothing lists or confirms a brand.

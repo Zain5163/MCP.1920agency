@@ -220,7 +220,7 @@ unlicensed, so it is cited and paraphrased, never copied)
 - Registering patterns: https://developer.wordpress.org/themes/patterns/registering-patterns/
 - Hardening guide: https://developer.wordpress.org/advanced-administration/security/hardening/
 - Application Passwords: https://developer.wordpress.org/advanced-administration/security/application-passwords/
-- {{PRODUCT_NAME}} connector research (Application Passwords, REST endpoints, WooCommerce, blockers): research/2026-10-08-wordpress-connector.md in the {{PRODUCT_NAME}} repository
+- {{PRODUCT_NAME}} connector research (Application Passwords, REST endpoints, WooCommerce, blockers): the {{PRODUCT_NAME}} team's WordPress connector research note (2026-10-08), kept with the product's internal documents
 - Image performance in 6.3 (fetchpriority): https://make.wordpress.org/core/2023/07/13/image-performance-enhancements-in-wordpress-6-3/
 - AVIF in 6.5: https://make.wordpress.org/core/2024/02/23/wordpress-6-5-adds-avif-support/
 - Speculative loading in 6.8: https://make.wordpress.org/core/2025/03/06/speculative-loading-in-6-8/

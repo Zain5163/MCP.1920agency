@@ -3,7 +3,7 @@
 Third-party marketing skills, **served by the MCP server** to AI clients through
 `list_skills` and `get_skill` (see `src/skills-library.ts`).
 
-Different from `reference/ad-skills/`, which is source material nobody is served.
+Different from `docs/reference/ad-skills/`, which is source material nobody is served.
 This folder **is** served, so what goes in it matters more.
 
 ## Contents
@@ -51,7 +51,7 @@ cover it), `best-practices` (host-level headers), `web-quality-audit` (an
 orchestrator), and every other anthropics/skills folder (not web-building, and
 some are source-available only). Each folder's NOTICE.md records what was copied.
 The full source survey, including what was read for knowledge only and why, is
-`research/2026-10-08-web-store-skills-sources.md`.
+`docs/research/2026-10-08-web-store-skills-sources.md`.
 
 ## Our own skills (`adspilot/`)
 
@@ -72,7 +72,7 @@ folders are never rewritten: their text stays as pinned.
   sources; `references/field-notes.md` collects lessons from real accounts, which the
   daily account runs append to.
 - Website building (2026-10-08, owner's request; sources in
-  `research/2026-10-08-web-store-skills-sources.md`):
+  `docs/research/2026-10-08-web-store-skills-sources.md`):
   - `shopify-theme-developer`: Online Store 2.0 structure, Liquid, speed, accessibility,
     and the theme-draft workflow (theme tools are local-only).
   - `landing-page-builder`: pages for ad traffic by paid result, message match, forms,
@@ -93,7 +93,7 @@ folders are never rewritten: their text stays as pinned.
   payments, price and tax display, consumer law that changes pages, consent before
   tracking, accessibility law, delivery and trust, language, ad-policy notes. All the
   website skills and campaign-setup point to it; cash on delivery is now one market's
-  pattern, not the default. Sources: `research/2026-10-08-global-markets-sources.md`.
+  pattern, not the default. Sources: `docs/research/2026-10-08-global-markets-sources.md`.
 - **Never name a client** in these files: they are served to every user. A test
   fails if a known client name appears.
 

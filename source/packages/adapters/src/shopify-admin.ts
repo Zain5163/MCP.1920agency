@@ -5,7 +5,7 @@ import { shopifyAppName } from '@social-publisher/config'
  * Shopify Admin API client: read a store so AdsPilot can judge ads on real sales
  * and audit the store for conversion problems.
  *
- * Phase 1 of architecture/2026-10-08-shopify-connector-plan.md. Read-only by
+ * Phase 1 of docs/architecture/2026-10-08-shopify-connector-plan.md. Read-only by
  * design: nothing here writes to a store. Writes come later, behind approvals.
  *
  * Auth: the client-credentials grant, which Shopify allows for stores owned by

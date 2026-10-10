@@ -90,7 +90,7 @@ done by the owner or developer, on staging first; {{PRODUCT_NAME}} gives the ste
 
 ## Sources (checked 2026-10-08; cited, not copied)
 
-- {{PRODUCT_NAME}} connector research (WooCommerce REST v3 with Application Passwords, the tax setting): research/2026-10-08-wordpress-connector.md in the {{PRODUCT_NAME}} repository
+- {{PRODUCT_NAME}} connector research (WooCommerce REST v3 with Application Passwords, the tax setting): the {{PRODUCT_NAME}} team's WordPress connector research note (2026-10-08), kept with the product's internal documents
 
 - WooCommerce 11.0 release: https://developer.woocommerce.com/2026/08/04/woocommerce-11-0/
 - Cart and Checkout blocks default since 8.3, HPOS default since 8.2: https://developer.woocommerce.com/2023/10/10/woocommerce-8-2-0-released/

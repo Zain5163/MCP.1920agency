@@ -19,7 +19,7 @@ import {
 } from './shopify-tools.ts'
 
 /**
- * Building a store (phase 2c of architecture/2026-10-08-shopify-connector-plan.md):
+ * Building a store (phase 2c of docs/architecture/2026-10-08-shopify-connector-plan.md):
  * what a new or rebuilt store needs beyond editing what is there. Products,
  * collections, menus and policies, made visible on the Online Store.
  *

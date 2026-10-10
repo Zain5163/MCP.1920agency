@@ -48,7 +48,7 @@ export class TenantScope {
       where: { tenantId: this.tenantId },
       orderBy: { createdAt: 'asc' },
       // The provider comes along because some platforms can be reached more than
-      // one way and the adapter has to know which. See decisions/0004.
+      // one way and the adapter has to know which. See docs/decisions/0004.
       include: { providerAuth: { select: { provider: true } } },
     })
   }

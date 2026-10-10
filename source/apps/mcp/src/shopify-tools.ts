@@ -13,7 +13,7 @@ import { audit, guarded, type ToolResult } from './ads-tools.ts'
 import { restoreBuildBackup } from './shopify-build-tools.ts'
 
 /**
- * Shopify tools, read-only (phase 1 of architecture/2026-10-08-shopify-connector-plan.md).
+ * Shopify tools, read-only (phase 1 of docs/architecture/2026-10-08-shopify-connector-plan.md).
  *
  * Stores are listed in ~/.social-publisher/shopify-stores.json, beside the ad
  * account list, read on every call:

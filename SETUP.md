@@ -255,7 +255,7 @@ Other things worth knowing:
 ## 9. Shopify — the store connector (optional)
 
 AdsPilot reads Shopify stores through the app **"1920 Agency Store Connector"**
-(config in `integrations/shopify-app`, plan in `architecture/2026-10-08-shopify-connector-plan.md`).
+(config in `integrations/shopify-app`, plan in `docs/architecture/2026-10-08-shopify-connector-plan.md`).
 
 1. In `~/.social-publisher/.env`: `SHOPIFY_CONNECTOR_CLIENT_ID` and `SHOPIFY_CONNECTOR_CLIENT_SECRET`
    (run `shopify app env show` in `integrations/shopify-app` to see them).

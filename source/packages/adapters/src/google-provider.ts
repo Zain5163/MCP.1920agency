@@ -45,7 +45,7 @@ import {
  *     exchange that still brings none is refused rather than stored.
  *
  * Endpoints and parameters were checked against Google's documentation on
- * 2026-10-02 (research/2026-10-02-youtube-api-facts.md, B1-B4).
+ * 2026-10-02 (docs/research/2026-10-02-youtube-api-facts.md, B1-B4).
  */
 
 const AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth'
@@ -112,7 +112,7 @@ const SCOPE = 'https://www.googleapis.com/auth/'
  * as full `youtube`, comes back in place of the narrow one, and it does
  * everything the narrow one does. So each permission lists every scope that
  * allows the calls behind it, as Google's discovery document lists them
- * (research/2026-10-02-youtube-api-facts.md):
+ * (docs/research/2026-10-02-youtube-api-facts.md):
  *
  *   - uploading: `videos.insert` takes youtube.upload, youtube,
  *     youtube.force-ssl or youtubepartner;

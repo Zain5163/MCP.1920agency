@@ -223,7 +223,7 @@ export const CAPABILITIES: Readonly<Record<Platform, CapabilityRecord>> = {
       'Native scheduling (status.publishAt) exists but only for private videos and is not used ' +
       'yet; the queue schedules instead, and a scheduled upload needs its file in the media ' +
       'bucket, which caps file size. Limits checked against Google documentation on ' +
-      '2026-10-02 (research/2026-10-02-youtube-api-facts.md); nothing has been uploaded for ' +
+      '2026-10-02 (docs/research/2026-10-02-youtube-api-facts.md); nothing has been uploaded for ' +
       'real yet, so verified stays false.',
   },
 
@@ -318,7 +318,7 @@ export const CAPABILITIES: Readonly<Record<Platform, CapabilityRecord>> = {
       'Losing one ETag wastes the whole upload. A post carries images, one video, or ' +
       'one document, never a mix. ' +
       'DOCUMENT posts (PDF carousels), checked against the Documents and Posts API docs ' +
-      '2026-10-02 (research/2026-10-02-linkedin-documents.md): /rest/documents ' +
+      '2026-10-02 (docs/research/2026-10-02-linkedin-documents.md): /rest/documents ' +
       'initializeUpload with the owner returns an uploadUrl and a urn:li:document id; the ' +
       'whole file goes up in ONE PUT (no parts, no finalize); the post is content.media ' +
       '{ id, title }, and the title is required for a document. PDF, PPT, PPTX, DOC or ' +

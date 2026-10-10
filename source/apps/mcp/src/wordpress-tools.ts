@@ -24,7 +24,7 @@ import type { WordPressAccess, WordPressSite } from './wordpress-access.ts'
 
 /**
  * WordPress and WooCommerce tools, on both transports
- * (research/2026-10-08-wordpress-connector.md).
+ * (docs/research/2026-10-08-wordpress-connector.md).
  *
  * Reads need no approval. Every change follows the same steps as the Shopify
  * connector, in code, whatever the AI asks:

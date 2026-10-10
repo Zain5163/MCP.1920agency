@@ -53,7 +53,7 @@ import { partialGrantRefusal } from './grant-check.ts'
  * Bridges the core Platform union to Prisma's generated enum.
  *
  * They are meant to be the same set and are not: core still lists `bluesky`,
- * which was dropped from scope in decisions/0001 but left in place because the
+ * which was dropped from scope in docs/decisions/0001 but left in place because the
  * validation tests use it as a fixture. Prisma's enum never had it. So a
  * `bluesky` connection would compile and then fail at the database.
  *

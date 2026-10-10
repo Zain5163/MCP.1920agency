@@ -6,7 +6,7 @@
 > `37.27.148.217`) for readability; the scripts never contain them. The gate's site file is rendered from
 > `caddy/site.caddy.template`: `scripts/caddy-site.sh` prints it, `scripts/caddy-site.sh --upload` installs it as
 > `/opt/gate/sites/<DOMAIN>.caddy`, validates the gate and reloads it (puts the old file back if the gate refuses).
-> Compose gives the MCP `PUBLIC_BASE_URL=https://$DOMAIN`. Rename or move: `architecture/2026-10-10-central-config.md`.
+> Compose gives the MCP `PUBLIC_BASE_URL=https://$DOMAIN`. Rename or move: `docs/architecture/2026-10-10-central-config.md`.
 >
 > **2026-10-09: the server has a front gate.** Raptor's Caddy no longer serves other sites: `/opt/gate`
 > (source: `AI-Automation/Server-Gate`) serves every domain. AdsPilot owns `/opt/gate/sites/mcp.1920agency.com.caddy`
@@ -192,7 +192,7 @@ HTTPS"). So, with a redirect address of the https form:
 2. After approval the provider sends the browser to
    `https://mcp.1920agency.com/<path>?code=...&state=...`.
 3. Caddy answers `302 Location: http://localhost:8787/<same path and query>`
-   (`deploy/caddy/mcp.1920agency.com.caddy`, the `@oauth` block: GET only,
+   (`deploy/caddy/site.caddy.template`, rendered by `caddy-site.sh`; the `@oauth` block: GET only,
    exactly the seven paths above, nothing else matched).
 4. The owner's browser delivers it to the listener on the same PC, which checks
    the path and `state` and exchanges the code exactly as with a localhost
@@ -611,8 +611,8 @@ happen in the PC's connect commands (token refreshes do not send it).
 
 ### Shopify: can its install callback use the bounce?
 
-Read with `research/2026-10-08-shopify-integration.md` and
-`architecture/2026-10-08-shopify-connector-plan.md`; no Shopify code is part of
+Read with `docs/research/2026-10-08-shopify-integration.md` and
+`docs/architecture/2026-10-08-shopify-connector-plan.md`; no Shopify code is part of
 this change.
 
 - **The dev store needs no callback at all.** It is owned by the app's own
@@ -654,7 +654,7 @@ to end:** `shopify_connect_store` from an AI app on the hosted URL (needs a
 dashboard token and a client pointed at https://mcp.1920agency.com/mcp).
 
 Code: commit d313b9e (`source/apps/mcp/src/shopify-hosted.ts`), plan in
-`architecture/2026-10-08-shopify-connector-plan.md`. The Shopify app (config
+`docs/architecture/2026-10-08-shopify-connector-plan.md`. The Shopify app (config
 version 5, `integrations/shopify-app/shopify.app.toml`) already sends users to
 `https://mcp.1920agency.com/shopify/callback`; nothing to set in Shopify. Until
 this deploy, that address answers 404, which only matters to a user who tries

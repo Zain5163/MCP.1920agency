@@ -46,7 +46,7 @@ import { clientOf, outcomeOf, type MeterOptions } from './metering.ts'
  *     allow-list of properties, checks every value, and drops everything
  *     else. The posthog-node client applies the same allow-list again
  *     (`before_send`), so nothing reaches the wire past both.
- * Written up for the privacy policy in architecture/2026-10-08-plans-usage-
+ * Written up for the privacy policy in docs/architecture/2026-10-08-plans-usage-
  * analytics-hosting.md, "Privacy notes (analytics)".
  */
 

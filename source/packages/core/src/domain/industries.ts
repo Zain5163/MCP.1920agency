@@ -1,7 +1,7 @@
 /**
  * Industry categories: what kind of business a tenant is.
  *
- * Phase 2 of the plans/analytics plan (architecture/2026-10-08-plans-usage-
+ * Phase 2 of the plans/analytics plan (docs/architecture/2026-10-08-plans-usage-
  * analytics-hosting.md): every analytics event carries the tenant's industry, so
  * usage and results can be read per industry and the playbooks tuned per
  * industry (Phase 5).

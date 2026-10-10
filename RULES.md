@@ -76,7 +76,7 @@ OAuth, its own scopes, its own token lifecycle. The correction was made publicly
 and in the roadmap.
 
 Platform behaviour is checked against current documentation and recorded in
-`research/` with its source and date. An unverified claim is labelled unverified
+`docs/research/` with its source and date. An unverified claim is labelled unverified
 rather than stated plainly.
 
 ## R8. Preserve what works; a rollback copy before replacing it
@@ -129,5 +129,5 @@ exists yet.
 ## Adding to this file
 
 A rule belongs here when the owner states how work should be done, rather than
-what to build. Requests to build something go to `ROADMAP.md` or `IDEAS.md`.
-Reasoning about a specific choice goes to `decisions/`.
+what to build. Requests to build something go to `docs/product/roadmap.md` or `docs/product/ideas.md`.
+Reasoning about a specific choice goes to `docs/decisions/`.

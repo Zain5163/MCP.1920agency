@@ -259,7 +259,7 @@ export function buildLocalServer(meter: MeterOptions): McpServer {
   )
 
   // Ads are local-only: the account comes from the owner's environment, which is
-  // single-tenant by construction. See ads-tools.ts and decisions/0005.
+  // single-tenant by construction. See ads-tools.ts and docs/decisions/0005.
   registerAdsTools(server)
   registerSetupTools(server)
   registerPerformanceTools(server)

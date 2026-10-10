@@ -45,7 +45,7 @@ const GRAPH_BASE = 'https://graph.facebook.com'
  *
  * Instagram authorised directly — no Facebook Page — speaks to its own host with
  * its own token. Same platform, same publishing flow, different address. See
- * `decisions/0004`.
+ * `docs/decisions/0004`.
  *
  * Sending a direct-Instagram token to graph.facebook.com fails with an auth
  * error that says nothing about the host being wrong, which is why this is

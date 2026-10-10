@@ -6,7 +6,7 @@ import { redactText } from './redact.ts'
 
 /**
  * Product analytics: server-side events to PostHog Cloud EU (Phase 2 of
- * architecture/2026-10-08-plans-usage-analytics-hosting.md).
+ * docs/architecture/2026-10-08-plans-usage-analytics-hosting.md).
  *
  * This answers "which tools are used, where do people get stuck, what makes
  * them upgrade". It is not the record of what happened: every MCP call is
@@ -35,7 +35,7 @@ import { redactText } from './redact.ts'
  *     they are dropped even if a caller passes them;
  *   - GeoIP is disabled on every event ($geoip_disable): from a server it
  *     would only record the data centre, and we have no need for a location.
- * Written up for the privacy policy in architecture/2026-10-08-plans-usage-
+ * Written up for the privacy policy in docs/architecture/2026-10-08-plans-usage-
  * analytics-hosting.md, "Privacy notes (analytics)".
  */
 

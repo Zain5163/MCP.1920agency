@@ -18,7 +18,7 @@
   },
   "sources": [
     { "id": "dashboard", "kind": "file", "ref": "AI-Automation/Social-Publisher/source/apps/web/src/app/globals.css (and the dashboard's components)", "checked": "2026-10-10", "note": "The dashboard's @theme tokens: colours, system font, 12px cards, 8px controls, 0.92rem semibold buttons." },
-    { "id": "name-research", "kind": "file", "ref": "AI-Automation/Social-Publisher/research/2026-10-01-product-name.md and 2026-10-08-product-name-shortlist.md", "checked": "2026-10-10", "note": "Why 'AdsPilot' cannot stay: the name is taken." },
+    { "id": "name-research", "kind": "file", "ref": "AI-Automation/Social-Publisher/docs/research/2026-10-01-product-name.md and 2026-10-08-product-name-shortlist.md", "checked": "2026-10-10", "note": "Why 'AdsPilot' cannot stay: the name is taken." },
     { "id": "project-rules", "kind": "file", "ref": "AI-Automation/Social-Publisher/START-HERE.md and RULES.md", "checked": "2026-10-10", "note": "The product bet and the standing rules (errors say why and how; nothing is called verified until proven)." },
     { "id": "prop-product", "kind": "proposed", "ref": "Proposed for the product from the dashboard's values and the project rules; owner to confirm.", "checked": "2026-10-10" }
   ],
@@ -146,7 +146,7 @@
     "rules": [
       "Until the name and identity are final, product ads are drafts only: none is published.",
       "Show the real product (a screen recording or screenshot), the approval step, and one plain benefit.",
-      "No claims beyond what is proven live (CURRENT-STATE.md)."
+      "No claims beyond what is proven live (docs/product/capabilities.md)."
     ],
     "placements": [
       { "id": "feed-1x1", "name": "Feed square", "ratio": "1:1", "widthPx": 1080, "heightPx": 1080, "safeZonePx": { "top": 72, "right": 72, "bottom": 72, "left": 72 }, "rules": ["72px margins."], "source": "prop-product" },
@@ -179,7 +179,7 @@
   },
   "socialTemplates": [
     { "id": "how-it-works", "name": "How it works carousel", "format": "feed-4x5", "purpose": "Three steps from connecting to approving, with real screens.", "structure": ["Connect your accounts", "Ask your AI in plain words", "Approve the summary", "It posts, and tells you what happened"], "rules": ["Real screenshots only; the name stays a placeholder until final."], "source": "prop-product" },
-    { "id": "feature", "name": "Feature card", "format": "feed-1x1", "purpose": "One proven feature, one screen.", "structure": ["Feature in plain words", "One screenshot", "What the user stays in control of"], "rules": ["Only features marked verified live in CURRENT-STATE.md."], "source": "prop-product" }
+    { "id": "feature", "name": "Feature card", "format": "feed-1x1", "purpose": "One proven feature, one screen.", "structure": ["Feature in plain words", "One screenshot", "What the user stays in control of"], "rules": ["Only features marked verified live in docs/product/capabilities.md."], "source": "prop-product" }
   ],
   "components": [
     { "id": "button-primary", "kind": "button-primary", "name": "Primary button", "label": "Schedule post", "spec": "Action violet fill (proposed), white semibold label, 8px radius.", "surface": "bg", "style": { "background": "action", "color": "white", "radiusPx": 8, "padding": "10px 16px", "fontWeight": "600", "fontSizePx": 15, "family": "system", "minHeightPx": 40 }, "rules": ["Disabled at 50% opacity with the reason nearby."], "source": "prop-product" },

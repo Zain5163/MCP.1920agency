@@ -12,7 +12,7 @@ import {
 /**
  * Instagram authorised directly, without a Facebook Page.
  *
- * The second way into Instagram. See `decisions/0004`. The one that matters:
+ * The second way into Instagram. See `docs/decisions/0004`. The one that matters:
  * Meta's docs state plainly that this setup *"does not require a Facebook Page
  * to be linked to the Instagram professional account"*.
  *

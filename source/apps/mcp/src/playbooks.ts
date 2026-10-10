@@ -19,7 +19,7 @@ import { z } from 'zod'
  *
  * A playbook is **advice to the AI, never a control.** Everything that must hold
  * — the spend ceiling, paused creation, the approval token, the variant limits —
- * is enforced in code regardless of what a playbook says. See decisions/0006.
+ * is enforced in code regardless of what a playbook says. See docs/decisions/0006.
  *
  * Safe on the hosted server: playbooks are static text and carry no credentials.
  */

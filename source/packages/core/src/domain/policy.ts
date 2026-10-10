@@ -189,7 +189,7 @@ export const ACTION_POLICY: Readonly<Record<string, ActionPolicy>> = {
   },
 
   /**
-   * WordPress and WooCommerce changes (research/2026-10-08-wordpress-connector.md).
+   * WordPress and WooCommerce changes (docs/research/2026-10-08-wordpress-connector.md).
    * Each saves the previous version first. New content is always a draft, so
    * making something public is its own approval.
    */

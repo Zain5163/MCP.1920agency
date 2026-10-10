@@ -297,7 +297,7 @@ partner in a supported country. Let the user decide; do not do it for them.
 ---
 
 *Informed by, and re-expressed from: Hainrixz/claude-ads (MIT) and
-coreyhaines31/marketingskills (MIT); source copies in `reference/ad-skills/`.
+coreyhaines31/marketingskills (MIT); source copies in `docs/reference/ad-skills/`.
 Specs, minimum budgets, learning phase, objectives, Smart+, GMV Max, Spark Ads,
 instant forms, deduplication and attribution checked against TikTok Business
 Help Center pages on 2026-09-30:

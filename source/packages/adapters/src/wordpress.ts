@@ -7,7 +7,7 @@ import { SafeHttpError, checkPublicUrl, createSafeFetch, type SafeFetch, type Sa
  * site whose owner gave AdsPilot an Application Password.
  *
  * Research and the decision to use core REST rather than the WordPress MCP
- * Adapter: research/2026-10-08-wordpress-connector.md. All code here is our own;
+ * Adapter: docs/research/2026-10-08-wordpress-connector.md. All code here is our own;
  * WordPress and WooCommerce are GPL and none of their code is copied.
  *
  * Three rules hold for every call:
