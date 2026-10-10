@@ -82,7 +82,7 @@ Below:
 
 ## Checkout (settings live in the owner's Shopify admin)
 
-AdsPilot's tools do not change checkout settings. Give the owner these steps:
+{{PRODUCT_NAME}}'s tools do not change checkout settings. Give the owner these steps:
 
 - [ ] Guest checkout allowed (customer accounts optional).
 - [ ] Only the fields needed for delivery; phone required only where couriers call before

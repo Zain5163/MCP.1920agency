@@ -49,11 +49,11 @@ report for the last 30–60 days and compare with `shopify_sales` (orders, cance
 - [ ] For digital payment, the gateways Pakistani buyers use (bank account, JazzCash,
       Easypaisa, Raast, cards) through a Shopify payment app the owner chooses. Safepay
       lists Shopify apps; check the App Store for current options. The owner installs and
-      configures payments in the admin: AdsPilot cannot.
+      configures payments in the admin: {{PRODUCT_NAME}} cannot.
 
 ## Reducing refused deliveries (the other half of conversion)
 
-These are owner operations, outside AdsPilot's tools. Recommend them, do not claim them:
+These are owner operations, outside {{PRODUCT_NAME}}'s tools. Recommend them, do not claim them:
 
 1. **Order confirmation** by WhatsApp message or call before dispatch, especially for first
    orders and high-value carts. Unconfirmed orders are held, not shipped.

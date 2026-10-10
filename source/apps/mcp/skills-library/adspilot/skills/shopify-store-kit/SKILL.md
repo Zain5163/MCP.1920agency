@@ -1,6 +1,6 @@
 ---
 name: shopify-store-kit
-description: "A ready, tested premium store design for Shopify's Horizon theme (4.x): five sections (photo hero, benefits strip, featured product, story block, fit help + FAQ), a shared style file, a design-settings recipe (fonts, sizes, colours, corners) and an example home page, plus the product-page and header/footer changes. Install it with AdsPilot's theme tools on a hidden copy, adapt colours, fonts, photos and copy to the business, check screenshots, then publish on approval. Use when asked to design, redesign or make a Shopify store look premium or professional, build a high-converting home page, or when a store looks like a default template."
+description: "A ready, tested premium store design for Shopify's Horizon theme (4.x): five sections (photo hero, benefits strip, featured product, story block, fit help + FAQ), a shared style file, a design-settings recipe (fonts, sizes, colours, corners) and an example home page, plus the product-page and header/footer changes. Install it with {{PRODUCT_NAME}}'s theme tools on a hidden copy, adapt colours, fonts, photos and copy to the business, check screenshots, then publish on approval. Use when asked to design, redesign or make a Shopify store look premium or professional, build a high-converting home page, or when a store looks like a default template."
 ---
 
 # Shopify store kit: a premium Horizon store in one pass
@@ -32,7 +32,7 @@ The text between the BEGIN and END lines is the file, unchanged.
 Every section has colour settings and an `image_picker` override, so the owner can change
 photos, words and colours later in Shopify's theme editor without code.
 
-## Install (AdsPilot app on the owner's computer: the theme tools)
+## Install ({{PRODUCT_NAME}} app on the owner's computer: the theme tools)
 
 1. **Ask first for what only the owner knows**: logo or brand name, brand colours (if any),
    real promises (delivery time and cost, returns, cash on delivery), the products to
@@ -69,7 +69,7 @@ photos, words and colours later in Shopify's theme editor without code.
 
 On the hosted connector (AI apps online) the theme tools are not available yet: give the
 owner these steps, or do the content parts (pages, policies, menus, collections) with the
-content tools and leave the theme to the owner's AdsPilot app.
+content tools and leave the theme to the owner's {{PRODUCT_NAME}} app.
 
 ## Adapting it
 

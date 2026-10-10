@@ -5,7 +5,7 @@ Shopify stores and lives in one place: `get_skill store-builder`, references
 `conversion-checklists.md` and `cash-on-delivery.md`. This file adds only what is specific
 to WooCommerce.
 
-**What AdsPilot can do here** (every change with the user's approval on an exact summary,
+**What {{PRODUCT_NAME}} can do here** (every change with the user's approval on an exact summary,
 the previous version saved first, the result read back): read products with
 `woocommerce_products`; change a product's name, descriptions, regular and sale price and
 sale dates with `woocommerce_update_product` (variable products are priced per variation);
@@ -16,7 +16,7 @@ the market's rule in `selling-by-country` (tax-inclusive shelf prices in the UK,
 Australia, New Zealand and the Gulf; a "was" price that was really charged, in the EU the
 lowest of the last 30 days). Product changes need a Shop Manager or Administrator login.
 Everything in the settings table below (checkout, payments, tax, shipping, coupons) is
-done by the owner or developer, on staging first; AdsPilot gives the steps.
+done by the owner or developer, on staging first; {{PRODUCT_NAME}} gives the steps.
 
 ## Settings that decide whether ad traffic buys
 
@@ -90,7 +90,7 @@ done by the owner or developer, on staging first; AdsPilot gives the steps.
 
 ## Sources (checked 2026-10-08; cited, not copied)
 
-- AdsPilot connector research (WooCommerce REST v3 with Application Passwords, the tax setting): research/2026-10-08-wordpress-connector.md in the AdsPilot repository
+- {{PRODUCT_NAME}} connector research (WooCommerce REST v3 with Application Passwords, the tax setting): research/2026-10-08-wordpress-connector.md in the {{PRODUCT_NAME}} repository
 
 - WooCommerce 11.0 release: https://developer.woocommerce.com/2026/08/04/woocommerce-11-0/
 - Cart and Checkout blocks default since 8.3, HPOS default since 8.2: https://developer.woocommerce.com/2023/10/10/woocommerce-8-2-0-released/

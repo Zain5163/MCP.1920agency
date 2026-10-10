@@ -43,7 +43,7 @@ is a planning failure, not bad luck. The full dated calendar, with sources, is
 | Channel | Use the calendar to |
 |---|---|
 | Paid ads (Meta, TikTok, Google, Snapchat, Pinterest…) | Launch event creative by the launch-by date, raise budget gradually into the peak, retire it right after |
-| Organic social (AdsPilot publishing) | Teasers 1–2 weeks out, greetings on the day, results or thanks after |
+| Organic social ({{PRODUCT_NAME}} publishing) | Teasers 1–2 weeks out, greetings on the day, results or thanks after |
 | Email / SMS / WhatsApp | Early-access messages to past buyers before the public sale; reminders before shipping cut-offs |
 
 ## Sensitivities (check every time)

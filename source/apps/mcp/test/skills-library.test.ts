@@ -3,7 +3,7 @@ import { test, describe } from 'node:test'
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 
-import { COVERED_ELSEWHERE, LIBRARIES, framing, loadLibrary, registerSkillsLibrary } from '../src/skills-library.ts'
+import { COVERED_ELSEWHERE, LIBRARIES, framing, loadLibrary, readSkillText, registerSkillsLibrary } from '../src/skills-library.ts'
 import { PLAYBOOKS, registerPlaybooks } from '../src/playbooks.ts'
 
 /**
@@ -361,9 +361,10 @@ describe('code templates in AdsPilot’s own skills', () => {
     }
   })
 
-  test('a template is served between markers, exactly as stored', async () => {
+  test('a template is served between markers, exactly as stored (product name filled in)', async () => {
     const { readFileSync } = await import('node:fs')
     const { join } = await import('node:path')
+    const { renderProductText } = await import('@social-publisher/config')
     const server = new McpServer({ name: 't', version: '1' })
     registerSkillsLibrary(server)
     const ref = 'references/theme/sections/ap-hero.liquid'
@@ -371,7 +372,24 @@ describe('code templates in AdsPilot’s own skills', () => {
     const body = text.split(`----- BEGIN ${ref} -----
 `)[1]!.split(`
 ----- END ${ref} -----`)[0]
-    assert.equal(body, readFileSync(join(library.get('shopify-store-kit')!.dir, ref), 'utf8'))
+    const stored = readFileSync(join(library.get('shopify-store-kit')!.dir, ref), 'utf8')
+    // The file writes the name as {{PRODUCT_NAME}}; it is served with the current name.
+    assert.ok(stored.includes('{{PRODUCT_NAME}}'))
+    assert.equal(body, renderProductText(stored))
+    assert.ok(!body.includes('{{PRODUCT_NAME}}'))
+  })
+
+  test('our own skills are served with the product name filled in, third-party text untouched', async () => {
+    const { productName } = await import('@social-publisher/config')
+    const server = new McpServer({ name: 't', version: '1' })
+    registerSkillsLibrary(server)
+    const text = await callTool(server, 'get_skill', { name: 'wordpress-site-builder' })
+    assert.ok(!text.includes('{{'), 'a placeholder reached the reader')
+    assert.ok(text.includes(`type "${productName()}"`) || text.includes(productName()))
+    const own = [...library.values()].filter((s) => s.library.own === true)
+    for (const skill of own) assert.ok(!skill.description.includes('{{'), `${skill.name}: description not rendered`)
+    // Third-party text is never passed through the renderer: it has no placeholder of ours.
+    assert.equal(readSkillText(LIBRARIES[1]!, 'x {{PRODUCT_NAME}} y'), 'x {{PRODUCT_NAME}} y')
   })
 
   test('the kit’s JSON templates parse', async () => {

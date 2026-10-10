@@ -44,9 +44,9 @@ Rules:
 6. While the whole account makes fewer than ~50 purchases a week, keep it to **one or two
    ad sets in total**. Every split slows learning.
 
-AdsPilot today sets budgets on ad sets (`budgetLevel: adset`). With one ad set this is
+{{PRODUCT_NAME}} today sets budgets on ad sets (`budgetLevel: adset`). With one ad set this is
 fine; when an account graduates to a multi-ad-set scaling campaign, say that a CBO
-campaign is the right structure and that AdsPilot cannot build it yet.
+campaign is the right structure and that {{PRODUCT_NAME}} cannot build it yet.
 
 ---
 

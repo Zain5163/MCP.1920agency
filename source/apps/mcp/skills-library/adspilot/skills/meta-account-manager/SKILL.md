@@ -1,6 +1,6 @@
 ---
 name: meta-account-manager
-description: "Run and scale a Meta (Facebook/Instagram) e-commerce ad account day to day, as a senior performance manager would: daily checks, cut/scale/refresh decisions with numbers, budget sized to the learning phase, creative pipeline, cash-on-delivery measurement, seasonal planning, and a report the owner can act on. Use when asked to manage, optimise, scale or lower the cost per sale of an ad account, to run a daily or weekly ads review, or to build a media-buying plan. Built on AdsPilot's tools (audit_ad_account, analyze_ad_performance, set_ad_delivery, change_budget, create_ad_plan) and dated research (references/research-2026-10.md); lessons from real accounts are in references/field-notes.md."
+description: "Run and scale a Meta (Facebook/Instagram) e-commerce ad account day to day, as a senior performance manager would: daily checks, cut/scale/refresh decisions with numbers, budget sized to the learning phase, creative pipeline, cash-on-delivery measurement, seasonal planning, and a report the owner can act on. Use when asked to manage, optimise, scale or lower the cost per sale of an ad account, to run a daily or weekly ads review, or to build a media-buying plan. Built on {{PRODUCT_NAME}}'s tools (audit_ad_account, analyze_ad_performance, set_ad_delivery, change_budget, create_ad_plan) and dated research (references/research-2026-10.md); lessons from real accounts are in references/field-notes.md."
 ---
 
 # Meta account manager
@@ -79,7 +79,7 @@ the account's own average and say that "better than average" is not "profitable"
   with enough purchases. Bigger jumps count as significant edits and can restart
   learning. For a bigger move, add new concepts (horizontal) rather than one big
   budget jump.
-- **Never** work around the AdsPilot spend ceiling, split a campaign to hide spend,
+- **Never** work around the {{PRODUCT_NAME}} spend ceiling, split a campaign to hide spend,
   or change the same budget twice within 3 days.
 
 ## 3. Creative: the main lever
@@ -105,7 +105,7 @@ the account's own average and say that "better than average" is not "profitable"
 
 ## 4. Daily routine (15 minutes of decisions, not tinkering)
 
-In this order. Pass the business's `account` to every AdsPilot tool.
+In this order. Pass the business's `account` to every {{PRODUCT_NAME}} tool.
 
 1. **Health**: payment status, rejected ads (`get_campaign_status`), pixel silent
    over 24 h. A sudden drop in spend is often billing, not ads.
@@ -116,7 +116,7 @@ In this order. Pass the business's `account` to every AdsPilot tool.
 4. **Decide**, using the table below. Most days the right action is "wait".
 5. **Report**: headline, done, waiting for approval, watch, learned.
 
-| Situation | Action | AdsPilot |
+| Situation | Action | {{PRODUCT_NAME}} |
 |---|---|---|
 | Ad under 3 days old, or spent under 2–3× target | Wait | — |
 | Ad spent ~2–3× target with zero purchases | Switch the ad off (never the last one in the ad set) | `set_ad_delivery` off (no approval) |
@@ -127,7 +127,7 @@ In this order. Pass the business's `account` to every AdsPilot tool.
 | Fatigue | Propose a fresh version of the same angle | `create_ad_plan` (yes) |
 
 Switching off needs no approval because stopping spend must never wait. Everything
-that spends needs the owner's yes on AdsPilot's own summary. Never supply a token
+that spends needs the owner's yes on {{PRODUCT_NAME}}'s own summary. Never supply a token
 the owner did not give, and never call a proposal done.
 
 ## 5. Weekly (Mondays)
@@ -136,7 +136,7 @@ the owner did not give, and never call a proposal done.
   changelog first). Note anything that changes how the account should be run.
 - Creative review: which angles won and lost, what to make next, what is tiring.
   Meta's Creative Diversity column and Account Insights (fatigue, similarity) are
-  the native signals; ask the owner to read them when AdsPilot cannot.
+  the native signals; ask the owner to read them when {{PRODUCT_NAME}} cannot.
 - Store review: add-to-cart rate, delivery terms, banners, size guide, page speed.
   When cost per purchase rises while click-through holds, the store is the usual cause.
 - Add field notes (`references/field-notes.md`) for anything the numbers proved.

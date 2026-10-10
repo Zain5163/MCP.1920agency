@@ -74,7 +74,7 @@ relying on a UI detail: Meta changed the flexible format in 2026.
   shipped [Vendor/Practice, Pakistan].
 - Language: no published test compares English, Urdu and Roman Urdu ads; test it in the account.
 
-Sources and links: the AdsPilot repository's research notes for the client account that prompted this
+Sources and links: the {{PRODUCT_NAME}} repository's research notes for the client account that prompted this
 (2026-10-09), and the citations in the original report.
 
 ## When to switch an ad off (and when not to)

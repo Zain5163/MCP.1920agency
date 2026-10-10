@@ -1,6 +1,6 @@
 ---
 name: shopify-theme-developer
-description: "Change or build a Shopify theme safely and well: Online Store 2.0 structure (JSON templates, sections, theme blocks, section groups, settings, locales), Liquid that renders fast, landing-page and product templates, speed (Core Web Vitals, images, app scripts), accessibility, and the AdsPilot theme workflow (draft copy, edit, preview link, publish only on approval, rollback). Use when asked to edit a Shopify theme, add a section or block, change the header, announcement bar, product page layout or home page, build a landing page template, speed up a store, remove leftover app code, or switch to a new theme such as Horizon or Dawn."
+description: "Change or build a Shopify theme safely and well: Online Store 2.0 structure (JSON templates, sections, theme blocks, section groups, settings, locales), Liquid that renders fast, landing-page and product templates, speed (Core Web Vitals, images, app scripts), accessibility, and the {{PRODUCT_NAME}} theme workflow (draft copy, edit, preview link, publish only on approval, rollback). Use when asked to edit a Shopify theme, add a section or block, change the header, announcement bar, product page layout or home page, build a landing page template, speed up a store, remove leftover app code, or switch to a new theme such as Horizon or Dawn."
 ---
 
 # Shopify theme developer
@@ -15,7 +15,7 @@ breaking a live store. For speed and accessibility in depth: `get_skill core-web
 
 ## 1. Which tools exist, and where
 
-| Job | AdsPilot tool | Approval |
+| Job | {{PRODUCT_NAME}} tool | Approval |
 |---|---|---|
 | Copy the live theme (backup) into an editable draft, or start from another theme (`from: "Horizon"`) | `shopify_theme_start_draft` | none: nothing on the store changes |
 | Read a file in the draft | `shopify_theme_read` | none |
@@ -25,9 +25,9 @@ breaking a live store. For speed and accessibility in depth: `get_skill core-web
 | Put back the theme that was live before | `shopify_theme_rollback` | **owner's approval** |
 | Throw a draft away | `shopify_theme_discard` | none |
 
-**The theme tools run only in the AdsPilot app on the owner's own computer** (they sign
+**The theme tools run only in the {{PRODUCT_NAME}} app on the owner's own computer** (they sign
 in through the Shopify CLI as a person). On the hosted connector (Claude, ChatGPT and
-other AI apps connected to AdsPilot online) they are not available yet. There, do the
+other AI apps connected to {{PRODUCT_NAME}} online) they are not available yet. There, do the
 content work with the content tools (`shopify_update_product`, `shopify_save_page`,
 `shopify_save_collection`, `shopify_save_menu`, `shopify_save_policy`,
 `shopify_create_discount`) and give the owner exact theme-editor steps for the rest

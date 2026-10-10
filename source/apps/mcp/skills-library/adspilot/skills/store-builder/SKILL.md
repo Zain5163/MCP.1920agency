@@ -1,13 +1,13 @@
 ---
 name: store-builder
-description: "Build, fix and improve a Shopify store so more visitors buy: audit it with real data, fix what costs the most sales first (trust, delivery and returns, product pages, sizes, offers, banners, speed), make the changes with AdsPilot's Shopify tools (product pages, store pages, discounts, theme drafts with preview and approved publish), check them three times, and measure the result against sales and ads. Use when asked to improve a store's conversion rate, set up or redesign a Shopify store, fix a product page, add an FAQ or size guide, change a banner, create a bundle or free-delivery offer, or when ads get clicks but the store does not sell. Works for any country: it asks which markets the store sells to and applies their payment, price, legal and consent rules from selling-by-country. References: page-by-page conversion checklists with sources, and cash-on-delivery stores (Pakistan, India, the Gulf and similar markets)."
+description: "Build, fix and improve a Shopify store so more visitors buy: audit it with real data, fix what costs the most sales first (trust, delivery and returns, product pages, sizes, offers, banners, speed), make the changes with {{PRODUCT_NAME}}'s Shopify tools (product pages, store pages, discounts, theme drafts with preview and approved publish), check them three times, and measure the result against sales and ads. Use when asked to improve a store's conversion rate, set up or redesign a Shopify store, fix a product page, add an FAQ or size guide, change a banner, create a bundle or free-delivery offer, or when ads get clicks but the store does not sell. Works for any country: it asks which markets the store sells to and applies their payment, price, legal and consent rules from selling-by-country. References: page-by-page conversion checklists with sources, and cash-on-delivery stores (Pakistan, India, the Gulf and similar markets)."
 ---
 
 # Store builder: a store that turns ad clicks into orders
 
 Ads bring visitors; the store decides whether they buy. When cost per purchase rises
 while the ads' click-through holds, the store is usually the cause. This skill is the
-order of work and the safe way to change a live store with AdsPilot.
+order of work and the safe way to change a live store with {{PRODUCT_NAME}}.
 
 **First, the market.** Ask which countries the store sells to (and from where) if it is
 not already known; never assume one. Then read `get_skill selling-by-country` and its
@@ -47,7 +47,7 @@ show it to the owner before changing anything.
 
 ## 2. What usually costs the most sales (fix in roughly this order)
 
-| Area | What good looks like | AdsPilot tool |
+| Area | What good looks like | {{PRODUCT_NAME}} tool |
 |---|---|---|
 | **Delivery and returns clarity** | One delivery promise everywhere (time, cost, free-delivery threshold); returns or exchange terms in plain words that meet at least the buyer's legal minimum (for example the 14-day withdrawal right in the EU and UK; see selling-by-country); the payment methods that market expects stated where they apply (cash on delivery, buy now pay later, local methods). Contradicting terms (two different free-delivery limits) cost trust | `shopify_save_policy` (refund, shipping), `shopify_save_page` (FAQ), theme draft (announcement bar, product page text) |
 | **Out-of-date banners** | Banners match today's offer; an expired sale banner says "this store is not looked after" | theme draft: usually `sections/header-group.json` or `sections/announcement-bar.liquid` |
@@ -64,7 +64,7 @@ show it to the owner before changing anything.
 
 Payment methods (cards, wallets, buy now pay later, local methods, cash on delivery),
 tax display, markets and currencies, the cookie banner, shipping rates and checkout
-settings are in the store owner's Shopify admin, not in AdsPilot's tools: say so and give
+settings are in the store owner's Shopify admin, not in {{PRODUCT_NAME}}'s tools: say so and give
 the steps.
 
 ## 3. Making changes safely (every change, every store)
@@ -72,7 +72,7 @@ the steps.
 - **Content** (products, pages, collections, menus, policies, discounts): the tool shows a before/after summary; nothing
   happens without the owner's approval; the current version is backed up; the result is read
   back. Pages are saved as hidden drafts unless publishing is approved.
-- **Theme**: never edit the live theme. The theme tools work only in the AdsPilot app on
+- **Theme**: never edit the live theme. The theme tools work only in the {{PRODUCT_NAME}} app on
   the owner's computer; on the hosted connector, give the owner theme-editor steps instead
   (details in `shopify-theme-developer`).
   1. `shopify_theme_start_draft` (downloads the live theme as a backup, makes a copy);
