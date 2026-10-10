@@ -565,7 +565,15 @@ export function registerAdsTools(server: McpServer): void {
         const loaded = loadClient(account)
         if ('error' in loaded) return text(loaded.error)
 
-        const adSet = await loaded.client.readObject(adSetId, 'name,campaign_id,effective_status,optimization_goal,daily_budget')
+        const adSet = await loaded.client.readObject(adSetId, 'name,campaign_id,effective_status,optimization_goal,daily_budget,is_dynamic_creative')
+        // A dynamic-creative ad set holds one ad only; Meta refuses a second at creation
+        // (found live 2026-10-09). Say so before asking anyone to approve.
+        if (adSet.is_dynamic_creative === true) {
+          return text(
+            `Nothing was created. Ad set "${adSet.name}" is a dynamic-creative ad set, which Meta limits to one ad. ` +
+              'Add the ads to another ad set (or create a new one with create_ad_plan); to change the creative here, its one ad would have to be replaced.',
+          )
+        }
         const campaign = await loaded.client.readObject(String(adSet.campaign_id), 'name,objective,effective_status,daily_budget')
 
         // Check the ads with the same rules as a new campaign, keeping only what is about the ads
