@@ -64,8 +64,43 @@ export interface DraftArgs {
         publicUrl?: string | undefined
         mime: string
         durationSeconds?: number | undefined
+        /** A video's thumbnail / cover, as a public https URL. */
+        thumbnailUrl?: string | undefined
+        /** A video's thumbnail / cover, as a local file (stdio only). */
+        thumbnailPath?: string | undefined
       }>
     | undefined
+}
+
+/**
+ * A video's thumbnail as media, or undefined when none was given. The type
+ * comes from the file name, since the tools take no thumbnail type: a name
+ * that is not .jpg, .jpeg or .png gets a type no platform takes, so the
+ * adapter says the thumbnail was not used rather than sending it as a guess.
+ */
+export function thumbnailRef(
+  index: number,
+  given: { thumbnailUrl?: string | undefined; thumbnailPath?: string | undefined },
+): MediaRef | undefined {
+  const where = given.thumbnailPath ?? given.thumbnailUrl
+  if (where === undefined || where.trim() === '') return undefined
+  let name = where
+  try {
+    if (given.thumbnailPath === undefined) name = new URL(where).pathname
+  } catch {
+    // Not a URL: the adapter reports it; the name still gives the type.
+  }
+  const extension = /\.([a-z0-9]+)$/i.exec(name)?.[1]?.toLowerCase()
+  const mime =
+    extension === 'png' ? 'image/png' : extension === 'jpg' || extension === 'jpeg' ? 'image/jpeg' : `image/${extension ?? 'unknown'}`
+  return {
+    id: `m${index}-thumbnail`,
+    kind: 'image',
+    mime,
+    bytes: 0,
+    ...(given.thumbnailPath !== undefined ? { localPath: given.thumbnailPath } : {}),
+    ...(given.thumbnailUrl !== undefined ? { publicUrl: given.thumbnailUrl } : {}),
+  }
 }
 
 export interface PublishArgs extends DraftArgs {
@@ -137,15 +172,20 @@ export interface PostingContext {
 export async function buildDraft(scope: TenantScope, args: DraftArgs) {
   const connections = await loadConnections(scope)
 
-  const media: MediaRef[] = (args.media ?? []).map((m, index) => ({
-    id: `m${index}`,
-    kind: m.kind,
-    mime: m.mime,
-    bytes: 0,
-    ...(m.localPath !== undefined ? { localPath: m.localPath } : {}),
-    ...(m.publicUrl !== undefined ? { publicUrl: m.publicUrl } : {}),
-    ...(m.durationSeconds !== undefined ? { durationSeconds: m.durationSeconds } : {}),
-  }))
+  const media: MediaRef[] = (args.media ?? []).map((m, index) => {
+    // Only a video carries a thumbnail; on an image it would mean nothing.
+    const thumbnail = m.kind === 'video' ? thumbnailRef(index, m) : undefined
+    return {
+      id: `m${index}`,
+      kind: m.kind,
+      mime: m.mime,
+      bytes: 0,
+      ...(m.localPath !== undefined ? { localPath: m.localPath } : {}),
+      ...(m.publicUrl !== undefined ? { publicUrl: m.publicUrl } : {}),
+      ...(m.durationSeconds !== undefined ? { durationSeconds: m.durationSeconds } : {}),
+      ...(thumbnail !== undefined ? { thumbnail } : {}),
+    }
+  })
 
   const title = args.title?.trim()
   const draft: PostDraft = {
@@ -217,6 +257,9 @@ export function approvalPayload(draft: PostDraft, chosen: readonly Connection[])
     body: draft.body,
     accounts: chosen.map((c) => c.id).sort(),
     media: draft.media.map((m) => m.publicUrl ?? m.localPath ?? m.id),
+    // A thumbnail is public too, so changing it voids an approval. Only
+    // present when one is given, so every other approval is unchanged.
+    ...(thumbnails(draft).length > 0 ? { thumbnails: thumbnails(draft) } : {}),
     // Both change what goes out — a title is public, the disclosure is a
     // statement to the platform — so changing either voids an approval.
     ...(draft.title !== undefined ? { title: draft.title } : {}),
@@ -249,9 +292,25 @@ export function approvalSummary(
     'Text:',
     ...draft.body.split('\n').map((line) => `  ${line}`),
     ...(draft.media.length > 0 ? ['', `Attachments: ${draft.media.length}`] : []),
+    ...thumbnails(draft).map((where) => `Video thumbnail: ${where} (used where the platform takes one)`),
     ...(fields.declaration.length > 0 ? ['', ...fields.declaration] : []),
   ].join('\n')
 }
+
+/** Where each video's thumbnail is, in attachment order. */
+export function thumbnails(draft: PostDraft): string[] {
+  return draft.media.flatMap((m) =>
+    m.thumbnail !== undefined ? [m.thumbnail.publicUrl ?? m.thumbnail.localPath ?? m.thumbnail.id] : [],
+  )
+}
+
+/**
+ * Said when a post with a thumbnail is scheduled: the media tables keep no
+ * thumbnail, so the worker publishes the video without it. Said, not hidden.
+ */
+export const THUMBNAIL_NOT_SCHEDULED_MESSAGE =
+  'The video thumbnail is not kept with a scheduled post (the media store has no place for it yet), ' +
+  "so the video goes out with the platform's own frame. Publish now to use the thumbnail, or set it in the platform's app afterwards."
 
 /**
  * Where the draft's title and AI-media declaration go, as lines to show.

@@ -180,6 +180,14 @@ export function buildLocalServer(meter: MeterOptions): McpServer {
           publicUrl: z.string().optional().describe('Public https URL. Required for Instagram.'),
           mime: z.string().describe('e.g. image/jpeg, video/mp4'),
           durationSeconds: z.number().optional().describe('Needed to check video length limits.'),
+          thumbnailPath: z
+            .string()
+            .optional()
+            .describe(
+              'Video only: absolute path to a local JPEG or PNG thumbnail. YouTube sets it as the custom thumbnail ' +
+                '(needs a verified channel; the video uploads either way) and Pinterest uses it as the cover.',
+            ),
+          thumbnailUrl: z.string().optional().describe('Video only: the thumbnail as a public https URL instead of a file.'),
         }),
       )
       .optional(),

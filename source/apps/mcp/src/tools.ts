@@ -14,6 +14,8 @@ import {
   formatPostList,
   publishPost,
   storeHostedMedia,
+  THUMBNAIL_NOT_SCHEDULED_MESSAGE,
+  thumbnails,
   validationProblems,
   type PostingDeps,
 } from './publishing.ts'
@@ -89,6 +91,13 @@ const draftShape = {
         publicUrl: z.string().describe('Public https URL of the image or video.'),
         mime: z.string().describe('e.g. image/jpeg, video/mp4'),
         durationSeconds: z.number().optional().describe('Needed to check video length limits.'),
+        thumbnailUrl: z
+          .string()
+          .optional()
+          .describe(
+            'Video only: public https URL of a JPEG or PNG thumbnail. YouTube sets it as the custom thumbnail ' +
+              '(needs a verified channel; the video uploads either way) and Pinterest uses it as the cover. Not kept for a scheduled post.',
+          ),
       }),
     )
     .optional()
@@ -274,7 +283,8 @@ export function registerTools(
 
         return text(
           `Scheduled for ${when.toISOString()} across ${chosen.length} account(s):\n` +
-            chosen.map((c) => `  ${c.displayName}`).join('\n'),
+            chosen.map((c) => `  ${c.displayName}`).join('\n') +
+            (thumbnails(draft).length > 0 ? `\n\n${THUMBNAIL_NOT_SCHEDULED_MESSAGE}` : ''),
         )
       }),
   )

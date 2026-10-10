@@ -24,6 +24,8 @@ import {
   formatPostList,
   publishNowResolution,
   publishPost,
+  THUMBNAIL_NOT_SCHEDULED_MESSAGE,
+  thumbnailRef,
   type MediaRow,
   type PostRows,
   type PostingDeps,
@@ -662,5 +664,98 @@ describe('analytics: publish_failed for a target that fails now', () => {
       will_retry: false,
     })
     assert.doesNotMatch(JSON.stringify(events), /Big launch|duplicate/)
+  })
+})
+
+describe('a video thumbnail, from the tool call to the adapter (2026-10-11)', () => {
+  test('the thumbnail reaches the adapter on the video, typed from its name', () => {
+    assert.deepEqual(thumbnailRef(0, { thumbnailUrl: 'https://cdn.example.com/covers/launch.PNG?v=2' }), {
+      id: 'm0-thumbnail',
+      kind: 'image',
+      mime: 'image/png',
+      bytes: 0,
+      publicUrl: 'https://cdn.example.com/covers/launch.PNG?v=2',
+    })
+    assert.equal(thumbnailRef(1, { thumbnailPath: 'C:/clips/cover.jpeg' })!.mime, 'image/jpeg')
+    // A type no platform takes is passed on as itself, so the adapter can say so.
+    assert.equal(thumbnailRef(2, { thumbnailPath: 'C:/clips/cover.gif' })!.mime, 'image/gif')
+    assert.equal(thumbnailRef(3, {}), undefined)
+    assert.equal(thumbnailRef(4, { thumbnailUrl: '  ' }), undefined)
+  })
+
+  test('publish_post hands the adapter the thumbnail, shows it in the approval, and binds the approval to it', async () => {
+    const seen: unknown[] = []
+    const { deps, scope } = harness([
+      adapter('youtube', async (_ctx, draft) => {
+        seen.push(draft.media[0]?.thumbnail)
+        return published('yt-1')
+      }),
+    ])
+    const video = (thumbnailUrl: string) => ({
+      body: 'Launch day',
+      platforms: ['youtube' as Platform],
+      media: [{ kind: 'video' as const, mime: 'video/mp4', publicUrl: 'https://cdn.example.com/v.mp4', thumbnailUrl }],
+    })
+
+    const approval = reply(await publishPost(scope as never, video('https://cdn.example.com/a.jpg'), { deps, actor: 'mcp' }))
+    assert.match(approval, /Video thumbnail: https:\/\/cdn\.example\.com\/a\.jpg/)
+
+    // The approval covers the thumbnail: a different one is a different post.
+    const swapped = reply(
+      await publishPost(scope as never, { ...video('https://cdn.example.com/b.jpg'), confirm: tokenIn(approval) }, { deps, actor: 'mcp' }),
+    )
+    assert.match(swapped, /APPROVAL NEEDED/)
+    assert.equal(seen.length, 0)
+
+    await publishPost(scope as never, { ...video('https://cdn.example.com/a.jpg'), confirm: tokenIn(approval) }, { deps, actor: 'mcp' })
+    assert.equal(seen.length, 1)
+    assert.deepEqual(seen[0], {
+      id: 'm0-thumbnail',
+      kind: 'image',
+      mime: 'image/jpeg',
+      bytes: 0,
+      publicUrl: 'https://cdn.example.com/a.jpg',
+    })
+  })
+
+  test('an image never carries a thumbnail', async () => {
+    const seen: unknown[] = []
+    const { deps, scope } = harness([
+      adapter('facebook_page', async (_ctx, draft) => {
+        seen.push(draft.media[0])
+        return published('fb-9')
+      }),
+    ])
+    const args = {
+      body: 'Photo',
+      platforms: ['facebook_page' as Platform],
+      media: [{ kind: 'image' as const, mime: 'image/jpeg', publicUrl: 'https://cdn.example.com/p.jpg', thumbnailUrl: 'https://cdn.example.com/t.jpg' }],
+    }
+    const approval = reply(await publishPost(scope as never, args, { deps, actor: 'mcp' }))
+    assert.doesNotMatch(approval, /Video thumbnail/)
+    await publishPost(scope as never, { ...args, confirm: tokenIn(approval) }, { deps, actor: 'mcp' })
+    assert.equal((seen[0] as { thumbnail?: unknown }).thumbnail, undefined)
+  })
+
+  test('schedule_post says the thumbnail is not kept, rather than dropping it silently', async () => {
+    const { deps, scope } = harness([adapter('youtube', async () => published('yt-2'))])
+    const server = new McpServer({ name: 't', version: '0' })
+    const logger = new Logger([{ name: 'memory', write: async () => {} }])
+    registerTools(server, { tokenId: 'tok', tenantId: TENANT, userId: 'user-7', scope: scope as never }, logger, deps)
+    const tools = (server as unknown as { _registeredTools: Record<string, { handler: Function }> })._registeredTools
+    const at = new Date(Date.now() + 3_600_000).toISOString()
+    const media = [{ kind: 'video', mime: 'video/mp4', publicUrl: 'https://cdn.example.com/v.mp4' }]
+
+    const withThumbnail = reply(
+      await tools.schedule_post!.handler(
+        { body: 'Later', platforms: ['youtube'], at, media: [{ ...media[0], thumbnailUrl: 'https://cdn.example.com/t.jpg' }] },
+        {},
+      ),
+    )
+    assert.match(withThumbnail, /^Scheduled for/)
+    assert.ok(withThumbnail.includes(THUMBNAIL_NOT_SCHEDULED_MESSAGE))
+
+    const without = reply(await tools.schedule_post!.handler({ body: 'Later', platforms: ['youtube'], at, media }, {}))
+    assert.ok(!without.includes(THUMBNAIL_NOT_SCHEDULED_MESSAGE))
   })
 })
