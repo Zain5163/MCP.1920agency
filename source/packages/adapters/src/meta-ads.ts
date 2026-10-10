@@ -980,6 +980,60 @@ export class MetaAdsClient {
   }
 
   /** Switches one ad, ad set or campaign on or off. */
+  /**
+   * Adds new ads to an ad set that already exists, PAUSED.
+   *
+   * Why: refreshing creative should not need a new campaign or ad set (that splits a small
+   * budget and restarts learning; owner, 2026-10-09). The ads are built exactly as in
+   * `create`: same creative builder, the same split for several texts × several shapes,
+   * and the same website tracking. Nothing spends until each ad is switched on.
+   */
+  async addAds(
+    adSetId: string,
+    requested: AdPlan['adSets'][number]['ads'],
+  ): Promise<{ adSetName: string; campaignId: string; creativeIds: string[]; adIds: string[] }> {
+    const adSet = (await this.#get(adSetId, { fields: 'id,name,campaign_id,effective_status' })) as {
+      name?: string
+      campaign_id?: string
+    }
+    if (adSet.campaign_id === undefined) {
+      throw new PublishError(`Ad set ${adSetId} was not found in this ad account.`, { failureClass: 'permanent' })
+    }
+    // The same split as `create`: several texts with files in several shapes become one ad per text.
+    const ads = expandForPlacements({
+      campaign: { name: 'existing', objective: 'OUTCOME_SALES' as never, budgetLevel: 'adset' },
+      adSets: [{ adSet: { name: adSet.name ?? adSetId } as never, ads: requested }],
+    }).adSets[0]!.ads
+    const created = { creativeIds: [] as string[], adIds: [] as string[] }
+    try {
+      for (const [j, ad] of ads.entries()) {
+        const creativeId = await this.#createCreative(ad, j)
+        created.creativeIds.push(creativeId)
+        const adId = await this.#post('ads', {
+          name: adName(META_DEFAULT_NAMING.ad, {
+            ...(ad.name !== '' ? { given: ad.name } : {}),
+            ...(ad.headline !== undefined ? { headline: ad.headline } : {}),
+            ...(ad.creative?.kind !== undefined ? { kind: ad.creative.kind } : {}),
+            index: j,
+          }),
+          adset_id: adSetId,
+          creative: JSON.stringify({ creative_id: creativeId }),
+          status: 'PAUSED',
+          ...websiteTracking(this.#account.pixelId),
+        })
+        created.adIds.push(adId)
+      }
+    } catch (error) {
+      throw new PublishError(
+        `${error instanceof Error ? error.message : String(error)}\n\n` +
+          `PARTIALLY CREATED in ad set ${adSetId}, all PAUSED so nothing is spending: ` +
+          `${created.adIds.length} ad(s) (${created.adIds.join(', ') || 'none'}). Delete them before retrying, or retry only the rest.`,
+        { failureClass: error instanceof PublishError ? error.failureClass : 'transient' },
+      )
+    }
+    return { adSetName: adSet.name ?? adSetId, campaignId: adSet.campaign_id, ...created }
+  }
+
   async setDelivery(id: string, on: boolean): Promise<void> {
     await this.#update(id, { status: on ? 'ACTIVE' : 'PAUSED' })
   }

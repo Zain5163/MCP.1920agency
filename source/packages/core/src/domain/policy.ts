@@ -105,6 +105,15 @@ export const ACTION_POLICY: Readonly<Record<string, ActionPolicy>> = {
    * are saved: customers see them. Each keeps the previous version so it can be
    * put back, but a customer may already have seen or used the change.
    */
+  add_ads_to_ad_set: {
+    rationale:
+      'Adds new ads to an ad set that is already running. The budget does not change, but switched-on ads ' +
+      'start spending part of it at once, and customers see them.',
+    risk: 'high',
+    reversible: true,
+    spendsMoney: true,
+    consequence: 'The new ads spend from the ad set’s existing budget from the moment Meta approves them. They can be switched off at any time; nothing already spent comes back.',
+  },
   shopify_update_product: {
     rationale:
       'Changes a live product page (title, description, SEO text). Customers see it at once. ' +

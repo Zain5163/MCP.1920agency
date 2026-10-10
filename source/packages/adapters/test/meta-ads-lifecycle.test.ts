@@ -169,3 +169,47 @@ describe('pausing', () => {
     assert.equal(writes[0]!.body.status, 'PAUSED')
   })
 })
+
+describe('adding ads to an ad set that already runs', () => {
+  /** A fake Meta that hands out ids for creatives and ads, and can fail on the Nth ad. */
+  function meta(failOnAd?: number) {
+    const calls: Call[] = []
+    let n = 0
+    let adCount = 0
+    const fetchImpl = (async (url: string | URL, init?: RequestInit) => {
+      const body: Record<string, string> = {}
+      if (init?.body instanceof URLSearchParams) for (const [k, v] of init.body) body[k] = v
+      const href = String(url)
+      calls.push({ method: init?.method ?? 'GET', url: href, body })
+      if ((init?.method ?? 'GET') === 'GET') return new Response(JSON.stringify({ id: 's1', name: 'Broad PK', campaign_id: 'c1', effective_status: 'ACTIVE' }))
+      if (/\/ads$/.test(new URL(href).pathname)) {
+        adCount++
+        if (adCount === failOnAd) return new Response(JSON.stringify({ error: { message: 'Invalid parameter', code: 100 } }), { status: 400 })
+      }
+      return new Response(JSON.stringify({ id: `id${++n}` }))
+    }) as unknown as typeof globalThis.fetch
+    return { calls, fetchImpl }
+  }
+  const one = (name: string) => ({ name, body: 'Rs. 5,999. Free delivery.', bodies: ['Rs. 5,999. Free delivery.', 'Winter is here.'], headlines: ['Chelsea Boots · Rs. 5,999'], landingPageUrl: 'https://example.com/p', callToAction: 'ORDER_NOW' })
+
+  test('each ad is created PAUSED in the given ad set, with website tracking', async () => {
+    const { calls, fetchImpl } = meta()
+    const c = new MetaAdsClient({ accessToken: 'T', account: { adAccountId: '123', pageId: 'P', currency: 'PKR', pixelId: 'PX' }, fetch: fetchImpl })
+    const out = await c.addAds('s1', [one('chelsea-poster'), one('chelsea-sale')] as never)
+    assert.equal(out.adIds.length, 2)
+    assert.equal(out.campaignId, 'c1')
+    const adPosts = calls.filter((x) => x.method === 'POST' && /\/ads$/.test(new URL(x.url).pathname))
+    assert.equal(adPosts.length, 2)
+    for (const p of adPosts) {
+      assert.equal(p.body.adset_id, 's1')
+      assert.equal(p.body.status, 'PAUSED')
+      assert.match(p.body.tracking_specs ?? '', /PX/)
+    }
+  })
+
+  test('a failure part-way says exactly which ads exist, all paused', async () => {
+    const { fetchImpl } = meta(2)
+    const c = new MetaAdsClient({ accessToken: 'T', account: { adAccountId: '123', pageId: 'P', currency: 'PKR' }, fetch: fetchImpl })
+    await assert.rejects(c.addAds('s1', [one('a'), one('b')] as never), (e: Error) => /PARTIALLY CREATED in ad set s1/.test(e.message) && /1 ad\(s\)/.test(e.message))
+  })
+})

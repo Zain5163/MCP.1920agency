@@ -551,6 +551,101 @@ export function registerAdsTools(server: McpServer): void {
   )
 
   server.tool(
+    'add_ads_to_ad_set',
+    "Add new ads to a Meta ad set that already exists: the way to refresh creative, swap tired ads or put proven creative into a running campaign without a new campaign or ad set. Same ad fields as create_ad_plan (up to 5 primary texts and 5 headlines per ad, each a different angle; files by shape). Budget and targeting stay as they are. Shows the ads and a Meta preview for the user's approval, creates them, reads them back, and switches them on unless activate is false.",
+    {
+      adSetId: z.string().describe('The ad set to add to (from get_campaign_status or analyze_ad_performance).'),
+      ads: z.array(adShape).min(1).max(6),
+      activate: z.boolean().default(true).describe('Switch the new ads on after creating them. false leaves them PAUSED.'),
+      confirm: z.string().optional().describe('Approval token from the previous call.'),
+      account: accountArg,
+    },
+    async ({ adSetId, ads, activate, confirm, account }) =>
+      await guarded(async () => {
+        const loaded = loadClient(account)
+        if ('error' in loaded) return text(loaded.error)
+
+        const adSet = await loaded.client.readObject(adSetId, 'name,campaign_id,effective_status,optimization_goal,daily_budget')
+        const campaign = await loaded.client.readObject(String(adSet.campaign_id), 'name,objective,effective_status,daily_budget')
+
+        // Check the ads with the same rules as a new campaign, keeping only what is about the ads
+        // (the ad set and its budget already exist and are not being changed).
+        const plan = toPlan(
+          {
+            campaignName: String(campaign.name),
+            objective: String(campaign.objective),
+            adSets: [{ name: String(adSet.name), dailyBudget: 1000, countries: ['PK'], ads }],
+          } as never,
+          loaded.account.currency,
+        )
+        const review = loaded.client.review(plan)
+        const adIssues = (list: readonly string[]) => list.filter((e) => /ads\[/.test(e))
+        if (adIssues(review.errors).length > 0) {
+          return text(`Nothing was created.\n\n${adIssues(review.errors).map((e) => `• ${e}`).join('\n')}`)
+        }
+
+        const previews: string[] = []
+        if (confirm === undefined) {
+          const first = expandForPlacements(plan).adSets[0]?.ads[0]
+          if (first !== undefined) {
+            try {
+              for (const [format, link] of Object.entries(await loaded.client.previewAd(first))) previews.push(`  ${format}: ${link}`)
+            } catch {
+              previews.push('  (Meta could not render a preview for this ad.)')
+            }
+          }
+        }
+
+        const built = expandForPlacements(plan).adSets[0]!.ads
+        const budget = campaign.daily_budget ?? adSet.daily_budget
+        const gate = decideOn(loaded, {
+          action: 'add_ads_to_ad_set',
+          payload: { adSetId, ads, activate },
+          ...(confirm !== undefined ? { confirmation: confirm } : {}),
+          describe: () =>
+            [
+              `Add ${built.length} ad(s) to ad set "${adSet.name}" in campaign "${campaign.name}" (${String(campaign.objective)}, optimising for ${String(adSet.optimization_goal).toLowerCase()}).`,
+              `Budget unchanged: ${budget !== undefined ? formatMoney({ minor: Number(budget), currency: loaded.account.currency }) + ' per day' : 'as set'} on the ${campaign.daily_budget !== undefined ? 'campaign' : 'ad set'}. The new ads share it.`,
+              '',
+              ...ads.flatMap((ad) => [
+                `• ${ad.name}: ${ad.files?.length ?? 0} file(s) (${(ad.files ?? []).map((f) => `${f.kind} ${f.aspectRatio}`).join(', ') || 'none'}), CTA ${ad.callToAction ?? 'default'}`,
+                `  link: ${ad.landingPageUrl ?? '(none)'}`,
+                ...ad.primaryTexts.map((t, i) => `  text ${i + 1}: ${t.replace(/\s+/g, ' ').slice(0, 140)}${t.length > 140 ? '…' : ''}`),
+                `  headlines: ${ad.headlines.join(' | ')}`,
+                ...(ad.descriptions !== undefined && ad.descriptions.length > 0 ? [`  descriptions: ${ad.descriptions.join(' | ')}`] : []),
+              ]),
+              ...(adIssues(review.warnings).length > 0 ? ['', 'Warnings:', ...adIssues(review.warnings).map((w) => `  • ${w}`)] : []),
+              '',
+              activate ? 'They are switched on as soon as they are created; Meta reviews them first (minutes to hours).' : 'They are created PAUSED.',
+              ...(previews.length > 0 ? ['', 'How the first ad will look (open in a browser; links expire):', ...previews] : []),
+            ].join('\n'),
+        })
+        if (!gate.allowed) return text(formatApprovalRequest(gate))
+
+        const result = await loaded.client.addAds(adSetId, plan.adSets[0]!.ads)
+        await audit('ads.ads.added', { adSetId, ads: result.adIds.length, activate })
+        if (activate) for (const id of result.adIds) await loaded.client.setDelivery(id, true)
+
+        // Read every new ad back: name, status, and the link it really carries.
+        const lines: string[] = []
+        for (const id of result.adIds) {
+          const back = await loaded.client.readObject(id, 'name,status,effective_status,creative{object_story_spec,asset_feed_spec}')
+          const cr = (back.creative ?? {}) as { object_story_spec?: { link_data?: { link?: string }; video_data?: { call_to_action?: { value?: { link?: string } } } }; asset_feed_spec?: { link_urls?: Array<{ website_url?: string }> } }
+          const link = cr.asset_feed_spec?.link_urls?.[0]?.website_url ?? cr.object_story_spec?.link_data?.link ?? cr.object_story_spec?.video_data?.call_to_action?.value?.link ?? '?'
+          lines.push(`  ${String(back.effective_status).padEnd(14)} ${back.name}  ${id}  → ${link}`)
+        }
+        return text(
+          [
+            `Added ${result.adIds.length} ad(s) to "${result.adSetName}" in ${loaded.label}${activate ? ', switched on' : ', PAUSED'}:`,
+            ...lines,
+            '',
+            'Meta reviews new ads before they deliver (usually minutes, sometimes hours). Check get_campaign_status for rejections.',
+          ].join('\n'),
+        )
+      }),
+  )
+
+  server.tool(
     'get_campaign_status',
     "Read what a Meta campaign is actually doing, including ads rejected or still in Meta's policy review.",
     { campaignId: z.string(), account: accountArg },
