@@ -7,7 +7,7 @@ import {
   YouTubeAdapter,
   youTubeOptionsFromEnv,
 } from '@social-publisher/adapters'
-import { optional, required } from '@social-publisher/config'
+import { optional, required, productSlug } from '@social-publisher/config'
 import { TenantScope, db, prismaCredentialStore } from '@social-publisher/db'
 import { PublishService, type TargetSpec } from '@social-publisher/publisher'
 import { TokenVault, parseKey } from '@social-publisher/vault'
@@ -119,7 +119,7 @@ export function targetFor(connection: Connection): TargetSpec {
       tokenVault(),
       connection,
       adapter?.refreshCredential?.bind(adapter),
-      (message) => console.error(`[adspilot] ${message}`),
+      (message) => console.error(`[${productSlug()}] ${message}`),
     ),
   }
 }

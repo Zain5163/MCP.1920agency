@@ -1,5 +1,5 @@
 [Unit]
-Description=AdsPilot: token refresh daily at 23:00 UTC (04:00 PKT, as the PC's AdsPilot-Refresh task)
+Description=Token refresh daily at 23:00 UTC (04:00 PKT, as the PC's refresh task)
 
 [Timer]
 OnCalendar=*-*-* 23:00:00 UTC

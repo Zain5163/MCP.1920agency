@@ -17,7 +17,7 @@ import {
   verifyState,
   type ShopifyTokenSet,
 } from '@social-publisher/adapters'
-import { CONFIG_DIR, optional } from '@social-publisher/config'
+import { CONFIG_DIR, optional, productName, publicBaseUrl } from '@social-publisher/config'
 import { TenantScope, listProviderAuths, markProviderAuthNeedsReauth, providerAuthCredentialStore, saveProviderAuth } from '@social-publisher/db'
 import { TokenVault, parseKey, type StoredCredential } from '@social-publisher/vault'
 
@@ -64,12 +64,23 @@ export function shopifyHostedConfig(): HostedConfig | { error: string } {
   const clientId = optional('SHOPIFY_CONNECTOR_CLIENT_ID')
   const clientSecret = optional('SHOPIFY_CONNECTOR_CLIENT_SECRET')
   if (clientId === undefined || clientSecret === undefined) {
-    return { error: 'Shopify is not set up on this AdsPilot server yet (SHOPIFY_CONNECTOR_CLIENT_ID / SECRET missing).' }
+    return { error: `Shopify is not set up on this ${productName()} server yet (SHOPIFY_CONNECTOR_CLIENT_ID / SECRET missing).` }
+  }
+  // The address the store owner's browser comes back to. No built-in default: the
+  // domain is written only in deploy/site.env, and the hosted server gets
+  // PUBLIC_BASE_URL from it (docker-compose.yml). Elsewhere it must be set.
+  const baseUrl = publicBaseUrl()
+  if (baseUrl === undefined) {
+    return {
+      error:
+        `Shopify is not set up on this ${productName()} server yet: PUBLIC_BASE_URL (its public https address) is not set. ` +
+        'On the hosted server it comes from DOMAIN in deploy/site.env through deploy/scripts/dc.sh; elsewhere add it to ~/.social-publisher/.env.',
+    }
   }
   return {
     clientId,
     clientSecret,
-    baseUrl: optional('PUBLIC_BASE_URL', 'https://mcp.1920agency.com')!.replace(/\/+$/, ''),
+    baseUrl,
     stateKey: createHmac('sha256', clientSecret).update('adspilot-shopify-state-v1').digest('base64url'),
   }
 }
@@ -170,7 +181,7 @@ const text = (body: string): ToolResult => ({ content: [{ type: 'text' as const,
 export function registerHostedShopifyTools(server: McpServer, tenantId: string): void {
   server.tool(
     'shopify_connect_store',
-    "Connect the user's Shopify store to AdsPilot. Returns a Shopify link: the user opens it, logs in to their store, and approves. Nothing is shared with AdsPilot except an access key for this store, stored encrypted for this account only. The link works for 15 minutes.",
+    `Connect the user's Shopify store to ${productName()}. Returns a Shopify link: the user opens it, logs in to their store, and approves. Nothing is shared with ${productName()} except an access key for this store, stored encrypted for this account only. The link works for 15 minutes.`,
     { shop: z.string().describe('The store address, e.g. "my-store.myshopify.com" or just "my-store".') },
     async ({ shop }) =>
       await guarded(async () => {
@@ -187,7 +198,7 @@ export function registerHostedShopifyTools(server: McpServer, tenantId: string):
             `Open this link, log in to ${normalised} if asked, and approve:`,
             link,
             '',
-            'Shopify shows exactly what AdsPilot may read and change. Nothing changes on the store without your approval in this chat.',
+            `Shopify shows exactly what ${productName()} may read and change. Nothing changes on the store without your approval in this chat.`,
             'When it says "Connected", come back here and ask for list_shopify_stores or a store audit.',
           ].join('\n'),
         )
@@ -196,7 +207,7 @@ export function registerHostedShopifyTools(server: McpServer, tenantId: string):
 
   server.tool(
     'shopify_disconnect_store',
-    'Disconnect a Shopify store from this AdsPilot account. AdsPilot stops using its access key at once. (To remove the app entirely, the store owner can also uninstall it in Shopify admin → Settings → Apps.)',
+    `Disconnect a Shopify store from this ${productName()} account. ${productName()} stops using its access key at once. (To remove the app entirely, the store owner can also uninstall it in Shopify admin → Settings → Apps.)`,
     { store: z.string() },
     async ({ store }) =>
       await guarded(async () => {
@@ -206,7 +217,7 @@ export function registerHostedShopifyTools(server: McpServer, tenantId: string):
         if (hit === undefined) return text(`No connected store called "${store}".`)
         await markProviderAuthNeedsReauth(tenantId, hit.id, 'disconnected by user')
         await auditFor(hostedShopifyAccess(tenantId), 'shopify.store.disconnected', { shop: hit.externalUserId })
-        return text(`${hit.displayName ?? hit.externalUserId} is disconnected. AdsPilot no longer uses its access key.`)
+        return text(`${hit.displayName ?? hit.externalUserId} is disconnected. ${productName()} no longer uses its access key.`)
       }),
   )
 
@@ -283,7 +294,7 @@ export async function handleShopifyCallback(
   const displayName = await (deps.shopName ?? defaultShopName)(shop, tokens.accessToken).catch(() => shop)
   await (deps.save ?? saveConnection)({ tenantId: state.tenantId, shop, tokens, displayName })
   deps.log?.('shopify.callback.connected', { shop })
-  return respond(res, 200, 'Connected', `${displayName} is connected to AdsPilot. You can close this tab and go back to your AI chat.`)
+  return respond(res, 200, 'Connected', `${displayName} is connected to ${productName()}. You can close this tab and go back to your AI chat.`)
 }
 
 async function defaultShopName(shop: string, accessToken: string): Promise<string> {

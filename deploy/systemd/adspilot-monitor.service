@@ -1,5 +1,5 @@
 [Unit]
-Description=AdsPilot: health monitor (worker heartbeat, queue, connections; alerts to Slack)
+Description=Health monitor (worker heartbeat, queue, connections; alerts to Slack)
 After=docker.service network-online.target
 Requires=docker.service
 

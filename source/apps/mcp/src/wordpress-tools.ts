@@ -16,6 +16,7 @@ import {
   type WooProduct,
   type WooProductChange,
 } from '@social-publisher/adapters'
+import { productName } from '@social-publisher/config'
 import { decide, formatApprovalRequest } from '@social-publisher/core'
 
 import { SEVERITY_ORDER, contentFindings, homepageFindings, pluginFindings, wooFindings, type Finding } from './wordpress-audit.ts'
@@ -150,10 +151,10 @@ export function registerWordPressTools(server: McpServer, access: WordPressAcces
 
   server.tool(
     'wordpress_connect_site',
-    'Connect a self-hosted WordPress site (with or without WooCommerce) so AdsPilot can read it and, with the user\'s approval for each change, improve it. ' +
+    `Connect a self-hosted WordPress site (with or without WooCommerce) so ${productName()} can read it and, with the user's approval for each change, improve it. ` +
       'Needs the site address, the WordPress username and an APPLICATION PASSWORD — never the password the user logs in with. ' +
-      'Before calling, tell the user how to make one: in WordPress go to Users > Profile (as the user AdsPilot should act as; an Editor can change pages and posts, ' +
-      'an Administrator or Shop Manager is needed for plugins, settings and products), scroll to "Application Passwords", type "AdsPilot", click ' +
+      `Before calling, tell the user how to make one: in WordPress go to Users > Profile (as the user ${productName()} should act as; an Editor can change pages and posts, ` +
+      `an Administrator or Shop Manager is needed for plugins, settings and products), scroll to "Application Passwords", type "${productName()}", click ` +
       '"Add New Application Password" and copy the password shown (it is shown once). It can be revoked there at any time. The site must use https://. ' +
       'The password is stored encrypted for this account only and is never shown again. WordPress.com-hosted sites are not supported yet.',
     {
@@ -169,7 +170,7 @@ export function registerWordPressTools(server: McpServer, access: WordPressAcces
         if (!/^[A-Za-z0-9]{24}$/.test(password)) {
           return (
             'Not connected. That does not look like a WordPress Application Password (24 letters and numbers, shown in groups of four). ' +
-            'Do not use the password you log in with. In WordPress: Users > Profile > Application Passwords > type "AdsPilot" > Add New Application Password, then copy what it shows.'
+            `Do not use the password you log in with. In WordPress: Users > Profile > Application Passwords > type "${productName()}" > Add New Application Password, then copy what it shows.`
           )
         }
         const anonymous = new WordPressClient({ siteUrl: url, fetch: access.fetch })
@@ -202,7 +203,7 @@ export function registerWordPressTools(server: McpServer, access: WordPressAcces
         }
         const can = (cap: string) => me.capabilities[cap] === true
         if (!can('edit_posts') && !can('edit_pages')) {
-          return `Not connected. The user "${me.username}" (${me.roles.join(', ') || 'no role'}) cannot edit pages or posts, so AdsPilot could do nothing useful with it. Create the Application Password as an Editor or Administrator instead.`
+          return `Not connected. The user "${me.username}" (${me.roles.join(', ') || 'no role'}) cannot edit pages or posts, so ${productName()} could do nothing useful with it. Create the Application Password as an Editor or Administrator instead.`
         }
         const woo = index.namespaces.includes('wc/v3')
         const name = index.name.trim() || url.replace(/^https:\/\//, '')
@@ -218,7 +219,7 @@ export function registerWordPressTools(server: McpServer, access: WordPressAcces
         return [
           `Connected ${name} (${url}) as a WordPress ${me.roles.join(', ') || 'user'}.`,
           ...abilities.map((a) => `  ${a}`),
-          index.restMode === 'query' ? '  (The site uses plain permalinks; AdsPilot reaches the API through ?rest_route=.)' : '',
+          index.restMode === 'query' ? `  (The site uses plain permalinks; ${productName()} reaches the API through ?rest_route=.)` : '',
           '',
           'Nothing changes on the site without the user\'s approval in this chat. The Application Password is stored encrypted for this account only.',
           'To revoke access at any time: WordPress > Users > Profile > Application Passwords > Revoke, or wordpress_disconnect_site.',
@@ -231,7 +232,7 @@ export function registerWordPressTools(server: McpServer, access: WordPressAcces
 
   server.tool(
     'wordpress_disconnect_site',
-    'Disconnect a WordPress site: AdsPilot revokes its Application Password on the site (when the site allows it) and deletes the stored copy at once. If revoking on the site fails, the result says so and how to revoke it in WordPress.',
+    `Disconnect a WordPress site: ${productName()} revokes its Application Password on the site (when the site allows it) and deletes the stored copy at once. If revoking on the site fails, the result says so and how to revoke it in WordPress.`,
     { site: siteArg },
     async ({ site }) =>
       await run(async () => {
@@ -243,14 +244,14 @@ export function registerWordPressTools(server: McpServer, access: WordPressAcces
         if ('error' in gone) return gone.error
         await access.record('wordpress.site.disconnected', { site: gone.url, revokedOnSite: revoked })
         return revoked
-          ? `${gone.name} (${gone.url}) is disconnected: the Application Password was revoked on the site and deleted from AdsPilot.`
-          : `${gone.name} (${gone.url}) is disconnected and its stored password deleted from AdsPilot. AdsPilot could not revoke it on the site, so do that too: WordPress > Users > Profile > Application Passwords > Revoke "AdsPilot".`
+          ? `${gone.name} (${gone.url}) is disconnected: the Application Password was revoked on the site and deleted from ${productName()}.`
+          : `${gone.name} (${gone.url}) is disconnected and its stored password deleted from ${productName()}. ${productName()} could not revoke it on the site, so do that too: WordPress > Users > Profile > Application Passwords > Revoke "${productName()}".`
       }),
   )
 
   server.tool(
     'list_wordpress_sites',
-    'List the WordPress sites connected to this account, with the role AdsPilot acts as and whether WooCommerce is active. Pass one as `site` to the other wordpress_ and woocommerce_ tools. Reads only.',
+    `List the WordPress sites connected to this account, with the role ${productName()} acts as and whether WooCommerce is active. Pass one as \`site\` to the other wordpress_ and woocommerce_ tools. Reads only.`,
     {},
     async () =>
       await run(async () => {
@@ -291,7 +292,7 @@ export function registerWordPressTools(server: McpServer, access: WordPressAcces
           `Theme: ${typeof theme === 'string' ? theme : theme === undefined ? 'unknown' : `${theme.name} ${theme.version}${theme.blockTheme === true ? ' (block theme)' : theme.blockTheme === false ? ' (classic theme)' : ''}`}.`,
           `Permalinks: ${entry.restMode === 'query' ? 'plain (?p=123) — change to "Post name" in Settings > Permalinks' : 'pretty (readable addresses)'}.`,
           `Pages: ${pages.total}. Posts: ${posts.total}.`,
-          `AdsPilot acts as: ${entry.roles.join(', ') || 'unknown role'}.`,
+          `${productName()} acts as: ${entry.roles.join(', ') || 'unknown role'}.`,
         ]
         if (typeof plugins === 'string') lines.push(`Plugins: ${plugins} (needs an Administrator).`)
         else {
@@ -396,7 +397,7 @@ export function registerWordPressTools(server: McpServer, access: WordPressAcces
           home !== undefined ? `Home page: title "${home.facts.title ?? ''}"; ${home.facts.scripts} scripts, ${home.facts.styles} stylesheets.` : '',
           wooLine,
           '',
-          findings.length > 0 ? `${findings.length} finding(s):` : 'No problems found in what AdsPilot can read.',
+          findings.length > 0 ? `${findings.length} finding(s):` : `No problems found in what ${productName()} can read.`,
           ...findings.map((f) => `  [${f.severity}] ${f.area}: ${f.finding}`),
           ...(notes.length > 0 ? ['', ...notes] : []),
           '',
@@ -584,14 +585,14 @@ export function registerWordPressTools(server: McpServer, access: WordPressAcces
 
   server.tool(
     'wordpress_list_backups',
-    'List the earlier versions AdsPilot saved before changing this site, newest first. Give type and id to also see WordPress\'s own revisions of that page or post. Reads only.',
+    `List the earlier versions ${productName()} saved before changing this site, newest first. Give type and id to also see WordPress's own revisions of that page or post. Reads only.`,
     { site: siteArg, type: typeArg.optional(), id: z.number().int().positive().optional() },
     async ({ site, type, id }) =>
       await withSite(access, site, async (client, entry) => {
         const dir = access.backupDir(entry)
         const files = existsSync(dir) ? readdirSync(dir).filter((f) => f.endsWith('.json')).sort().reverse() : []
         const mine = type !== undefined && id !== undefined ? files.filter((f) => f.endsWith(`-${type}-${id}.json`)) : files
-        const lines = [mine.length === 0 ? 'No AdsPilot backups yet for this.' : 'AdsPilot backups (newest first; restore with wordpress_restore_backup file):', ...mine.slice(0, 50).map((f) => `  ${f}`)]
+        const lines = [mine.length === 0 ? `No ${productName()} backups yet for this.` : `${productName()} backups (newest first; restore with wordpress_restore_backup file):`, ...mine.slice(0, 50).map((f) => `  ${f}`)]
         if (type !== undefined && id !== undefined) {
           try {
             const revisions = await client.revisions(type, id)
@@ -611,7 +612,7 @@ export function registerWordPressTools(server: McpServer, access: WordPressAcces
 
   server.tool(
     'wordpress_restore_backup',
-    'Put an earlier version back: an AdsPilot backup file (pages, posts and WooCommerce products, from wordpress_list_backups) or a WordPress revision of a page or post (type, id and revisionId). Shows what will be restored for the user\'s approval, saves the current version first, then reads it back.',
+    `Put an earlier version back: an ${productName()} backup file (pages, posts and WooCommerce products, from wordpress_list_backups) or a WordPress revision of a page or post (type, id and revisionId). Shows what will be restored for the user's approval, saves the current version first, then reads it back.`,
     {
       site: siteArg,
       file: z.string().regex(/^[\w.-]+\.json$/).optional(),
@@ -806,7 +807,7 @@ export function registerWordPressTools(server: McpServer, access: WordPressAcces
                   ? 'This store enters prices INCLUDING tax: the price above is what buyers pay.'
                   : incl === 'no'
                     ? 'This store enters prices EXCLUDING tax: tax is added on top at checkout. In the UK, EU, Australia, New Zealand and the Gulf buyers expect the shown price to include VAT/GST (get_skill selling-by-country).'
-                    : 'AdsPilot could not read whether this store\'s prices include tax (needs a Shop Manager or Administrator): check WooCommerce > Settings > Tax before approving.'),
+                    : `${productName()} could not read whether this store's prices include tax (needs a Shop Manager or Administrator): check WooCommerce > Settings > Tax before approving.`),
           )
           if (sale !== '' && sale !== undefined) {
             lines.push(

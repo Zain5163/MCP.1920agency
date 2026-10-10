@@ -1,3 +1,5 @@
+import { productName } from '@social-publisher/config'
+
 /**
  * Plans and usage metering: the rules, with no I/O.
  *
@@ -7,8 +9,9 @@
  * user at the limit can always see where they stand and how to upgrade.
  *
  * Kept pure so the numbers that decide whether a customer's call runs are
- * tested without a database, and so both transports read the same rules. The
- * MCP wrapper (apps/mcp/src/metering.ts) does the reading and writing.
+ * tested without a database, and so both transports read the same rules (the
+ * only setting read is the product's name, for the wording; packages/config
+ * product.ts). The MCP wrapper (apps/mcp/src/metering.ts) does the reading and writing.
  */
 
 export const PLANS = ['free', 'premium'] as const
@@ -87,7 +90,7 @@ export function formatDay(date: Date): string {
  */
 export function upgradeTarget(upgradeUrl: string | undefined): string {
   if (upgradeUrl !== undefined && /^https:\/\/\S+$/.test(upgradeUrl.trim())) return upgradeUrl.trim()
-  return 'checkout is not open yet, so ask your AdsPilot contact to put you on the waitlist'
+  return `checkout is not open yet, so ask your ${productName()} contact to put you on the waitlist`
 }
 
 /** The call count at which a threshold is crossed: 90% of 200 is the 180th call. */
@@ -213,7 +216,7 @@ export function upgradeMessage(plan: Plan | undefined, upgradeUrl: string | unde
     return 'This account is already on Premium: unlimited use, nothing to upgrade.'
   }
   return [
-    `Premium is ${PREMIUM_PRICE}: unlimited calls to every AdsPilot service, now and in future.`,
+    `Premium is ${PREMIUM_PRICE}: unlimited calls to every ${productName()} service, now and in future.`,
     `To upgrade: ${upgradeTarget(upgradeUrl)}.`,
   ].join('\n')
 }

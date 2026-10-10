@@ -69,7 +69,8 @@ export function selectTargets(
       message: [
         'Several accounts are connected on this platform, so the post needs to say which. Nothing was posted.',
         ...crowded.map((x) => `  ${x.p}: ${x.names.join(', ')}`),
-        'Name them with `accounts`, e.g. accounts: ["1920 Agency"].',
+        // The example is one of the user's own account names, not a fixed company name.
+        `Name them with \`accounts\`, e.g. accounts: [${JSON.stringify(crowded[0]!.names[0] ?? 'Account name')}].`,
       ].join('\n'),
     }
   }

@@ -2,6 +2,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 
 import { ShopifyError, type MenuContent, type MenuItemInput, type ShopifyAdminClient } from '@social-publisher/adapters'
+import { productName } from '@social-publisher/config'
 import { decide, formatApprovalRequest } from '@social-publisher/core'
 
 import {
@@ -69,7 +70,7 @@ export function menuLink(link: string, targets: MenuLinkTargets): Omit<MenuItemI
     return { type: kind.toUpperCase(), resourceId: id }
   }
   if (/^https:\/\/[^\s]+$/i.test(l) || /^\/[^\s]*$/.test(l)) return { type: 'HTTP', url: l }
-  return { error: `"${l}" is not a link AdsPilot understands. Use home, catalog, search, collection:<handle>, page:<handle>, product:<handle>, policy:<refund|shipping|privacy|terms|contact>, a /path or an https:// address.` }
+  return { error: `"${l}" is not a link ${productName()} understands. Use home, catalog, search, collection:<handle>, page:<handle>, product:<handle>, policy:<refund|shipping|privacy|terms|contact>, a /path or an https:// address.` }
 }
 
 /** A menu as indented text, for summaries. */

@@ -1,5 +1,7 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 
+import { productName } from '@social-publisher/config'
+
 import { ShopifyError, httpsTransport, type ShopifyTransport } from './shopify-admin.ts'
 
 /**
@@ -49,7 +51,7 @@ export function verifyState(token: string, key: string, now: number = Date.now()
   const expected = b64url(createHmac('sha256', key).update(`state.${body}`).digest())
   const a = Buffer.from(mac)
   const b = Buffer.from(expected)
-  if (a.length !== b.length || !timingSafeEqual(a, b)) return { error: 'The connect link was not issued by AdsPilot.' }
+  if (a.length !== b.length || !timingSafeEqual(a, b)) return { error: `The connect link was not issued by ${productName()}.` }
   let parsed: InstallState
   try {
     parsed = JSON.parse(Buffer.from(body, 'base64url').toString('utf8')) as InstallState
@@ -57,7 +59,7 @@ export function verifyState(token: string, key: string, now: number = Date.now()
     return { error: 'The connect link is malformed.' }
   }
   if (typeof parsed.expiresAt !== 'number' || parsed.expiresAt < now) {
-    return { error: 'The connect link has expired. Ask AdsPilot for a new one in your chat.' }
+    return { error: `The connect link has expired. Ask ${productName()} for a new one in your chat.` }
   }
   return parsed
 }

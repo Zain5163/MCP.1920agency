@@ -306,13 +306,13 @@ describe('our own playbooks', () => {
 
 describe('the instructions every client receives on connecting', () => {
   test('point the AI at every playbook and at the skills, by the names the tools use', async () => {
-    const { SERVER_INSTRUCTIONS } = await import('../src/playbooks.ts')
+    const SERVER_INSTRUCTIONS = (await import('../src/playbooks.ts')).serverInstructions()
     for (const { key } of PLAYBOOKS) assert.ok(SERVER_INSTRUCTIONS.includes(key), `instructions miss ${key}`)
     for (const tool of ['get_playbook', 'list_skills', 'get_skill']) assert.ok(SERVER_INSTRUCTIONS.includes(tool))
   })
 
   test('every skill they name is served', async () => {
-    const { SERVER_INSTRUCTIONS } = await import('../src/playbooks.ts')
+    const SERVER_INSTRUCTIONS = (await import('../src/playbooks.ts')).serverInstructions()
     const library = loadLibrary()
     for (const name of ['store-builder', 'landing-page-builder', 'shopify-theme-developer', 'web-ui-design', 'wordpress-site-builder', 'shopify-store-kit', 'campaign-setup', 'selling-by-country']) {
       assert.ok(SERVER_INSTRUCTIONS.includes(name), `instructions miss ${name}`)

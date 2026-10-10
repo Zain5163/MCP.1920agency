@@ -6,7 +6,7 @@ import {
   providerFor,
   type Provider,
 } from '@social-publisher/adapters'
-import { optional, required } from '@social-publisher/config'
+import { oauthRedirectUri, optional, required } from '@social-publisher/config'
 import {
   disconnect,
   expiredProviderAuths,
@@ -44,7 +44,7 @@ function registerProviders(): void {
   registerMetaProvider({
     appId: required('META_APP_ID'),
     appSecret: required('META_APP_SECRET'),
-    redirectUri: optional('META_REDIRECT_URI', 'http://localhost:8787/callback')!,
+    redirectUri: oauthRedirectUri('META_REDIRECT_URI'),
     apiVersion: optional('META_API_VERSION', 'v25.0')!,
   })
 
@@ -56,7 +56,7 @@ function registerProviders(): void {
     registerThreadsProvider({
       appId: threadsId,
       appSecret: threadsSecret,
-      redirectUri: optional('THREADS_REDIRECT_URI', 'http://localhost:8787/threads/callback')!,
+      redirectUri: oauthRedirectUri('THREADS_REDIRECT_URI'),
     })
   }
 

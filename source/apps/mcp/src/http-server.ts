@@ -3,7 +3,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 
 import { identifyToken, type TokenIdentity } from '@social-publisher/auth'
-import { analyticsConfig, optional } from '@social-publisher/config'
+import { analyticsConfig, mcpPort, optional, productName, upgradeUrl } from '@social-publisher/config'
 import { disconnect, health } from '@social-publisher/db'
 import { createAnalytics, createLogger, flushOnExit } from '@social-publisher/telemetry'
 
@@ -58,8 +58,8 @@ const mcpAnalyticsClient = createMcpAnalyticsClient({
 const mcpAnalytics: McpAnalyticsSetup | undefined =
   mcpAnalyticsClient === undefined ? undefined : { client: mcpAnalyticsClient, serverBuild: resolveServerBuild() }
 
-const PORT = Number(optional('MCP_PORT', '8080'))
-const UPGRADE_URL = optional('UPGRADE_URL')
+const PORT = mcpPort()
+const UPGRADE_URL = upgradeUrl()
 
 function json(res: ServerResponse, status: number, body: unknown): void {
   const payload = JSON.stringify(body)
@@ -116,10 +116,10 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   if (url.pathname === '/shopify' && req.method === 'GET') {
     const body =
       '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
-      '<title>AdsPilot store connector</title><body style="font-family:system-ui;max-width:32rem;margin:4rem auto;padding:0 1rem">' +
-      '<h1 style="font-size:1.3rem">AdsPilot works from your AI chat</h1>' +
-      '<p>AdsPilot runs inside Claude, ChatGPT or another AI assistant, not in this window.</p>' +
-      '<p>To link this store to your AdsPilot account: open your AI chat with AdsPilot connected and say ' +
+      `<title>${productName()} store connector</title><body style="font-family:system-ui;max-width:32rem;margin:4rem auto;padding:0 1rem">` +
+      `<h1 style="font-size:1.3rem">${productName()} works from your AI chat</h1>` +
+      `<p>${productName()} runs inside Claude, ChatGPT or another AI assistant, not in this window.</p>` +
+      `<p>To link this store to your ${productName()} account: open your AI chat with ${productName()} connected and say ` +
       '<b>&ldquo;connect my Shopify store&rdquo;</b> with your store&rsquo;s myshopify.com address, then approve in Shopify.</p>' +
       '<p>After that, ask it to audit your store, check sales, or improve a page. ' +
       'Nothing changes on your store without your approval in the chat.</p></body>'
@@ -148,7 +148,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       res,
       401,
       'Unauthorized',
-      'Send a valid API token as "Authorization: Bearer adsp_...". Create one in the AdsPilot dashboard.',
+      `Send a valid API token as "Authorization: Bearer adsp_...". Create one in the ${productName()} dashboard.`,
     )
     return
   }

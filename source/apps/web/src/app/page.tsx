@@ -12,6 +12,7 @@ import { formatDateTime } from '@/lib/format'
 import { targetView, toneClasses } from '@/lib/targets'
 import { Composer, type AccountOption } from '@/components/Composer'
 import { PlatformBadge, humanisePlatform } from '@/components/PlatformBadge'
+import { Wordmark } from '@/components/Wordmark'
 
 export const dynamic = 'force-dynamic'
 
@@ -52,7 +53,7 @@ export default async function Dashboard() {
       <header className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-line pb-5">
         <div className="flex items-center gap-5">
           <span className="text-lg font-bold tracking-tight">
-            Ads<span className="text-brand">Pilot</span>
+            <Wordmark />
           </span>
           <Link href="/accounts" className="text-[0.85rem] text-muted no-underline hover:text-ink">
             Accounts

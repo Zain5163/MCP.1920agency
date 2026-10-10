@@ -1,6 +1,6 @@
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 
-import { analyticsConfig, optional } from '@social-publisher/config'
+import { analyticsConfig, optional, productSlug, upgradeUrl } from '@social-publisher/config'
 import { disconnect, type TenantScope } from '@social-publisher/db'
 import { createAnalytics, createLogger, flushOnExit } from '@social-publisher/telemetry'
 
@@ -67,11 +67,11 @@ function localAccount(): Promise<TenantScope> {
 const server = buildLocalServer({
   transport: 'stdio',
   account: localAccount,
-  upgradeUrl: optional('UPGRADE_URL'),
+  upgradeUrl: upgradeUrl(),
   analytics,
   mcpAnalytics: mcpAnalyticsClient === undefined ? undefined : { client: mcpAnalyticsClient, serverBuild: resolveServerBuild() },
   log: (event, message, error) => {
-    console.error(`[adspilot] ${message}: ${error instanceof Error ? error.message : String(error)}`)
+    console.error(`[${productSlug()}] ${message}: ${error instanceof Error ? error.message : String(error)}`)
     void logger.error(event, message, { data: { error } })
   },
 })

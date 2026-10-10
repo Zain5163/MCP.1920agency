@@ -1,5 +1,5 @@
 [Unit]
-Description=AdsPilot: monitor every 30 minutes (as the PC's AdsPilot-Monitor task)
+Description=Monitor every 30 minutes (as the PC's monitor task)
 
 [Timer]
 OnCalendar=*:00,30

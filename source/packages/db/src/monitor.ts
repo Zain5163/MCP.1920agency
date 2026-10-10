@@ -1,3 +1,5 @@
+import { FIXED_NAMES } from '@social-publisher/config'
+
 import { db } from './client.ts'
 import { expiredProviderAuths, expiringProviderAuths } from './credential-refresh.ts'
 
@@ -68,7 +70,7 @@ export async function checkWorker(options: {
       severity: 'warning',
       summary: 'The scheduler has never reported running.',
       action:
-        'Run it once by hand (run-worker-now.cmd). If that works, check the AdsPilot-Worker task exists in Task Scheduler and is enabled.',
+        `Run it once by hand (run-worker-now.cmd). If that works, check the ${FIXED_NAMES.PC_WORKER_TASK} task exists in Task Scheduler and is enabled.`,
     }
   }
 
@@ -78,7 +80,7 @@ export async function checkWorker(options: {
       severity: 'critical',
       summary: `The scheduler has not run for ${Math.round(age)} minutes. Scheduled posts are not going out.`,
       action:
-        'Check the AdsPilot-Worker task in Task Scheduler: enabled, and what LastTaskResult says. Run run-worker-now.cmd to publish anything already due.',
+        `Check the ${FIXED_NAMES.PC_WORKER_TASK} task in Task Scheduler: enabled, and what LastTaskResult says. Run run-worker-now.cmd to publish anything already due.`,
       detail: { ageMinutes: Math.round(age) },
     }
   }
@@ -248,7 +250,7 @@ export async function checkCredentialExpiry(): Promise<HealthCheck> {
       severity: 'warning',
       summary: `${soonest.provider} authorisation expires in ${soonest.daysLeft} day(s).`,
       action:
-        'The refresh task should renew this automatically. If it keeps counting down, check that AdsPilot-Refresh is enabled and what its last run reported.',
+        `The refresh task should renew this automatically. If it keeps counting down, check that ${FIXED_NAMES.PC_REFRESH_TASK} is enabled and what its last run reported.`,
       detail: { provider: soonest.provider, daysLeft: soonest.daysLeft },
     }
   }

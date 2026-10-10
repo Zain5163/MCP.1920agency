@@ -1,3 +1,5 @@
+import { DEFAULT_OAUTH_CALLBACK_PORT } from '@social-publisher/config'
+
 /**
  * Where the one-shot OAuth listener listens, worked out from the redirect address.
  *
@@ -6,23 +8,29 @@
  *   http://localhost:8787/<path>              the provider sends the browser straight
  *                                            to this PC (how every connection was made
  *                                            until 2026-10-08)
- *   https://mcp.1920agency.com/<path>        the provider sends the browser to the
+ *   https://<DOMAIN>/<path>                  the provider sends the browser to the
  *                                            hosted server, whose Caddy answers with a
  *                                            302 to http://localhost:8787/<path>?<query>
- *                                            (deploy/caddy/mcp.1920agency.com.caddy)
+ *                                            (deploy/caddy/site.caddy.template; the
+ *                                            domain is DOMAIN in deploy/site.env)
  *
  * The second exists because Meta's "Enforce HTTPS" refuses http://localhost while
  * an app is Live (the 2026-10-02 "Can't load URL"). Before this, the port came from
  * the redirect address, so an https address made the CLI listen on port 80 and the
  * code never arrived.
  *
- * Pure on purpose: no network, no env file. The connect commands pass in the
+ * Pure on purpose: no network, no env file (the default port below is a
+ * constant from packages/config, not a setting read here). The connect commands pass in the
  * redirect address and the OAUTH_CALLBACK_PORT setting, so the choice is tested
  * without a browser or a provider.
  */
 
-/** Where the hosted server's bounce sends the browser. Fixed in the Caddy snippet. */
-export const BOUNCE_PORT = 8787
+/**
+ * Where the hosted server's bounce sends the browser. One value, in
+ * packages/config product.ts; deploy/site.env OAUTH_BOUNCE_PORT renders the same
+ * number into the Caddy file (a test keeps them equal).
+ */
+export const BOUNCE_PORT = DEFAULT_OAUTH_CALLBACK_PORT
 
 /**
  * Names that always mean "this machine". A redirect to any of them is caught here
@@ -77,7 +85,7 @@ export function listenAddress(redirectUri: string, portSetting?: string): Listen
     if (redirect.protocol !== 'http:') {
       throw new CallbackAddressError(
         `The redirect address "${redirectUri}" uses ${redirect.protocol.replace(':', '')} on this PC, ` +
-          'but the connect command can only listen with plain http. Use http://localhost:8787/<path>, ' +
+          `but the connect command can only listen with plain http. Use http://localhost:${BOUNCE_PORT}/<path>, ` +
           'or the https address of the hosted server (deploy/README.md, "OAuth callbacks").',
       )
     }
@@ -114,7 +122,7 @@ function parsePort(setting: string | undefined): number | undefined {
   if (!/^\d+$/.test(value) || port < 1 || port > 65535) {
     throw new CallbackAddressError(
       `OAUTH_CALLBACK_PORT is "${value}", which is not a port number (1 to 65535). ` +
-        'Fix or remove it in ~/.social-publisher/.env; without it the listener uses 8787.',
+        `Fix or remove it in ~/.social-publisher/.env; without it the listener uses ${BOUNCE_PORT}.`,
     )
   }
   return port

@@ -6,7 +6,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 
 import { ShopifyAdminClient, ShopifyError, httpsTransport, type AuditFinding } from '@social-publisher/adapters'
-import { CONFIG_DIR, optional } from '@social-publisher/config'
+import { CONFIG_DIR, optional, productName } from '@social-publisher/config'
 import { decide, formatApprovalRequest } from '@social-publisher/core'
 
 import { audit, guarded, type ToolResult } from './ads-tools.ts'
@@ -174,7 +174,7 @@ export async function withStore(
 export function registerShopifyTools(server: McpServer, access: ShopifyAccess = localShopifyAccess): void {
   server.tool(
     'list_shopify_stores',
-    'List the Shopify stores AdsPilot can read. Pass one as `store` to the other shopify_ tools. Reads only.',
+    `List the Shopify stores ${productName()} can read. Pass one as \`store\` to the other shopify_ tools. Reads only.`,
     {},
     async () =>
       await guarded(async () => {
@@ -270,7 +270,7 @@ export function registerShopifyTools(server: McpServer, access: ShopifyAccess = 
           `Pages: ${a.pages.join(', ') || 'none'}. Policies published: ${a.policies.join(', ') || 'none readable'}.`,
           `Active discount codes: ${a.activeDiscounts.join(', ') || 'none'}.`,
           '',
-          findings.length > 0 ? `${findings.length} finding(s):` : 'No problems found in the data AdsPilot can read.',
+          findings.length > 0 ? `${findings.length} finding(s):` : `No problems found in the data ${productName()} can read.`,
           ...findings.map((f) => `  [${f.severity}] ${f.area}: ${f.finding}`),
           '',
           'Not checked by this audit (look at the live pages): banners and their dates, page speed, the size selector, trust badges, delivery messaging on the product page. Read get_skill cro and copywriting before proposing fixes; changes to a store need the owner’s approval.',
@@ -486,12 +486,12 @@ export function registerShopifyWriteTools(server: McpServer, access: ShopifyAcce
 
   server.tool(
     'shopify_list_backups',
-    'List the saved earlier versions of products and pages that AdsPilot changed on a store, newest first. Reads only.',
+    `List the saved earlier versions of products and pages that ${productName()} changed on a store, newest first. Reads only.`,
     { store: storeArg },
     async ({ store }) =>
       await withStore(access, store, async (_client, entry) => {
         const dir = access.backupDir(entry)
-        if (!existsSync(dir)) return 'No backups yet: AdsPilot has not changed this store.'
+        if (!existsSync(dir)) return `No backups yet: ${productName()} has not changed this store.`
         const files = readdirSync(dir).filter((f) => f.endsWith('.json')).sort().reverse()
         return files.length === 0 ? 'No backups yet.' : ['Backups (newest first):', ...files.slice(0, 50).map((f) => `  ${f}`)].join('\n')
       }),

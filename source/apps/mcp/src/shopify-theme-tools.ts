@@ -6,7 +6,7 @@ import { join, relative, sep } from 'node:path'
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 
-import { CONFIG_DIR, optional } from '@social-publisher/config'
+import { CONFIG_DIR, optional, productName } from '@social-publisher/config'
 import { decide, formatApprovalRequest } from '@social-publisher/core'
 
 import { audit, guarded, type ToolResult } from './ads-tools.ts'
@@ -345,7 +345,7 @@ export function registerShopifyThemeTools(server: McpServer, cli: CliRunner = ru
         if (state === undefined) return `No draft "${draft}".`
         const c = draftChanges(root)
         if (c.changed.length + c.added.length + c.removed.length === 0 && state.baseThemeId === undefined) return 'The draft has no changes yet: nothing to preview.'
-        const target = state.previewThemeId !== undefined ? ['--theme', String(state.previewThemeId)] : ['--unpublished', '--theme', `AdsPilot ${draft}`]
+        const target = state.previewThemeId !== undefined ? ['--theme', String(state.previewThemeId)] : ['--unpublished', '--theme', `${productName()} ${draft}`]
         const r = await cli(['theme', 'push', ...authArgs(s), '--path', join(root, 'draft'), ...target, '--json'], root)
         if (r.code !== 0) return `Upload failed: ${cliError(r)}`
         let theme: { id: number; role: string; preview_url: string; editor_url: string }
@@ -414,12 +414,12 @@ export function registerShopifyThemeTools(server: McpServer, cli: CliRunner = ru
 
   server.tool(
     'shopify_theme_rollback',
-    'Put back the theme that was live before the last AdsPilot publish. Needs the owner’s approval.',
+    `Put back the theme that was live before the last ${productName()} publish. Needs the owner’s approval.`,
     { store: storeArg, confirm: z.string().optional() },
     async ({ store, confirm }) =>
       await withTheme(store, async (s) => {
         const p = join(THEMES_DIR, s.shop, 'last-publish.json')
-        if (!existsSync(p)) return 'AdsPilot has not published a theme on this store, so there is nothing to roll back.'
+        if (!existsSync(p)) return `${productName()} has not published a theme on this store, so there is nothing to roll back.`
         const last = JSON.parse(readFileSync(p, 'utf8')) as { previousLiveThemeId: number; previousLiveThemeName: string; publishedThemeId: number }
         const gate = decide({
           action: 'shopify_theme_rollback',

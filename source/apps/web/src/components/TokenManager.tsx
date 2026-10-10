@@ -15,7 +15,12 @@ export interface TokenRow {
   readonly createdAt: string
 }
 
-export function TokenManager({ tokens, mcpUrl }: { tokens: readonly TokenRow[]; mcpUrl: string }) {
+/**
+ * `serverKey` names the server in the client config snippet: the product's slug
+ * (packages/config product.ts), passed from the server page because a client
+ * component cannot read settings.
+ */
+export function TokenManager({ tokens, mcpUrl, serverKey }: { tokens: readonly TokenRow[]; mcpUrl: string; serverKey: string }) {
   const [state, action, pending] = useActionState<TokenResult | null, FormData>(createToken, null)
   const [copied, setCopied] = useState(false)
 
@@ -42,7 +47,7 @@ export function TokenManager({ tokens, mcpUrl }: { tokens: readonly TokenRow[]; 
         <pre className="overflow-x-auto rounded-lg border border-line bg-surface-2 p-3 text-[0.8rem] text-ink">
 {`{
   "mcpServers": {
-    "adspilot": {
+    ${JSON.stringify(serverKey)}: {
       "type": "http",
       "url": "${mcpUrl}",
       "headers": { "Authorization": "Bearer YOUR_TOKEN" }

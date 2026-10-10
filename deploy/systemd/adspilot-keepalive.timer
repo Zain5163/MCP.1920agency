@@ -1,5 +1,5 @@
 [Unit]
-Description=AdsPilot: keep-alive every 3 days, 04:00 UTC (09:00 PKT)
+Description=Keep-alive every 3 days, 04:00 UTC (09:00 PKT)
 
 [Timer]
 # Every 3 days (days 1, 4, 7 ... of each month; at most 3 days apart, 1 day at a

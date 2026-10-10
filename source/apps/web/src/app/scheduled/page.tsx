@@ -7,6 +7,7 @@ import { db } from '@social-publisher/db'
 import { logout } from '../actions'
 import { currentUser } from '@/lib/auth'
 import { ScheduledList, type ScheduledItem } from '@/components/ScheduledList'
+import { Wordmark } from '@/components/Wordmark'
 
 export const dynamic = 'force-dynamic'
 
@@ -50,7 +51,7 @@ export default async function ScheduledPage() {
       <header className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-line pb-5">
         <div className="flex items-center gap-5">
           <Link href="/" className="text-lg font-bold tracking-tight text-ink no-underline">
-            Ads<span className="text-brand">Pilot</span>
+            <Wordmark />
           </Link>
           <Link href="/" className="text-[0.85rem] text-muted no-underline hover:text-ink">
             Dashboard

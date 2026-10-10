@@ -12,7 +12,7 @@ import { createAnalytics, type Analytics, type AnalyticsEvent } from '@social-pu
 
 import { createAdsPilotServer } from '../src/mcp-server.ts'
 import { installMetering, outcomeOf, type MeterOptions, type UsageAccount } from '../src/metering.ts'
-import { SERVER_INSTRUCTIONS } from '../src/playbooks.ts'
+import { serverInstructions } from '../src/playbooks.ts'
 
 /**
  * The metering wrapper, against an in-memory account. No database: the SQL is
@@ -266,7 +266,7 @@ describe('business type (set_business_type, check_usage)', () => {
   })
 
   test('the server instructions tell the AI to ask once and never guess', () => {
-    assert.match(SERVER_INSTRUCTIONS, /no business type, ask the user once .* call set_business_type; never guess it/)
+    assert.match(serverInstructions(), /no business type, ask the user once .* call set_business_type; never guess it/)
   })
 })
 

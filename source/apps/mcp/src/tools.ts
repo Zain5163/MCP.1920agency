@@ -2,6 +2,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 
 import type { TokenIdentity } from '@social-publisher/auth'
+import { productName } from '@social-publisher/config'
 import { PLATFORMS, overridesForStorage, type ErrorCode } from '@social-publisher/core'
 import { queueStats } from '@social-publisher/db'
 import type { Analytics, Logger } from '@social-publisher/telemetry'
@@ -140,7 +141,7 @@ export function registerTools(
 
   server.tool(
     'check_status',
-    'Check AdsPilot health for this account: connected social accounts, scheduled posts, and any failures.',
+    `Check ${productName()} health for this account: connected social accounts, scheduled posts, and any failures.`,
     {},
     async () =>
       await guard('check_status', async () => {

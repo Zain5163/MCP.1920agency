@@ -1,7 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 
-import { checkConfig } from '@social-publisher/config'
+import { checkConfig, productName } from '@social-publisher/config'
 import { PLATFORMS, type ErrorCode } from '@social-publisher/core'
 import { health, queueStats, type TenantScope } from '@social-publisher/db'
 
@@ -78,7 +78,7 @@ export function buildLocalServer(meter: MeterOptions): McpServer {
 
   server.tool(
     'check_status',
-    'Check AdsPilot health: configuration, database, keep-alive age, connected accounts and queue. Run this first if anything seems wrong.',
+    `Check ${productName()} health: configuration, database, keep-alive age, connected accounts and queue. Run this first if anything seems wrong.`,
     {},
     async () => {
       try {

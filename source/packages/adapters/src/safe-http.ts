@@ -2,6 +2,8 @@ import { lookup as dnsLookup } from 'node:dns/promises'
 import https from 'node:https'
 import { isIP } from 'node:net'
 
+import { productName } from '@social-publisher/config'
+
 /**
  * HTTPS requests to addresses a user typed in, without letting the user point
  * this server at itself or its neighbours.
@@ -176,7 +178,7 @@ export function checkPublicUrl(raw: string): URL | { error: string } {
   if (url.protocol === 'http:') {
     return {
       error:
-        `${url.host} was given as http://, which is not encrypted. AdsPilot only connects over https://, ` +
+        `${url.host} was given as http://, which is not encrypted. ${productName()} only connects over https://, ` +
         'because the site password would otherwise cross the internet readable by anyone on the way. ' +
         'Use the https:// address. If the site has no certificate yet, turn HTTPS on first (most hosts offer a free Let\'s Encrypt certificate in their control panel).',
     }
@@ -186,12 +188,12 @@ export function checkPublicUrl(raw: string): URL | { error: string } {
     return { error: 'Do not put a username or password inside the address. Give the address alone, and the login separately.' }
   }
   if (url.port !== '' && url.port !== '443') {
-    return { error: `${url.host} uses port ${url.port}. AdsPilot connects only to the standard https port (443). Use the site's public address.` }
+    return { error: `${url.host} uses port ${url.port}. ${productName()} connects only to the standard https port (443). Use the site's public address.` }
   }
   const host = url.hostname.replace(/^\[|\]$/g, '')
   if (isIP(host) !== 0) {
     const reason = blockedAddressReason(host)
-    if (reason !== undefined) return { error: `${host} is ${reason}, not a public website. AdsPilot only connects to sites on the public internet.` }
+    if (reason !== undefined) return { error: `${host} is ${reason}, not a public website. ${productName()} only connects to sites on the public internet.` }
     return url
   }
   if (!host.includes('.') || INTERNAL_NAME.test(host)) {
@@ -211,7 +213,7 @@ export async function resolvePublic(host: string, resolver: AddressResolver = sy
   const bare = host.replace(/^\[|\]$/g, '')
   if (isIP(bare) !== 0) {
     const reason = blockedAddressReason(bare)
-    if (reason !== undefined) throw new SafeHttpError(`${bare} is ${reason}. AdsPilot only connects to sites on the public internet.`, 'blocked_address')
+    if (reason !== undefined) throw new SafeHttpError(`${bare} is ${reason}. ${productName()} only connects to sites on the public internet.`, 'blocked_address')
     return { address: bare, family: isIP(bare) }
   }
   let answers: ReadonlyArray<{ address: string; family: number }>
@@ -229,7 +231,7 @@ export async function resolvePublic(host: string, resolver: AddressResolver = sy
     const reason = blockedAddressReason(a.address)
     if (reason !== undefined) {
       throw new SafeHttpError(
-        `${bare} points to ${reason} (${a.address}), not to a public website. AdsPilot only connects to sites on the public internet. ` +
+        `${bare} points to ${reason} (${a.address}), not to a public website. ${productName()} only connects to sites on the public internet. ` +
           'If this is a site on your own computer or office network, it has to be published on a public host first.',
         'blocked_address',
       )
@@ -388,7 +390,7 @@ export function createSafeFetch(options: { resolver?: AddressResolver; connect?:
       }
       if (!sameHost && policy === 'same-host') {
         throw new SafeHttpError(
-          `${url.host} redirected to ${next.protocol}//${next.host}, a different address, so AdsPilot stopped there (it never sends your login to an address you did not give). ` +
+          `${url.host} redirected to ${next.protocol}//${next.host}, a different address, so ${productName()} stopped there (it never sends your login to an address you did not give). ` +
             `If your site really lives at ${next.protocol === 'https:' ? next.origin : `https://${next.host}`}, connect that address instead.`,
           'redirect',
           next.toString(),

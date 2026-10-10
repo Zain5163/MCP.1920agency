@@ -4,6 +4,8 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, test } from 'node:test'
 
+import { OAUTH_REDIRECT_PATHS } from '@social-publisher/config'
+
 import {
   BOUNCE_PORT,
   CallbackAddressError,
@@ -144,7 +146,10 @@ describe('the Caddy bounce matches exactly the callback paths the CLI uses', () 
     .map((value) => listenAddress(value).path)
     .sort()
 
-  const caddy = readFileSync(join(REPO, 'deploy', 'caddy', 'mcp.1920agency.com.caddy'), 'utf8')
+  // The template the gate's site file is rendered from (deploy/scripts/caddy-site.sh).
+  const caddy = readFileSync(join(REPO, 'deploy', 'caddy', 'site.caddy.template'), 'utf8')
+  const sitePort = /^OAUTH_BOUNCE_PORT=(\d+)\s*$/m.exec(readFileSync(join(REPO, 'deploy', 'site.env'), 'utf8'))?.[1]
+  const configPaths = Object.values(OAUTH_REDIRECT_PATHS).slice().sort()
   const matcher = /@oauth \{([\s\S]*?)\}/.exec(caddy)?.[1] ?? ''
   const caddyPaths = (/^\s*path (.+)$/m.exec(matcher)?.[1] ?? '').trim().split(/\s+/).sort()
 
@@ -157,8 +162,14 @@ describe('the Caddy bounce matches exactly the callback paths the CLI uses', () 
     assert.deepEqual(caddyPaths, cliPaths)
   })
 
+  test('the defaults in packages/config are the same set too', () => {
+    assert.deepEqual(configPaths, caddyPaths)
+  })
+
   test('the bounce is GET only and goes to the fixed listener port', () => {
     assert.match(matcher, /^\s*method GET\s*$/m)
-    assert.match(caddy, new RegExp(`redir http://localhost:${BOUNCE_PORT}\\{uri\\} 302`))
+    assert.match(caddy, /redir http:\/\/localhost:\{\{OAUTH_BOUNCE_PORT\}\}\{uri\} 302/)
+    // site.env fills that placeholder; it must be the port the listener uses.
+    assert.equal(Number(sitePort), BOUNCE_PORT)
   })
 })

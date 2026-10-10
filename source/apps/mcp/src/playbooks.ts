@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import { productName, productSlug, renderProductText } from '@social-publisher/config'
 import { z } from 'zod'
 
 /**
@@ -110,9 +111,12 @@ const PLAYBOOK_KEYS = PLAYBOOKS.map((p) => p.key) as [PlaybookKey, ...PlaybookKe
  * and the user gets an ordinary assistant guessing at ads. The owner's aim is
  * that any AI connected here works like a senior media buyer from the first
  * message, without being told how (2026-09-30).
+ *
+ * A function, not a constant: it names the product, and the name is a setting
+ * (packages/config product.ts) read when a server is built, not at import.
  */
-export const SERVER_INSTRUCTIONS = [
-  'AdsPilot runs social posting and paid advertising for a business.',
+export const serverInstructions = (): string => [
+  `${productName()} runs social posting and paid advertising for a business.`,
   '',
   'Before planning, writing or changing any ad campaign, read the playbook for that platform with get_playbook',
   `(${PLAYBOOKS.map((p) => p.key).join(', ')}) and follow it: choose the objective from what the business wants to pay for,`,
@@ -155,7 +159,8 @@ function load(): Record<PlaybookKey, string> {
   for (const { key } of PLAYBOOKS) {
     const url = new URL(`../playbooks/${key}.md`, import.meta.url)
     try {
-      out[key] = readFileSync(url, 'utf8')
+      // Our own text: {{PRODUCT_NAME}} and similar are filled from the one setting.
+      out[key] = renderProductText(readFileSync(url, 'utf8'))
     } catch (cause) {
       throw new Error(`Playbook "${key}" is missing at ${url.pathname}. The server cannot start without it.`, {
         cause,
@@ -200,7 +205,7 @@ export function registerPlaybooks(server: McpServer): void {
   for (const playbook of PLAYBOOKS) {
     server.registerResource(
       `playbook-${playbook.key}`,
-      `adspilot://playbooks/${playbook.key}`,
+      `${productSlug()}://playbooks/${playbook.key}`,
       { title: playbook.title, description: playbook.description, mimeType: 'text/markdown' },
       async (uri) => ({ contents: [{ uri: uri.href, mimeType: 'text/markdown', text: withFreshness(text[playbook.key]) }] }),
     )
@@ -237,7 +242,7 @@ export function registerPlaybooks(server: McpServer): void {
     async (args) =>
       promptText(
         [
-          'You are running a Meta ad campaign for this business through the AdsPilot tools.',
+          `You are running a Meta ad campaign for this business through the ${productName()} tools.`,
           'Follow the playbook below. It is the standard this campaign is held to.',
           '',
           'The brief:',
@@ -283,7 +288,7 @@ export function registerPlaybooks(server: McpServer): void {
     async (args) =>
       promptText(
         [
-          'You are a senior Meta performance team working for this business through the AdsPilot tools.',
+          `You are a senior Meta performance team working for this business through the ${productName()} tools.`,
           'Work through the five roles in the playbook below, in order, and follow its rules exactly.',
           '',
           `Scope: ${args.campaignId !== undefined ? `campaign ${args.campaignId}` : 'the whole ad account'}`,

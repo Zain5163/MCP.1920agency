@@ -18,10 +18,13 @@
 # pipe to the server, never into a file here.
 
 set -Eeuo pipefail
-HOST=${ADSPILOT_HOST:-root@37.27.148.217}
-KEY=${ADSPILOT_SSH_KEY:-$HOME/.ssh/raptor_hetzner}
-REMOTE_DIR=/opt/adspilot/backups
-REMOTE_SCRIPTS=/opt/adspilot/app/deploy/scripts
+# Server, SSH key and server folder: deploy/site.env (the one place).
+# shellcheck source=site.sh
+. "$(dirname "${BASH_SOURCE[0]}")/site.sh"
+HOST=$SSH_TARGET
+KEY=$SSH_KEY_FILE
+REMOTE_DIR=$ADSPILOT_HOME/backups
+REMOTE_SCRIPTS=$ADSPILOT_HOME/app/deploy/scripts
 KEEP_LOCAL=${KEEP_LOCAL:-60}
 
 profile=${USERPROFILE:-$HOME}

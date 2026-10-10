@@ -1,3 +1,5 @@
+import { productName } from '@social-publisher/config'
+
 import { SafeHttpError, checkPublicUrl, createSafeFetch, type SafeFetch, type SafeResponse } from './safe-http.ts'
 
 /**
@@ -172,7 +174,8 @@ export interface WordPressClientOptions {
   readonly fetch?: SafeFetch
 }
 
-const UA = 'AdsPilot-WordPress-Connector/1.0'
+// A function, not a constant: the product name is a setting, read when a request is made.
+const ua = (): string => `${productName()}-WordPress-Connector/1.0`
 
 /** "https://Example.com/blog/" -> "https://example.com/blog". Undefined if it cannot be a site address. */
 export function normaliseSiteUrl(raw: string): string | { error: string } {
@@ -226,7 +229,7 @@ export class WordPressClient {
     route: string,
     options: { query?: Record<string, string | number | undefined>; json?: unknown; body?: Uint8Array; headers?: Record<string, string>; auth?: boolean; mode?: RestMode } = {},
   ): Promise<{ res: SafeResponse; authSent: boolean }> {
-    const headers: Record<string, string> = { accept: 'application/json', 'user-agent': UA, ...options.headers }
+    const headers: Record<string, string> = { accept: 'application/json', 'user-agent': ua(), ...options.headers }
     let authSent = false
     if (options.auth !== false && this.#login !== undefined) {
       const login = await this.#login()
@@ -351,7 +354,7 @@ export class WordPressClient {
   /** The public home page HTML, fetched without logging in, for the audit. */
   async homepage(): Promise<{ status: number; html: string; bytes: number; headers: Readonly<Record<string, string>> }> {
     try {
-      const res = await this.#fetch({ url: `${this.siteUrl}/`, headers: { accept: 'text/html', 'user-agent': UA }, maxBytes: 5 * 1_048_576 })
+      const res = await this.#fetch({ url: `${this.siteUrl}/`, headers: { accept: 'text/html', 'user-agent': ua() }, maxBytes: 5 * 1_048_576 })
       return { status: res.status, html: res.body.toString('utf8'), bytes: res.body.length, headers: res.headers }
     } catch (error) {
       if (error instanceof SafeHttpError) throw new WordPressError(error.message, error.kind === 'network' || error.kind === 'timeout' ? 'network' : 'unsafe')
@@ -569,12 +572,12 @@ export function explainWordPressError(input: {
   const code = typeof j.code === 'string' ? j.code : undefined
   const wpSays = typeof j.message === 'string' ? ` (WordPress says: "${strip(j.message).slice(0, 200)}")` : ''
   const fail = (message: string, kind: WordPressErrorKind) => new WordPressError(message, kind, code, status)
-  const PROFILE = 'In WordPress go to Users > Profile, scroll to "Application Passwords", type a name such as "AdsPilot" and click "Add New Application Password"'
+  const PROFILE = `In WordPress go to Users > Profile, scroll to "Application Passwords", type a name such as "${productName()}" and click "Add New Application Password"`
 
   if (/challenge/i.test(input.headers?.['cf-mitigated'] ?? '')) {
     return fail(
       `Cloudflare in front of ${site} answered with an "are you human?" challenge instead of letting the request through. ` +
-        `In the site's Cloudflare dashboard (Security > WAF), add a rule that skips the challenge for ${site.replace(/^https:\/\/[^/]+/, '')}/wp-json/* (or for the user agent "${UA}"), then try again.`,
+        `In the site's Cloudflare dashboard (Security > WAF), add a rule that skips the challenge for ${site.replace(/^https:\/\/[^/]+/, '')}/wp-json/* (or for the user agent "${ua()}"), then try again.`,
       'blocked',
     )
   }
@@ -584,7 +587,7 @@ export function explainWordPressError(input: {
       return fail(
         `${site} refused the request before WordPress saw it (HTTP ${status}, a web page instead of a REST answer). ` +
           'A firewall or security service in front of the site (for example Cloudflare, Sucuri, Wordfence or the host\'s own firewall) is blocking API requests. ' +
-          `Ask whoever runs the site to allow requests to ${site}/wp-json/ from AdsPilot (user agent "${UA}"), then try again.`,
+          `Ask whoever runs the site to allow requests to ${site}/wp-json/ from ${productName()} (user agent "${ua()}"), then try again.`,
         'blocked',
       )
     }
@@ -623,7 +626,7 @@ export function explainWordPressError(input: {
     case 'rest_forbidden_context':
       if (authSent) {
         return fail(
-          'WordPress did not receive the login, although AdsPilot sent it. On many hosts the server removes the "Authorization" header before WordPress sees it ' +
+          `WordPress did not receive the login, although ${productName()} sent it. On many hosts the server removes the "Authorization" header before WordPress sees it ` +
             '(common on Apache with CGI/FastCGI). The fix, for the host or developer: in the site\'s .htaccess, above the WordPress rules, add ' +
             '"SetEnvIf Authorization (.*) HTTP_AUTHORIZATION=$1" (or the equivalent for the server). ' +
             'It also happens when the site does not see itself as HTTPS (behind some proxies), which hides application passwords: check Users > Profile shows an "Application Passwords" section.',
@@ -658,7 +661,7 @@ export function explainWordPressError(input: {
   if (status === 401 || status === 403) {
     if (code !== undefined && /^(rest|woocommerce_rest)_cannot_|^rest_forbidden|^woocommerce_rest_authentication|_cannot_(view|edit|create|publish|delete|read)/.test(code)) {
       return fail(
-        `The WordPress user AdsPilot logs in as is not allowed to do this${wpSays}. ` +
+        `The WordPress user ${productName()} logs in as is not allowed to do this${wpSays}. ` +
           'Its role decides what it can do: Editors can change all pages and posts; changing plugins, settings or WooCommerce products needs an Administrator or Shop Manager. ' +
           'Either do this step yourself in WordPress, or connect with an Application Password from a user whose role allows it.',
         'forbidden',
