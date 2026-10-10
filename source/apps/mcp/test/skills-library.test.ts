@@ -4,7 +4,7 @@ import { test, describe } from 'node:test'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 
 import { productName } from '@social-publisher/config'
-import { COVERED_ELSEWHERE, LIBRARIES, framing, loadLibrary, readSkillText, registerSkillsLibrary } from '../src/skills-library.ts'
+import { COVERED_ELSEWHERE, LIBRARIES, framing, frontmatter, loadLibrary, readSkillText, registerSkillsLibrary, skillFilePath } from '../src/skills-library.ts'
 import { PLAYBOOKS, registerPlaybooks } from '../src/playbooks.ts'
 
 /**
@@ -24,7 +24,7 @@ describe('the skills library', () => {
   const library = loadLibrary()
 
   test('loads every skill in the pinned copies', () => {
-    assert.equal(library.size, 70)
+    assert.equal(library.size, 81)
     for (const name of ['seo-audit', 'ai-seo', 'copywriting', 'ads', 'social', 'cro']) {
       assert.ok(library.has(name), `${name} is missing`)
     }
@@ -38,7 +38,7 @@ describe('the skills library', () => {
     const server = new McpServer({ name: 't', version: '1' })
     registerSkillsLibrary(server)
     const text = await callTool(server, 'list_skills', {})
-    assert.match(text, /^70 skills/)
+    assert.match(text, /^81 skills/)
     assert.match(text, /seo-audit/)
   })
 
@@ -126,6 +126,88 @@ describe('the skills library', () => {
     const cwv = await callTool(server, 'get_skill', { name: 'core-web-vitals' })
     assert.match(cwv, /get_skill \{ name: "performance", reference: "references\/MEASUREMENT\.md" \}/)
     assert.ok(library.get('performance')!.references.includes('references/MEASUREMENT.md'))
+  })
+
+  const YT = ['yt-audit', 'yt-chapters', 'yt-comment', 'yt-edit', 'yt-package', 'yt-plan', 'yt-retention', 'yt-script', 'yt-seo', 'yt-shorts', 'yt-viral']
+
+  test('serves the eleven YouTube skills under their own source, licence and reading note', async () => {
+    const server = new McpServer({ name: 't', version: '1' })
+    registerSkillsLibrary(server)
+    for (const name of YT) {
+      assert.equal(library.get(name)?.library.source, 'Jakeschincariol/youtube-agent-skill', name)
+      const text = await callTool(server, 'get_skill', { name })
+      assert.ok(text.startsWith(`[Skill library: "${name}"`), name)
+      assert.match(text, /Jakeschincariol\/youtube-agent-skill \(MIT licence\), pinned at a2feb21049/, name)
+      // The reading note: specialist first, helpers optional and never claimed, brand voice first, approval to publish.
+      assert.match(text, /prefer them over the general video and social skills/, name)
+      assert.match(text, /Never claim a helper ran/, name)
+      assert.match(text, /get_brand \{ brand, section: "voice" \}/, name)
+      assert.match(text, /publish_post or\s+schedule_post\), with the user’s approval/, name)
+      assert.ok(!text.includes('{{'), `${name}: a placeholder reached the reader`)
+    }
+  })
+
+  test('the YouTube helpers are served as text, exactly as pinned, and every one a skill names exists', async () => {
+    const { readFileSync } = await import('node:fs')
+    const server = new McpServer({ name: 't', version: '1' })
+    registerSkillsLibrary(server)
+    const helpers: Record<string, string[]> = {
+      'yt-chapters': ['chapters.py'],
+      'yt-edit': ['deadair.py'],
+      'yt-package': ['title.py'],
+      'yt-retention': ['retention.py'],
+      'yt-script': ['hooks.json', 'hookscore.py'],
+      'yt-viral': ['swipe.py'],
+    }
+    for (const [name, files] of Object.entries(helpers)) {
+      const skill = library.get(name)!
+      for (const file of files) {
+        assert.ok(skill.references.includes(file), `${name}/${file} is not listed`)
+        const text = await callTool(server, 'get_skill', { name, reference: file })
+        assert.match(text, /this server never runs it/)
+        const body = text.split(`----- BEGIN ${file} -----\n`)[1]!.split(`\n----- END ${file} -----`)[0]
+        assert.equal(body, readFileSync(skillFilePath(skill, file), 'utf8'), `${name}/${file} changed on the way out`)
+      }
+    }
+    JSON.parse(readFileSync(skillFilePath(library.get('yt-script')!, 'hooks.json'), 'utf8'))
+    // Every helper a SKILL.md names, here or in a sibling ("../yt-x/file.py"), is served by that skill.
+    for (const name of YT) {
+      const skill = library.get(name)!
+      const md = readFileSync(skillFilePath(skill, 'SKILL.md'), 'utf8')
+      for (const [, sibling, file] of md.matchAll(/(?:\.\.\/(yt-[a-z]+)\/)?\b([a-z]+\.(?:py|json))\b/g)) {
+        if (file === 'collected.json') continue // the user's own input file, not a helper
+        const owner = library.get(sibling ?? name)!
+        assert.ok(owner.references.includes(file!), `${name} names ${sibling ?? name}/${file}, which is not served`)
+      }
+    }
+  })
+
+  test('the voice template is a reference of every YouTube skill and nothing else', async () => {
+    const server = new McpServer({ name: 't', version: '1' })
+    registerSkillsLibrary(server)
+    for (const name of YT) assert.ok(library.get(name)!.references.includes('templates/voice.md'), name)
+    for (const skill of library.values()) {
+      if (skill.library.folder !== 'youtube-agent-skill') assert.ok(!skill.references.includes('templates/voice.md'), skill.name)
+    }
+    const text = await callTool(server, 'get_skill', { name: 'yt-plan', reference: 'templates/voice.md' })
+    assert.match(text, /## Words I never use/)
+    // The shared path is looked up in the index, so its neighbours stay out of reach.
+    for (const reference of ['templates/../LICENSE', '../../templates/voice.md', 'templates/nope.md']) {
+      assert.match(await callTool(server, 'get_skill', { name: 'yt-plan', reference }), /is not a reference of "yt-plan"/, reference)
+    }
+  })
+
+  test('a folded YAML description is read as one line, not as ">-"', () => {
+    assert.equal(
+      library.get('yt-chapters')!.description,
+      'Write YouTube chapters from a transcript, validated against YouTube\'s own rules so they actually render. Use for "add chapters", "timestamps", "break this video into sections".',
+    )
+    assert.deepEqual(frontmatter('---\nname: x\ndescription: |\n  one\n  two\nother: y\n---\n'), { name: 'x', description: 'one\ntwo', other: 'y' })
+  })
+
+  test('a shared file that is missing stops the server rather than vanishing', () => {
+    const yt = LIBRARIES.find((l) => l.folder === 'youtube-agent-skill')!
+    assert.throws(() => loadLibrary(undefined, [{ ...yt, note: undefined, shared: ['templates/nope.md'] }]), /declares the shared file/)
   })
 
   test('every vendored source keeps its licence text beside the copy', async () => {
@@ -315,7 +397,7 @@ describe('the instructions every client receives on connecting', () => {
   test('every skill they name is served', async () => {
     const SERVER_INSTRUCTIONS = (await import('../src/playbooks.ts')).serverInstructions()
     const library = loadLibrary()
-    for (const name of ['store-builder', 'landing-page-builder', 'shopify-theme-developer', 'web-ui-design', 'wordpress-site-builder', 'shopify-store-kit', 'campaign-setup', 'selling-by-country']) {
+    for (const name of ['store-builder', 'landing-page-builder', 'shopify-theme-developer', 'web-ui-design', 'wordpress-site-builder', 'shopify-store-kit', 'campaign-setup', 'selling-by-country', 'yt-plan', 'yt-script', 'yt-package', 'yt-seo', 'yt-shorts', 'yt-retention']) {
       assert.ok(SERVER_INSTRUCTIONS.includes(name), `instructions miss ${name}`)
       assert.ok(library.has(name), `instructions name ${name}, which is not served`)
     }
@@ -351,15 +433,18 @@ describe('playbooks stay current', () => {
 describe('code templates in AdsPilot’s own skills', () => {
   const library = loadLibrary()
 
-  test('the store kit serves its theme files, and third-party skills stay Markdown-only', () => {
+  test('the store kit serves its theme files, and third-party skills stay Markdown-only unless they declare helpers', () => {
     const kit = library.get('shopify-store-kit')!
     for (const f of ['references/theme/sections/ap-hero.liquid', 'references/theme/snippets/ap-kit-base.liquid', 'references/theme/templates/index.example.json', 'references/theme/config/settings_data.recipe.json']) {
       assert.ok(kit.references.includes(f), f)
     }
     for (const skill of library.values()) {
       if (skill.library.own === true) continue
-      for (const r of skill.references) assert.match(r, /\.md$/, `${skill.name}: ${r}`)
+      const helpers = skill.library.helpers
+      for (const r of skill.references) assert.ok(r.endsWith('.md') || helpers?.test(r) === true, `${skill.name}: ${r}`)
     }
+    // Only the YouTube source declares helpers, and only Python scripts and their JSON data.
+    assert.deepEqual(LIBRARIES.filter((l) => l.own !== true && l.helpers !== undefined).map((l) => l.folder), ['youtube-agent-skill'])
   })
 
   test('a template is served between markers, exactly as stored (product name filled in)', async () => {

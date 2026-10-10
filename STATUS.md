@@ -70,6 +70,7 @@ Organisation follow-ups waiting on the owner: a private GitHub repo for
 
 | Date | What | Where recorded |
 |---|---|---|
+| 2026-10-10 | YouTube skills: 11 MIT `yt-*` skills from Jakeschincariol/youtube-agent-skill vendored with a reading note; helpers served as text; server instructions point at them. On branch `youtube-skills`, not merged or released | `source/apps/mcp/skills-library/youtube-agent-skill/NOTICE.md` |
 | 2026-10-10 | Workspace organisation phases 0–4: `docs/` shelves, `START-HERE.md` map, this file, backups, merged branches deleted | decision 0011 |
 | 2026-10-10 | Brand design systems released with a private signed-link viewer | `ecb5973`, `docs/architecture/2026-10-10-brand-design-systems.md` |
 | 2026-10-10 | Central configuration; Google sign-in always shows the account chooser | `b898666`…`db9ea93`, `5a25c11` |

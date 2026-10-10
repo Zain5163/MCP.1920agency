@@ -81,6 +81,7 @@ Around the posting:
 | Playbooks with a section per goal: Meta, Google, Microsoft, TikTok, Snapchat, Pinterest, LinkedIn, X, Reddit, Amazon, Telegram | ✅ Only Meta can launch from the server; the rest are planning and copy |
 | Stale-playbook warning after 90 days | ✅ |
 | 50 marketing skills (copywriting, SEO, CRO, pricing, launch…) | ✅ MIT-licensed, pinned |
+| 11 YouTube skills (`yt-*`: plan, script and scored hook, title and thumbnail, SEO, chapters, Shorts, edit list, retention, comments, outliers, audit) with their six Python helpers served as text, never run by the server | 🟡 2026-10-10 Built and tested on branch `youtube-skills`; not merged or released. MIT, pinned at `a2feb21` |
 | Prompts: launch a Meta campaign, write ad copy | ✅ |
 | Brand design systems: 1920 Agency and PSX Ascend (imported), Muzaree and the product (proposed); `list_brands`, `get_brand`, `brand_viewer_link` on both transports; private docs-style viewer at `/brands` (signed, expiring links; tenant-scoped) | ✅ 2026-10-10 Live: 1920 Agency, PSX Ascend (imported), Muzaree and the product (proposed); tools list_brands / get_brand / brand_viewer_link; private viewer at /brands (signed 24 h links, 404 otherwise) released `142423d` and the gate site file reloaded |
 

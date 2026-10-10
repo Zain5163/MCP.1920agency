@@ -38,6 +38,11 @@ import { z } from 'zod'
  *   (owner's request for website-building skills, 2026-10-08).
  * - `anthropics/skills` (Apache-2.0): frontend-design only, for visual direction
  *   and for avoiding pages that look machine-generated.
+ * - `Jakeschincariol/youtube-agent-skill` (MIT): eleven yt-* skills for running a
+ *   YouTube channel (plan, script, packaging, SEO, chapters, Shorts, edit,
+ *   retention, comments, outliers, audit), with six small Python helpers and a
+ *   voice template (owner's request, 2026-10-10). The helpers are served as text
+ *   and never run by this server.
  *
  * Our own playbooks (Meta, Google, TikTok) take precedence where both cover the
  * same ground, because they describe this server's tools and rules.
@@ -53,6 +58,17 @@ export interface LibrarySource {
   readonly licence: string
   /** Extra reading guidance for this source only, added to the framing note. */
   readonly note?: readonly string[]
+  /**
+   * Non-Markdown files a third-party source ships beside its skills (helper
+   * scripts and their data), served as text between markers at their upstream
+   * path. This server never runs them; the AI may hand them to the user.
+   */
+  readonly helpers?: RegExp
+  /**
+   * Files at the source's root, outside skills/, offered as a reference of every
+   * skill in it under their upstream path (a shared template, for example).
+   */
+  readonly shared?: readonly string[]
   /**
    * Our own skills, written and maintained in this repository. Not pinned to an
    * upstream commit and not third-party text, so they are framed differently and
@@ -97,6 +113,10 @@ export const LIBRARIES: readonly LibrarySource[] = [
     source: 'coreyhaines31/marketingskills',
     commit: 'dda3841f0b294e01e93b1541486beefbfab0915e',
     licence: 'MIT licence',
+    note: [
+      '- For YouTube work (planning, scripts and hooks, titles and thumbnails, descriptions, chapters, Shorts,',
+      '  retention, comments), the yt-* skills are more specific than video and social: e.g. get_skill { name: "yt-script" }.',
+    ],
   },
   {
     folder: 'advertising-skills',
@@ -141,6 +161,37 @@ export const LIBRARIES: readonly LibrarySource[] = [
       '- The brand’s own logo, colours and fonts always win over a new visual direction.',
     ],
   },
+  {
+    folder: 'youtube-agent-skill',
+    source: 'Jakeschincariol/youtube-agent-skill',
+    commit: 'a2feb2104981a375ffd4f87ee04f4f5344ac43c6',
+    licence: 'MIT licence',
+    helpers: /\.(py|json)$/,
+    shared: ['templates/voice.md'],
+    get note() {
+      return [
+        '- These are specialist YouTube skills: for YouTube work, prefer them over the general video and social skills.',
+        `  ${productName()}’s own skills still win on ${productName()}’s tools, limits and approvals.`,
+        '- The Python helpers (hookscore.py, title.py, deadair.py, chapters.py, retention.py, swipe.py, and the',
+        '  formulas in hooks.json) are optional. Read one with get_skill { name: <its skill>, reference: <file> }, e.g.',
+        '  get_skill { name: "yt-script", reference: "hookscore.py" }; "../yt-package/title.py" means skill yt-package.',
+        '  "/yt-retention" and the like are the other skills here: get_skill { name: "yt-retention" }.',
+        '- If you have a terminal on the user’s own machine, you may save the helpers there unchanged and run them',
+        '  locally with Python 3 on the user’s files. Keep each in a folder named after its skill, side by side:',
+        '  chapters.py and retention.py import yt-edit/deadair.py; hookscore.py and swipe.py read yt-script/hooks.json.',
+        `  On the hosted ${productName()} server you cannot run them: apply the rules the skill states by hand.`,
+        '  Never claim a helper ran, or present a score as its output, when it did not run.',
+        '- yt-viral’s collecting step (yt-dlp, the public channel page) also needs the user’s machine or a list the',
+        '  user pastes; this server does not fetch YouTube listings.',
+        '- Voice profile: before using "~/.claude/youtube/voice.md", call list_brands. When the channel belongs to a',
+        '  brand there, load its voice with get_brand { brand, section: "voice" } and use that. Only otherwise follow',
+        '  the voice-file flow; its template is get_skill { name: <any yt-* skill>, reference: "templates/voice.md" }.',
+        `- Publishing to YouTube happens only through ${productName()}’s own tools (validate_post, then publish_post or`,
+        '  schedule_post), with the user’s approval of the exact title, description and file. These skills write;',
+        '  the user approves.',
+      ]
+    },
+  },
 ]
 
 export interface LibrarySkill {
@@ -151,13 +202,27 @@ export interface LibrarySkill {
   readonly library: LibrarySource
 }
 
-function frontmatter(text: string): Record<string, string> {
+/**
+ * The top-level `key: value` lines of a skill's front matter. A YAML block scalar
+ * (`description: >-` followed by indented lines, as some sources write it) is read
+ * too: folded (`>`) joins its lines with spaces, literal (`|`) keeps the breaks.
+ */
+export function frontmatter(text: string): Record<string, string> {
   const match = text.match(/^---\r?\n([\s\S]*?)\r?\n---/)
   const out: Record<string, string> = {}
   if (match === null) return out
-  for (const line of match[1]!.split(/\r?\n/)) {
-    const m = line.match(/^([a-zA-Z_]+):\s*(.*)$/)
-    if (m !== null) out[m[1]!] = m[2]!.replace(/^["']|["']$/g, '')
+  const lines = match[1]!.split(/\r?\n/)
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i]!.match(/^([a-zA-Z_]+):\s*(.*)$/)
+    if (m === null) continue
+    const block = m[2]!.match(/^([>|])[-+]?\s*$/)
+    if (block === null) {
+      out[m[1]!] = m[2]!.replace(/^["']|["']$/g, '')
+      continue
+    }
+    const body: string[] = []
+    while (i + 1 < lines.length && (/^\s/.test(lines[i + 1]!) || lines[i + 1]!.trim() === '')) body.push(lines[++i]!.trim())
+    out[m[1]!] = body.join(block[1] === '>' ? ' ' : '\n').trim()
   }
   return out
 }
@@ -165,18 +230,33 @@ function frontmatter(text: string): Record<string, string> {
 /**
  * Reference files a skill may serve. Markdown everywhere; AdsPilot's own skills may
  * also ship code templates (Shopify theme sections and JSON templates) that an AI
- * installs unchanged, so those are served too. Third-party libraries stay Markdown-only.
+ * installs unchanged, so those are served too. Third-party libraries stay Markdown-only,
+ * except the helper files a source declares (`helpers`): served as text, never run.
  */
 const CODE_REFERENCE = /\.(liquid|json)$/
 
-function listFiles(dir: string, withCode = false): string[] {
+/** The non-Markdown files a source may serve, if any. */
+function codeFiles(source: LibrarySource): RegExp | undefined {
+  return source.own === true ? CODE_REFERENCE : source.helpers
+}
+
+function listFiles(dir: string, code?: RegExp): string[] {
   const out: string[] = []
   for (const entry of readdirSync(dir)) {
     const full = join(dir, entry)
-    if (statSync(full).isDirectory()) out.push(...listFiles(full, withCode))
-    else if (entry.endsWith('.md') || (withCode && CODE_REFERENCE.test(entry))) out.push(full)
+    if (statSync(full).isDirectory()) out.push(...listFiles(full, code))
+    else if (entry.endsWith('.md') || code?.test(entry) === true) out.push(full)
   }
   return out
+}
+
+/**
+ * Where a listed reference lives on disk. A shared file sits at the source's root
+ * (skills-library/<folder>/), two levels above the skill's own folder.
+ */
+export function skillFilePath(skill: LibrarySkill & { dir: string }, file: string): string {
+  const base = skill.library.shared?.includes(file) === true ? join(skill.dir, '..', '..') : skill.dir
+  return join(base, ...file.split('/'))
 }
 
 /**
@@ -223,10 +303,16 @@ export function loadLibrary(
         )
       }
       const meta = frontmatter(readSkillText(source, skillText))
-      const references = listFiles(dir, source.own === true)
+      const references = listFiles(dir, codeFiles(source))
         .map((f) => relative(dir, f).split(sep).join('/'))
         .filter((f) => f !== 'SKILL.md')
-        .sort()
+      for (const file of source.shared ?? []) {
+        if (statSync(join(root, source.folder, ...file.split('/')), { throwIfNoEntry: false })?.isFile() !== true) {
+          throw new Error(`${source.folder} declares the shared file "${file}", which is missing. The server cannot start without it.`)
+        }
+        references.push(file)
+      }
+      references.sort()
       library.set(name, { name, description: meta.description ?? '', references, dir, library: source })
     }
   }
@@ -281,7 +367,7 @@ export function registerSkillsLibrary(server: McpServer, root: string = LIBRARY_
 
   server.tool(
     'list_skills',
-    `List the ${library.size} built-in marketing, advertising and website skills (SEO, AI search visibility, copywriting, CRO, email, pricing, launch, social, ads, offers, buyer awareness and funnels; building and improving Shopify stores, landing pages and WordPress sites, web design, page speed and accessibility). Read one with get_skill before doing that kind of work.`,
+    `List the ${library.size} built-in marketing, advertising and website skills (SEO, AI search visibility, copywriting, CRO, email, pricing, launch, social, ads, offers, buyer awareness and funnels; building and improving Shopify stores, landing pages and WordPress sites, web design, page speed and accessibility; running a YouTube channel: planning, scripts and hooks, titles and thumbnails, video SEO, chapters, Shorts, retention, comments). Read one with get_skill before doing that kind of work.`,
     {},
     async () => ({
       content: [
@@ -353,11 +439,15 @@ export function registerSkillsLibrary(server: McpServer, root: string = LIBRARY_
         }
       }
 
-      const raw = readSkillText(skill.library, readFileSync(join(skill.dir, ...file.split('/')), 'utf8'))
-      // Code templates are installed as-is: mark exactly where the file starts and ends,
-      // so the framing above never ends up inside a theme file.
-      const text = CODE_REFERENCE.test(file)
-        ? `This is a template file. Install the text between the two marker lines unchanged (for example with shopify_theme_edit, full content).
+      const raw = readSkillText(skill.library, readFileSync(skillFilePath(skill, file), 'utf8'))
+      // Code is passed on as-is: mark exactly where the file starts and ends, so the
+      // framing above never ends up inside a theme file or a helper script.
+      const intro =
+        skill.library.own === true
+          ? 'This is a template file. Install the text between the two marker lines unchanged (for example with shopify_theme_edit, full content).'
+          : `This is a helper file from ${skill.library.source}, served as text: this server never runs it. To use it, save the text between the two marker lines unchanged on the user’s own machine (see the reading note above); otherwise apply the skill’s rules by hand.`
+      const text = codeFiles(skill.library)?.test(file) === true
+        ? `${intro}
 ----- BEGIN ${file} -----
 ${raw}
 ----- END ${file} -----

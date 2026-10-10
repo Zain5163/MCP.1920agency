@@ -15,6 +15,7 @@ This folder **is** served, so what goes in it matters more.
 | `advertising-skills/` | github.com/realkimbarrett/advertising-skills | MIT (declared; see its NOTICE.md) | `45f4a4a1dabe24113193369b55b929b1de4ff04a` | 4 of 12 |
 | `web-quality-skills/` | github.com/addyosmani/web-quality-skills | MIT | `afa8da942115f2961fdbfa80807ea0b232ff6c00` | 3 of 6 |
 | `anthropic-skills/` | github.com/anthropics/skills (`frontend-design` only) | Apache-2.0 (the skill's own LICENSE.txt) | `683bc88e56f3e09ba94f7055977f3d3aa499f202` | 1 |
+| `youtube-agent-skill/` | github.com/Jakeschincariol/youtube-agent-skill | MIT | `a2feb2104981a375ffd4f87ee04f4f5344ac43c6` | 11 of 11 |
 
 `marketingskills` was fetched 2026-09-30 at the owner's request, so future SEO,
 WordPress and Google work starts from this knowledge rather than from new
@@ -52,6 +53,21 @@ orchestrator), and every other anthropics/skills folder (not web-building, and
 some are source-available only). Each folder's NOTICE.md records what was copied.
 The full source survey, including what was read for knowledge only and why, is
 `docs/research/2026-10-08-web-store-skills-sources.md`.
+
+`youtube-agent-skill` was added 2026-10-10 at the owner's request: all eleven yt-*
+skills for running a YouTube channel (plan, script with a scored hook, title and
+thumbnail, video SEO, chapters, Shorts, edit list, retention, comments, niche
+outliers, channel audit). It is the first vendored source that ships more than
+Markdown: six small Python helpers and `hooks.json` sit beside their SKILL.md, and
+`templates/voice.md` at the folder root. In `src/skills-library.ts` the source
+declares them (`helpers` and `shared`), so `get_skill { name, reference }` serves
+them **as text between marker lines**; the server never runs them. Its reading note
+says: prefer these skills for YouTube work (our own still win on our tools, limits
+and approvals); run the helpers only with a terminal on the user's own machine and
+never claim one ran; load the brand's voice with `get_brand` before the upstream
+`~/.claude/youtube/voice.md` flow; publish only through our own YouTube tools with
+the user's approval. The server instructions and the marketingskills note point at
+the yt-* skills. NOTICE.md records what was copied and the scan result.
 
 ## Our own skills (`adspilot/`)
 
