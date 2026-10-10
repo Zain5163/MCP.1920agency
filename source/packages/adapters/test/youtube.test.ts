@@ -1367,3 +1367,147 @@ describe('limits on the upload loop', () => {
     assert.ok(result.issues.some((i) => i.code === 'long_video_needs_verification' && i.severity === 'warning'))
   })
 })
+
+/**
+ * Custom thumbnails (thumbnails.set), added 2026-10-11. Set after the upload,
+ * only when one is given, and never able to fail the publish: the video
+ * already exists, and a retry would upload it twice.
+ */
+describe('custom thumbnail', () => {
+  const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3])
+
+  async function thumbnailFile(name = 'thumb.jpg', bytes: Buffer = JPEG): Promise<string> {
+    const dir = await mkdtemp(join(tmpdir(), 'yt-thumb-'))
+    const file = join(dir, name)
+    await writeFile(file, bytes)
+    return file
+  }
+
+  const thumb = (path: string, over: Partial<MediaRef> = {}): MediaRef => ({
+    id: 't1',
+    kind: 'image',
+    mime: 'image/jpeg',
+    bytes: JPEG.length,
+    localPath: path,
+    ...over,
+  })
+
+  const isThumbnailCall = (c: { url: string }) => c.url.startsWith('https://www.googleapis.com/upload/youtube/v3/thumbnails/set')
+
+  test('without a thumbnail, thumbnails.set is never called', async () => {
+    const file = await videoFile(10)
+    const { yt, calls } = make([MINE, STARTED, CREATED('public'), READ_BACK('public')], { audited: true, privacy: 'public' })
+    const result = await yt.publish(ctx(), draft({ media: [vid(file)] }))
+
+    assert.equal(calls.length, 4)
+    assert.equal(calls.some(isThumbnailCall), false)
+    assert.equal((result.raw as Record<string, unknown>).thumbnailSet, undefined)
+    assert.equal(result.notice, undefined)
+  })
+
+  test('with one, it is uploaded after the video, to that video, as the image bytes', async () => {
+    const file = await videoFile(10)
+    const image = await thumbnailFile()
+    const { yt, calls } = make([MINE, STARTED, CREATED('public'), READ_BACK('public'), { status: 200, body: { items: [] } }], {
+      audited: true,
+      privacy: 'public',
+    })
+    const result = await yt.publish(ctx(), draft({ media: [vid(file, { thumbnail: thumb(image) })] }))
+
+    assert.equal(calls.length, 5)
+    const set = calls[4]!
+    assert.ok(isThumbnailCall(set))
+    assert.equal(set.method, 'POST')
+    const url = new URL(set.url)
+    assert.equal(url.searchParams.get('videoId'), 'VID123')
+    assert.equal(url.searchParams.get('uploadType'), 'media')
+    assert.equal(header(set, 'Content-Type'), 'image/jpeg')
+    assert.equal(header(set, 'Authorization'), 'Bearer YT_TOKEN')
+    assert.deepEqual(Buffer.from(set.rawBody as Uint8Array), JPEG)
+
+    assert.equal((result.raw as Record<string, unknown>).thumbnailSet, true)
+    assert.equal(result.notice, undefined, 'a public upload with its thumbnail set is plainly published')
+  })
+
+  test('an unverified channel: the video is uploaded, and the result says why the thumbnail was not set', async () => {
+    const file = await videoFile(10)
+    const image = await thumbnailFile()
+    const refused = googleFailure(
+      403,
+      'forbidden',
+      "The authenticated user doesn't have permissions to upload and set custom video thumbnails.",
+    )
+    const { yt } = make([MINE, STARTED, CREATED('public'), READ_BACK('public'), refused], { audited: true, privacy: 'public' })
+    const result = await yt.publish(ctx(), draft({ media: [vid(file, { thumbnail: thumb(image) })] }))
+
+    assert.equal(result.platformPostId, 'VID123')
+    assert.equal((result.raw as Record<string, unknown>).thumbnailSet, false)
+    assert.match(result.notice!, /^Video uploaded; the thumbnail was not set because this YouTube channel is not allowed custom thumbnails/)
+    assert.match(result.notice!, /phone verification/)
+    assert.match(result.notice!, /https:\/\/www\.youtube\.com\/verify/)
+    assert.doesNotMatch(result.notice!, /post (it )?again|upload (it )?again/i, 'never suggests uploading the video twice')
+  })
+
+  test('the thumbnail notice is added to the privacy notice, not instead of it', async () => {
+    const file = await videoFile(10)
+    const image = await thumbnailFile()
+    const { yt } = make([MINE, STARTED, CREATED('private'), READ_BACK('private'), googleFailure(403, 'forbidden', 'no permissions to upload and set custom video thumbnails')])
+    const result = await yt.publish(ctx(), draft({ media: [vid(file, { thumbnail: thumb(image) })] }))
+
+    assert.match(result.notice!, /^Uploaded as private, not published/)
+    assert.match(result.notice!, /Video uploaded; the thumbnail was not set because/)
+  })
+
+  test('a network failure or any other refusal never fails the publish', async () => {
+    for (const last of [new Error('socket hang up'), googleFailure(400, 'invalidImage', 'The provided image content is invalid.'), { status: 500 }]) {
+      const file = await videoFile(10)
+      const image = await thumbnailFile()
+      const { yt } = make([MINE, STARTED, CREATED('public'), READ_BACK('public'), last], { audited: true, privacy: 'public' })
+      const result = await yt.publish(ctx(), draft({ media: [vid(file, { thumbnail: thumb(image) })] }))
+      assert.equal(result.platformPostId, 'VID123')
+      assert.equal((result.raw as Record<string, unknown>).thumbnailSet, false)
+      assert.match(result.notice!, /^Video uploaded; the thumbnail was not set because/)
+      assert.match(result.notice!, /YouTube Studio/)
+    }
+  })
+
+  test('a token refused at the thumbnail step is renewed once and the thumbnail retried', async () => {
+    const file = await videoFile(10)
+    const image = await thumbnailFile()
+    const { yt, calls } = make([MINE, STARTED, CREATED('public'), READ_BACK('public'), { status: 401 }, { status: 200, body: {} }], {
+      audited: true,
+      privacy: 'public',
+    })
+    const result = await yt.publish(
+      { ...ctx(), renewAccessToken: async () => 'YT_TOKEN_2' },
+      draft({ media: [vid(file, { thumbnail: thumb(image) })] }),
+    )
+
+    const sets = calls.filter(isThumbnailCall)
+    assert.equal(sets.length, 2)
+    assert.equal(header(sets[1]!, 'Authorization'), 'Bearer YT_TOKEN_2')
+    assert.equal((result.raw as Record<string, unknown>).thumbnailSet, true)
+  })
+
+  test('a thumbnail YouTube cannot take is not sent: a warning before, a notice after', async () => {
+    const file = await videoFile(10)
+    const image = await thumbnailFile('thumb.gif', Buffer.from('GIF89a'))
+    const media = [vid(file, { thumbnail: thumb(image, { mime: 'image/gif' }) })]
+    const { yt, calls } = make([MINE, STARTED, CREATED('public'), READ_BACK('public')], { audited: true, privacy: 'public' })
+
+    const validation = yt.validate(draft({ media }))
+    assert.ok(validation.ok, 'a bad thumbnail never blocks the video')
+    assert.ok(issueCodes(validation, 'warning').includes('thumbnail_unsupported'))
+
+    const result = await yt.publish(ctx(), draft({ media }))
+    assert.equal(calls.some(isThumbnailCall), false)
+    assert.match(result.notice!, /JPEG or PNG/)
+  })
+
+  test('validation says a custom thumbnail needs a verified channel', () => {
+    const { yt } = make([])
+    const result = yt.validate(draft({ media: [vid('clip.mp4', { thumbnail: thumb('thumb.jpg') })] }))
+    assert.ok(result.ok)
+    assert.ok(issueCodes(result, 'warning').includes('thumbnail_needs_verified_channel'))
+  })
+})

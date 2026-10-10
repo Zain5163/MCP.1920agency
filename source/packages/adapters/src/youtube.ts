@@ -11,6 +11,7 @@ import {
   type Capabilities,
   type Credential,
   type FailureClass,
+  type MediaRef,
   type Platform,
   type PlatformAdapter,
   type PostDraft,
@@ -77,6 +78,14 @@ import { openMedia, type MediaSource } from './media-source.ts'
 const API_BASE = 'https://www.googleapis.com/youtube/v3'
 const UPLOAD_URL = 'https://www.googleapis.com/upload/youtube/v3/videos'
 const WATCH_URL = 'https://www.youtube.com/watch?v='
+const THUMBNAIL_URL = 'https://www.googleapis.com/upload/youtube/v3/thumbnails/set'
+
+/**
+ * thumbnails.set: "Maximum file size: 50MB" (Google reference, checked
+ * 2026-10-11; it was 2 MB before 2026-09-14). Read as 50,000,000 bytes, the
+ * stricter reading.
+ */
+const THUMBNAIL_MAX_BYTES = 50_000_000
 
 /** Google's unit for chunk sizes: every chunk but the last is a multiple of it. */
 const CHUNK_UNIT = 262_144
@@ -323,6 +332,35 @@ export class YouTubeAdapter implements PlatformAdapter {
       )
     }
 
+    /**
+     * The thumbnail is set after the upload and can never fail it, so a
+     * thumbnail YouTube would refuse is a warning: the video still goes up,
+     * without it. Said now so it can be fixed before publishing.
+     */
+    for (const item of draft.media) {
+      const thumbnail = item.thumbnail
+      if (thumbnail === undefined) continue
+      if (thumbnailMime(thumbnail.mime) === undefined) {
+        add(
+          'warning',
+          'thumbnail_unsupported',
+          `The thumbnail is ${thumbnail.mime}; YouTube takes JPEG or PNG, so the video would be uploaded without it. Export the thumbnail as JPEG or PNG.`,
+        )
+      } else if (thumbnail.bytes > THUMBNAIL_MAX_BYTES) {
+        add(
+          'warning',
+          'thumbnail_too_large',
+          `The thumbnail is ${megabytes(thumbnail.bytes)}, over YouTube's ${megabytes(THUMBNAIL_MAX_BYTES)} limit, so the video would be uploaded without it. Use a smaller image.`,
+        )
+      }
+      add(
+        'warning',
+        'thumbnail_needs_verified_channel',
+        'A custom thumbnail is set only on a verified YouTube channel (phone verification at https://www.youtube.com/verify). ' +
+          'On an unverified channel the video is still uploaded, and the result says the thumbnail was not set.',
+      )
+    }
+
     return { ok: !issues.some((i) => i.severity === 'error'), issues }
   }
 
@@ -385,12 +423,16 @@ export class YouTubeAdapter implements PlatformAdapter {
     // make the worker retry, and a retry is a second copy of the video.
     const readBack = await this.#readPrivacy(ctx, token, created.id)
     const applied = readBack ?? created.status?.privacyStatus
-    const notice = privacyNotice({
+    const privacy = privacyNotice({
       audited: this.#audited,
       requested,
       applied,
       confirmed: readBack !== undefined,
     })
+
+    // Only when a thumbnail was given; never throws (see #setThumbnail).
+    const thumbnail = video.thumbnail !== undefined ? await this.#setThumbnail(ctx, token, created.id, video.thumbnail) : undefined
+    const notices = [privacy, thumbnail?.notice].filter((n): n is string => n !== undefined)
 
     return {
       platformPostId: created.id,
@@ -400,8 +442,108 @@ export class YouTubeAdapter implements PlatformAdapter {
         requestedPrivacy: requested,
         privacyConfirmed: readBack !== undefined,
         uploadStatus: created.status?.uploadStatus ?? null,
+        ...(thumbnail !== undefined ? { thumbnailSet: thumbnail.set } : {}),
       },
-      ...(notice !== undefined ? { notice } : {}),
+      ...(notices.length > 0 ? { notice: notices.join(' ') } : {}),
+    }
+  }
+
+  /**
+   * Sets the video's custom thumbnail with `thumbnails.set`, after the upload.
+   *
+   * WHY it never throws (2026-10-11): the video already exists, so a failure
+   * here must not fail the publish — a retry would upload the video a second
+   * time. Instead the result says "video uploaded, thumbnail not set because …"
+   * and how to fix it, and `raw.thumbnailSet` records the outcome.
+   *
+   * From Google's thumbnails.set reference
+   * (developers.google.com/youtube/v3/docs/thumbnails/set, checked 2026-10-11):
+   * POST to the upload host with the image as the body; image/jpeg or
+   * image/png; "Maximum file size: 50MB" (raised from 2 MB on 2026-09-14, per
+   * the revision history in the research note); about 50 quota units. A 403
+   * `forbidden` reading "The authenticated user doesn't have permissions to
+   * upload and set custom video thumbnails" means the channel is not verified:
+   * custom thumbnails need a verified channel (phone verification, YouTube
+   * Help 72431). Whether the API sets a thumbnail on a Short is unverified.
+   */
+  async #setThumbnail(
+    ctx: PublishContext,
+    token: PublishToken,
+    videoId: string,
+    thumbnail: MediaRef,
+  ): Promise<{ set: boolean; notice?: string }> {
+    const notSet = (because: string): { set: false; notice: string } => ({
+      set: false,
+      notice: `Video uploaded; the thumbnail was not set because ${because}`,
+    })
+
+    const mime = thumbnailMime(thumbnail.mime)
+    if (mime === undefined) {
+      return notSet(
+        `it is ${thumbnail.mime}, and YouTube takes a JPEG or PNG thumbnail. Export it as JPEG or PNG and set it in YouTube Studio; do not upload the video again.`,
+      )
+    }
+
+    let bytes: Uint8Array
+    try {
+      const source = await openMedia(thumbnail, this.#fetch, ctx.signal !== undefined ? { signal: ctx.signal } : {})
+      try {
+        if (source.size === 0) return notSet('the thumbnail file is empty. Set one in YouTube Studio.')
+        if (source.size > THUMBNAIL_MAX_BYTES) {
+          return notSet(
+            `the image is ${megabytes(source.size)}, over YouTube's ${megabytes(THUMBNAIL_MAX_BYTES)} thumbnail limit. ` +
+              'Use a smaller JPEG (1280x720 under 2 MB works everywhere) and set it in YouTube Studio.',
+          )
+        }
+        bytes = await source.read(0, source.size - 1)
+      } finally {
+        await source.close()
+      }
+    } catch (error) {
+      return notSet(
+        `the thumbnail image could not be read (${describeFailure(error)}). Check the file or its URL, then set it in YouTube Studio.`,
+      )
+    }
+
+    const url = new URL(THUMBNAIL_URL)
+    url.searchParams.set('videoId', videoId)
+    url.searchParams.set('uploadType', 'media')
+
+    for (let attempt = 1; ; attempt += 1) {
+      let response: Response
+      try {
+        await token.renewIfOld()
+        const init: RequestInit = {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token.value}`, 'Content-Type': mime },
+          body: bytes,
+        }
+        if (ctx.signal !== undefined) init.signal = ctx.signal
+        response = await this.#fetch(url.toString(), init)
+      } catch (error) {
+        return notSet(`YouTube could not be reached to set it (${describeFailure(error)}). Set it in YouTube Studio.`)
+      }
+
+      if (response.ok) {
+        await drain(response)
+        return { set: true }
+      }
+
+      // An hour-long upload can outlive the token: renew once and try again.
+      if (response.status === 401 && attempt === 1 && token.canRenew) {
+        await drain(response)
+        try {
+          await token.renew()
+          continue
+        } catch (error) {
+          return notSet(`YouTube refused the access token and renewing it failed (${describeFailure(error)}). Set it in YouTube Studio.`)
+        }
+      }
+
+      const body = ((await readJson(response)) ?? {}) as GoogleErrorBody
+      const reason = body.error?.errors?.[0]?.reason
+      const message = body.error?.errors?.[0]?.message ?? body.error?.message ?? ''
+      return notSet(thumbnailRefusal(response.status, reason, message))
     }
   }
 
@@ -902,6 +1044,50 @@ export class YouTubeAdapter implements PlatformAdapter {
     }
     return parsed as T
   }
+}
+
+/** The Content-Type thumbnails.set takes for this image, or undefined when it takes none. */
+function thumbnailMime(mime: string): 'image/jpeg' | 'image/png' | undefined {
+  const base = mime.toLowerCase().split(';')[0]!.trim()
+  if (base === 'image/jpeg' || base === 'image/jpg') return 'image/jpeg'
+  if (base === 'image/png') return 'image/png'
+  return undefined
+}
+
+/**
+ * Why YouTube refused a thumbnail, in plain words, with the fix. The video is
+ * already uploaded, so the fix is always "set it in YouTube Studio", never
+ * "post again", which would upload the video twice.
+ */
+function thumbnailRefusal(status: number, reason: string | undefined, message: string): string {
+  if (status === 403 && /permission/i.test(message) && /thumbnail/i.test(message)) {
+    return (
+      'this YouTube channel is not allowed custom thumbnails yet: YouTube requires a verified channel (phone verification). ' +
+      'Verify it at https://www.youtube.com/verify, then set the thumbnail in YouTube Studio. ' +
+      `YouTube said: "${message}"`
+    )
+  }
+  if (reason === 'invalidImage' || reason === 'mediaBodyRequired') {
+    return `YouTube refused the image (${reason}${message !== '' ? `: ${message}` : ''}). Export a fresh JPEG or PNG and set it in YouTube Studio.`
+  }
+  if (status === 429 || reason === 'uploadRateLimitExceeded') {
+    return 'the channel has uploaded too many thumbnails recently. Wait a while, then set it in YouTube Studio.'
+  }
+  if (reason === 'quotaExceeded' || reason === 'dailyLimitExceeded') {
+    return "the project's YouTube API quota for today is used up (a thumbnail costs about 50 units). Set it in YouTube Studio."
+  }
+  if (status === 404 || reason === 'videoNotFound') {
+    return 'YouTube could not find the new video yet. Set the thumbnail in YouTube Studio once the video appears there.'
+  }
+  return (
+    `YouTube refused it (HTTP ${status}${reason !== undefined ? `, ${reason}` : ''}${message !== '' ? `: ${message}` : ''}). ` +
+    'Set it in YouTube Studio.'
+  )
+}
+
+/** Bytes as decimal megabytes for a message, e.g. 50 MB or 51.2 MB. */
+function megabytes(bytes: number): string {
+  return `${Math.round(bytes / 100_000) / 10} MB`
 }
 
 /**
