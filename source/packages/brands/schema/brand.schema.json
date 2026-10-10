@@ -1,0 +1,467 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mcp.1920agency.com/schemas/brand.schema.json",
+  "title": "Brand design system",
+  "description": "One brand's design system: tokens with roles and sources, logo files, type, voice, ad and social rules. Validated by packages/brands/src/validate.ts (a strict subset of JSON Schema 2020-12: type, required, properties, additionalProperties, items, enum, const, pattern, minLength, minItems, minimum, maximum, $ref).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "slug", "name", "status", "version", "updated", "summary", "ownership", "approval", "sources",
+    "colors", "contrastPairs", "gradients", "typography", "spacing", "radii", "shadows", "layout", "logo",
+    "imagery", "icons", "voice", "adCreatives", "socialTemplates", "components"
+  ],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": 1 },
+    "slug": { "$ref": "#/$defs/id" },
+    "name": { "type": "string", "minLength": 1 },
+    "nameSetting": { "enum": ["productName"] },
+    "status": { "enum": ["imported", "proposed", "mixed"] },
+    "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+(-[a-z0-9.]+)?$" },
+    "updated": { "$ref": "#/$defs/date" },
+    "summary": { "$ref": "#/$defs/text" },
+    "ownership": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tenant", "note"],
+      "properties": {
+        "tenant": { "type": "string", "pattern": "^(owner|[A-Za-z0-9_-]{8,64})$" },
+        "note": { "$ref": "#/$defs/text" }
+      }
+    },
+    "approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["approvers", "rule"],
+      "properties": {
+        "approvers": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/text" } },
+        "rule": { "$ref": "#/$defs/text" }
+      }
+    },
+    "sources": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "kind", "ref", "checked"],
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "kind": { "enum": ["file", "live", "owner", "proposed"] },
+          "ref": { "$ref": "#/$defs/text" },
+          "checked": { "$ref": "#/$defs/date" },
+          "note": { "$ref": "#/$defs/text" }
+        }
+      }
+    },
+    "colors": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name", "hex", "role", "use", "source"],
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "name": { "$ref": "#/$defs/text" },
+          "hex": { "type": "string", "pattern": "^#[0-9A-F]{6}$" },
+          "role": { "$ref": "#/$defs/text" },
+          "use": { "$ref": "#/$defs/text" },
+          "source": { "$ref": "#/$defs/id" }
+        }
+      }
+    },
+    "contrastPairs": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["fg", "bg", "use", "source"],
+        "properties": {
+          "fg": { "$ref": "#/$defs/id" },
+          "bg": { "$ref": "#/$defs/id" },
+          "use": { "enum": ["text", "large-text", "ui", "decorative", "avoid"] },
+          "note": { "$ref": "#/$defs/text" },
+          "documentedRatio": { "type": "number", "minimum": 1, "maximum": 21 },
+          "source": { "$ref": "#/$defs/id" }
+        }
+      }
+    },
+    "gradients": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name", "css", "use", "source"],
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "name": { "$ref": "#/$defs/text" },
+          "css": { "$ref": "#/$defs/css" },
+          "use": { "$ref": "#/$defs/text" },
+          "source": { "$ref": "#/$defs/id" }
+        }
+      }
+    },
+    "typography": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["families", "scale", "rules"],
+      "properties": {
+        "families": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "name", "role", "stack", "files", "licence", "source"],
+            "properties": {
+              "id": { "$ref": "#/$defs/id" },
+              "name": { "$ref": "#/$defs/text" },
+              "role": { "$ref": "#/$defs/text" },
+              "stack": { "$ref": "#/$defs/css" },
+              "files": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["path", "weight", "style", "format"],
+                  "properties": {
+                    "path": { "$ref": "#/$defs/path" },
+                    "weight": { "type": "string", "pattern": "^[1-9]00( [1-9]00)?$" },
+                    "style": { "enum": ["normal", "italic"] },
+                    "format": { "enum": ["woff2", "woff", "truetype"] }
+                  }
+                }
+              },
+              "licence": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["name", "notes"],
+                "properties": {
+                  "name": { "$ref": "#/$defs/text" },
+                  "file": { "$ref": "#/$defs/path" },
+                  "url": { "type": "string", "pattern": "^https://" },
+                  "notes": { "$ref": "#/$defs/text" }
+                }
+              },
+              "source": { "$ref": "#/$defs/id" }
+            }
+          }
+        },
+        "scale": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "role", "family", "size", "weight", "lineHeight", "sample", "source"],
+            "properties": {
+              "id": { "$ref": "#/$defs/id" },
+              "role": { "$ref": "#/$defs/text" },
+              "family": { "$ref": "#/$defs/id" },
+              "size": { "$ref": "#/$defs/css" },
+              "sizeMobile": { "$ref": "#/$defs/css" },
+              "weight": { "type": "string", "pattern": "^[1-9][0-9]{2}$" },
+              "lineHeight": { "$ref": "#/$defs/css" },
+              "tracking": { "$ref": "#/$defs/css" },
+              "transform": { "enum": ["none", "uppercase", "capitalize"] },
+              "sample": { "$ref": "#/$defs/text" },
+              "source": { "$ref": "#/$defs/id" }
+            }
+          }
+        },
+        "rules": { "$ref": "#/$defs/rules" }
+      }
+    },
+    "spacing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["unitPx", "scalePx", "rules", "source"],
+      "properties": {
+        "unitPx": { "type": "number", "minimum": 1, "maximum": 16 },
+        "scalePx": { "type": "array", "minItems": 4, "items": { "type": "number", "minimum": 0, "maximum": 400 } },
+        "rules": { "$ref": "#/$defs/rules" },
+        "source": { "$ref": "#/$defs/id" }
+      }
+    },
+    "radii": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "px", "use", "source"],
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "px": { "type": "number", "minimum": 0, "maximum": 999 },
+          "use": { "$ref": "#/$defs/text" },
+          "source": { "$ref": "#/$defs/id" }
+        }
+      }
+    },
+    "shadows": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "css", "use", "source"],
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "css": { "$ref": "#/$defs/css" },
+          "use": { "$ref": "#/$defs/text" },
+          "source": { "$ref": "#/$defs/id" }
+        }
+      }
+    },
+    "layout": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["maxWidthPx", "gutters", "breakpointsPx", "grid", "rules", "source"],
+      "properties": {
+        "maxWidthPx": { "type": "number", "minimum": 320, "maximum": 2400 },
+        "gutters": { "$ref": "#/$defs/text" },
+        "breakpointsPx": { "type": "array", "minItems": 1, "items": { "type": "number", "minimum": 240, "maximum": 3000 } },
+        "grid": { "$ref": "#/$defs/text" },
+        "rules": { "$ref": "#/$defs/rules" },
+        "source": { "$ref": "#/$defs/id" }
+      }
+    },
+    "logo": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["files", "clearSpace", "clearSpaceRatio", "minSize", "do", "dont", "licence", "source"],
+      "properties": {
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "name", "path", "format", "widthPx", "heightPx", "sha256", "background", "use", "source"],
+            "properties": {
+              "id": { "$ref": "#/$defs/id" },
+              "name": { "$ref": "#/$defs/text" },
+              "path": { "$ref": "#/$defs/path" },
+              "format": { "enum": ["png", "webp", "svg", "jpeg"] },
+              "widthPx": { "type": "number", "minimum": 1 },
+              "heightPx": { "type": "number", "minimum": 1 },
+              "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+              "background": { "enum": ["dark", "light", "any"] },
+              "use": { "$ref": "#/$defs/text" },
+              "source": { "$ref": "#/$defs/id" }
+            }
+          }
+        },
+        "placeholder": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["text", "note"],
+          "properties": { "text": { "$ref": "#/$defs/text" }, "note": { "$ref": "#/$defs/text" } }
+        },
+        "clearSpace": { "$ref": "#/$defs/text" },
+        "clearSpaceRatio": { "type": "number", "minimum": 0, "maximum": 2 },
+        "minSize": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["digitalPx", "note"],
+          "properties": {
+            "digitalPx": { "type": "number", "minimum": 8, "maximum": 2000 },
+            "note": { "$ref": "#/$defs/text" }
+          }
+        },
+        "do": { "$ref": "#/$defs/rules" },
+        "dont": { "$ref": "#/$defs/rules" },
+        "licence": { "$ref": "#/$defs/text" },
+        "source": { "$ref": "#/$defs/id" }
+      }
+    },
+    "imagery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["style", "do", "dont", "source"],
+      "properties": {
+        "style": { "$ref": "#/$defs/text" },
+        "do": { "$ref": "#/$defs/rules" },
+        "dont": { "$ref": "#/$defs/rules" },
+        "source": { "$ref": "#/$defs/id" }
+      }
+    },
+    "icons": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["style", "rules", "source"],
+      "properties": {
+        "style": { "$ref": "#/$defs/text" },
+        "rules": { "$ref": "#/$defs/rules" },
+        "source": { "$ref": "#/$defs/id" }
+      }
+    },
+    "voice": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["personality", "rules", "examples", "neverOnCreative", "source"],
+      "properties": {
+        "personality": { "$ref": "#/$defs/rules" },
+        "rules": { "$ref": "#/$defs/rules" },
+        "examples": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["say", "avoid"],
+            "properties": { "say": { "$ref": "#/$defs/text" }, "avoid": { "$ref": "#/$defs/text" } }
+          }
+        },
+        "neverOnCreative": { "type": "array", "items": { "$ref": "#/$defs/text" } },
+        "source": { "$ref": "#/$defs/id" }
+      }
+    },
+    "adCreatives": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rules", "placements", "style", "sample"],
+      "properties": {
+        "rules": { "$ref": "#/$defs/rules" },
+        "placements": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "name", "ratio", "widthPx", "heightPx", "safeZonePx", "rules", "source"],
+            "properties": {
+              "id": { "$ref": "#/$defs/id" },
+              "name": { "$ref": "#/$defs/text" },
+              "ratio": { "type": "string", "pattern": "^\\d+:\\d+$" },
+              "widthPx": { "type": "number", "minimum": 100 },
+              "heightPx": { "type": "number", "minimum": 100 },
+              "safeZonePx": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["top", "right", "bottom", "left"],
+                "properties": {
+                  "top": { "type": "number", "minimum": 0 },
+                  "right": { "type": "number", "minimum": 0 },
+                  "bottom": { "type": "number", "minimum": 0 },
+                  "left": { "type": "number", "minimum": 0 }
+                }
+              },
+              "rules": { "$ref": "#/$defs/rules" },
+              "source": { "$ref": "#/$defs/id" }
+            }
+          }
+        },
+        "style": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["background", "text", "accent", "muted", "headlineFamily", "bodyFamily", "headlineWeight", "logo", "logoPosition", "ctaBackground", "ctaText", "ctaRadiusPx"],
+          "properties": {
+            "background": { "$ref": "#/$defs/id" },
+            "text": { "$ref": "#/$defs/id" },
+            "accent": { "$ref": "#/$defs/id" },
+            "muted": { "$ref": "#/$defs/id" },
+            "headlineFamily": { "$ref": "#/$defs/id" },
+            "bodyFamily": { "$ref": "#/$defs/id" },
+            "headlineWeight": { "type": "string", "pattern": "^[1-9][0-9]{2}$" },
+            "headlineTransform": { "enum": ["none", "uppercase", "capitalize"] },
+            "logo": { "type": ["string", "null"] },
+            "logoField": { "$ref": "#/$defs/id" },
+            "logoPosition": { "enum": ["top", "bottom"] },
+            "ctaBackground": { "$ref": "#/$defs/id" },
+            "ctaText": { "$ref": "#/$defs/id" },
+            "ctaRadiusPx": { "type": "number", "minimum": 0, "maximum": 999 }
+          }
+        },
+        "sample": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["headline", "cta", "note", "source"],
+          "properties": {
+            "eyebrow": { "$ref": "#/$defs/text" },
+            "headline": { "$ref": "#/$defs/text" },
+            "emphasis": { "$ref": "#/$defs/text" },
+            "emphasisGradient": { "$ref": "#/$defs/id" },
+            "body": { "$ref": "#/$defs/text" },
+            "price": { "$ref": "#/$defs/text" },
+            "cta": { "$ref": "#/$defs/text" },
+            "note": { "$ref": "#/$defs/text" },
+            "source": { "$ref": "#/$defs/id" }
+          }
+        }
+      }
+    },
+    "socialTemplates": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name", "format", "purpose", "structure", "rules", "source"],
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "name": { "$ref": "#/$defs/text" },
+          "format": { "$ref": "#/$defs/id" },
+          "purpose": { "$ref": "#/$defs/text" },
+          "structure": { "$ref": "#/$defs/rules" },
+          "rules": { "$ref": "#/$defs/rules" },
+          "source": { "$ref": "#/$defs/id" }
+        }
+      }
+    },
+    "components": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "kind", "name", "label", "spec", "surface", "style", "rules", "source"],
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "kind": { "enum": ["button-primary", "button-secondary", "card", "chip", "input", "link", "badge"] },
+          "name": { "$ref": "#/$defs/text" },
+          "label": { "$ref": "#/$defs/text" },
+          "spec": { "$ref": "#/$defs/text" },
+          "surface": { "$ref": "#/$defs/id" },
+          "style": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["color", "radiusPx"],
+            "properties": {
+              "background": { "$ref": "#/$defs/id" },
+              "color": { "$ref": "#/$defs/id" },
+              "border": { "$ref": "#/$defs/css" },
+              "radiusPx": { "type": "number", "minimum": 0, "maximum": 999 },
+              "padding": { "$ref": "#/$defs/css" },
+              "fontWeight": { "type": "string", "pattern": "^[1-9][0-9]{2}$" },
+              "fontSizePx": { "type": "number", "minimum": 8, "maximum": 40 },
+              "family": { "$ref": "#/$defs/id" },
+              "shadow": { "$ref": "#/$defs/id" },
+              "transform": { "enum": ["none", "uppercase", "capitalize"] },
+              "letterSpacing": { "$ref": "#/$defs/css" },
+              "minHeightPx": { "type": "number", "minimum": 0, "maximum": 120 }
+            }
+          },
+          "rules": { "$ref": "#/$defs/rules" },
+          "source": { "$ref": "#/$defs/id" }
+        }
+      }
+    },
+    "motion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rules", "source"],
+      "properties": {
+        "rules": { "$ref": "#/$defs/rules" },
+        "source": { "$ref": "#/$defs/id" }
+      }
+    }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
+    "date": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+    "text": { "type": "string", "minLength": 1 },
+    "path": { "type": "string", "pattern": "^(assets|fonts)/[A-Za-z0-9._-]+$" },
+    "css": { "type": "string", "pattern": "^[^<>{};]+$" },
+    "rules": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+  }
+}

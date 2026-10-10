@@ -1,0 +1,192 @@
+{
+  "$schema": "../../schema/brand.schema.json",
+  "schemaVersion": 1,
+  "slug": "product",
+  "name": "The product (name not final)",
+  "nameSetting": "productName",
+  "status": "proposed",
+  "version": "0.1.0",
+  "updated": "2026-10-10",
+  "summary": "The AI marketing product itself: social posting and paid ads run from any AI chat. 'AdsPilot' is a working name only and is being replaced. Colours and type are taken from the product's own dashboard; adopting them as the product's brand is proposed, and there is deliberately no logo until the name is final.",
+  "ownership": {
+    "tenant": "owner",
+    "note": "The owner's own product. Served only to the owner's tenant (BRANDS_OWNER_TENANT_ID)."
+  },
+  "approval": {
+    "approvers": ["Rana Zain Usman (owner)"],
+    "rule": "Nothing here is approved: the name, any logo and the launch identity are the owner's decisions. Until the name is chosen, nothing public carries a product logo or the working name."
+  },
+  "sources": [
+    { "id": "dashboard", "kind": "file", "ref": "AI-Automation/Social-Publisher/source/apps/web/src/app/globals.css (and the dashboard's components)", "checked": "2026-10-10", "note": "The dashboard's @theme tokens: colours, system font, 12px cards, 8px controls, 0.92rem semibold buttons." },
+    { "id": "name-research", "kind": "file", "ref": "AI-Automation/Social-Publisher/research/2026-10-01-product-name.md and 2026-10-08-product-name-shortlist.md", "checked": "2026-10-10", "note": "Why 'AdsPilot' cannot stay: the name is taken." },
+    { "id": "project-rules", "kind": "file", "ref": "AI-Automation/Social-Publisher/START-HERE.md and RULES.md", "checked": "2026-10-10", "note": "The product bet and the standing rules (errors say why and how; nothing is called verified until proven)." },
+    { "id": "prop-product", "kind": "proposed", "ref": "Proposed for the product from the dashboard's values and the project rules; owner to confirm.", "checked": "2026-10-10" }
+  ],
+  "colors": [
+    { "id": "bg", "name": "Background", "hex": "#0B0D10", "role": "App background", "use": "Page background (the dashboard is dark-only today).", "source": "dashboard" },
+    { "id": "surface", "name": "Surface", "hex": "#12151A", "role": "Cards", "use": "Cards and panels.", "source": "dashboard" },
+    { "id": "surface-2", "name": "Surface 2", "hex": "#171B21", "role": "Inputs", "use": "Inputs and nested panels.", "source": "dashboard" },
+    { "id": "line", "name": "Line", "hex": "#232830", "role": "Borders", "use": "Card and input borders.", "source": "dashboard" },
+    { "id": "ink", "name": "Ink", "hex": "#E6E8EB", "role": "Text", "use": "Body and headings.", "source": "dashboard" },
+    { "id": "muted", "name": "Muted", "hex": "#9AA4B2", "role": "Secondary text", "use": "Labels, hints, placeholders.", "source": "dashboard" },
+    { "id": "brand", "name": "Violet", "hex": "#7C5CFF", "role": "Accent", "use": "Focus rings, active borders, large accents.", "source": "dashboard" },
+    { "id": "brand-soft", "name": "Violet soft", "hex": "#9D85FF", "role": "Accent text", "use": "Links and accent text on dark.", "source": "dashboard" },
+    { "id": "action", "name": "Action violet", "hex": "#6A4AF0", "role": "Button fill", "use": "Proposed fill for buttons with white labels: 5.45:1, where the dashboard's #7C5CFF gives 4.35:1.", "source": "prop-product" },
+    { "id": "white", "name": "White", "hex": "#FFFFFF", "role": "Button label", "use": "Labels on action buttons.", "source": "dashboard" },
+    { "id": "ok", "name": "OK", "hex": "#5EE6A8", "role": "Success status", "use": "Success, always with a word.", "source": "dashboard" },
+    { "id": "warn", "name": "Warn", "hex": "#FFC95C", "role": "Warning status", "use": "Warnings, always with a word.", "source": "dashboard" },
+    { "id": "bad", "name": "Bad", "hex": "#FF6B6B", "role": "Error status", "use": "Errors, always with a word and the fix (RULES R1).", "source": "dashboard" }
+  ],
+  "contrastPairs": [
+    { "fg": "ink", "bg": "bg", "use": "text", "source": "dashboard" },
+    { "fg": "muted", "bg": "bg", "use": "text", "source": "dashboard" },
+    { "fg": "muted", "bg": "surface", "use": "text", "source": "dashboard" },
+    { "fg": "ink", "bg": "surface-2", "use": "text", "source": "dashboard" },
+    { "fg": "brand-soft", "bg": "bg", "use": "text", "source": "dashboard" },
+    { "fg": "brand", "bg": "bg", "use": "ui", "note": "4.48:1: focus rings and borders, not small text.", "source": "dashboard" },
+    { "fg": "white", "bg": "brand", "use": "large-text", "note": "4.35:1. The dashboard's .btn puts 0.92rem semibold white labels on it, which is under the 4.5:1 AA minimum for normal text. Finding; proposed fix: the Action violet.", "source": "dashboard" },
+    { "fg": "white", "bg": "action", "use": "text", "source": "prop-product" },
+    { "fg": "ok", "bg": "bg", "use": "text", "source": "dashboard" },
+    { "fg": "warn", "bg": "bg", "use": "text", "source": "dashboard" },
+    { "fg": "bad", "bg": "bg", "use": "text", "source": "dashboard" },
+    { "fg": "line", "bg": "bg", "use": "decorative", "note": "Card borders only; not a control boundary on its own.", "source": "dashboard" }
+  ],
+  "gradients": [
+    { "id": "canvas", "name": "Canvas with violet glow", "css": "radial-gradient(ellipse at 20% 0%, #7C5CFF2E, transparent 60%), #0B0D10", "use": "Placeholder canvas for product ads and posts until a launch identity exists.", "source": "prop-product" }
+  ],
+  "typography": {
+    "families": [
+      {
+        "id": "system",
+        "name": "System UI",
+        "role": "Everything, as in the dashboard: the reader's own system font.",
+        "stack": "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+        "files": [],
+        "licence": { "name": "None needed", "notes": "No font file is shipped; each device uses its own system font." },
+        "source": "dashboard"
+      }
+    ],
+    "scale": [
+      { "id": "display", "role": "Display (proposed)", "family": "system", "size": "40px", "sizeMobile": "30px", "weight": "650", "lineHeight": "1.1", "tracking": "-0.02em", "sample": "Posts and ads from one AI chat", "source": "prop-product" },
+      { "id": "heading", "role": "Heading", "family": "system", "size": "18px", "weight": "600", "lineHeight": "1.3", "sample": "Connected accounts", "source": "dashboard" },
+      { "id": "body", "role": "Body", "family": "system", "size": "16px", "weight": "400", "lineHeight": "1.55", "sample": "Approve before anything goes live.", "source": "dashboard" },
+      { "id": "ui", "role": "Controls", "family": "system", "size": "14.7px", "weight": "600", "lineHeight": "1.3", "sample": "Schedule post", "source": "dashboard" },
+      { "id": "small", "role": "Small text", "family": "system", "size": "13.6px", "weight": "400", "lineHeight": "1.45", "sample": "Last checked 2 minutes ago", "source": "dashboard" }
+    ],
+    "rules": [
+      "System fonts until a launch identity is chosen: nothing to license, nothing to load.",
+      "Labels and help text at 13px or more; body 16px."
+    ]
+  },
+  "spacing": {
+    "unitPx": 4,
+    "scalePx": [4, 8, 12, 16, 20, 24, 32, 40, 48, 64],
+    "rules": ["Tailwind's 4px steps, as the dashboard uses them; cards pad 20px."],
+    "source": "dashboard"
+  },
+  "radii": [
+    { "id": "control", "px": 8, "use": "Buttons and inputs (rounded-lg).", "source": "dashboard" },
+    { "id": "card", "px": 12, "use": "Cards (--radius-card).", "source": "dashboard" },
+    { "id": "pill", "px": 999, "use": "Status pills.", "source": "dashboard" }
+  ],
+  "shadows": [],
+  "layout": {
+    "maxWidthPx": 1200,
+    "gutters": "16px mobile, 24px desktop (proposed).",
+    "breakpointsPx": [640, 768, 1024, 1280],
+    "grid": "Tailwind breakpoints, single-column forms, card grids that wrap.",
+    "rules": ["Every error says what happened, why, and the numbered steps to fix it (RULES R1)."],
+    "source": "prop-product"
+  },
+  "logo": {
+    "files": [],
+    "placeholder": {
+      "text": "Product name",
+      "note": "No logo exists and the name is not final: 'AdsPilot' is a working name and is taken. This dashed text box is a placeholder, not a logo. Do not design around it, export it, or put it on anything public. When the PRODUCT_NAME setting is set, the placeholder shows that name, still marked as a placeholder."
+    },
+    "clearSpace": "Not defined until a logo exists.",
+    "clearSpaceRatio": 0,
+    "minSize": { "digitalPx": 96, "note": "A placeholder value; set it when a real logo is designed." },
+    "do": ["Write the product name in plain text in the interface until a logo exists.", "Read the name from the product setting, never hard-code it."],
+    "dont": [
+      "Never put the working name 'AdsPilot' in a logo, on an ad or on any public image.",
+      "Never invent a logo, icon mark or wordmark for the product.",
+      "Never borrow another brand's logo (1920 Agency, a platform) as the product's mark."
+    ],
+    "licence": "None: no logo exists yet.",
+    "source": "name-research"
+  },
+  "imagery": {
+    "style": "Real screenshots of the product working: the AI chat, an approval summary, a published post. Dark interface on its own background.",
+    "do": ["Use real screens with real (or clearly labelled demo) data.", "Show the approval step: nothing goes live without the user's yes."],
+    "dont": ["No invented results, ROAS figures or customer logos.", "No platform logos implying partnership or certification.", "No mock-ups of features that are not built."],
+    "source": "prop-product"
+  },
+  "icons": {
+    "style": "Simple line icons with text labels; status shown in words as well as colour.",
+    "rules": ["Never colour alone for status: OK, Warning and Error carry a word."],
+    "source": "prop-product"
+  },
+  "voice": {
+    "personality": ["Plain", "Exact", "Calm", "Helpful"],
+    "rules": [
+      "Say what happened, why, and how to fix it (RULES R1).",
+      "Never call something verified, live or done until it has been proven against the real thing (RULES R4).",
+      "Plain words for business owners, not marketing jargon.",
+      "The working name never appears in public copy until the name is final."
+    ],
+    "examples": [
+      { "say": "Not published: the Page needs reconnecting. Reconnect it in the dashboard, then try again.", "avoid": "Error 190." },
+      { "say": "Scheduled for 15:30. You can cancel it until then.", "avoid": "Success!" }
+    ],
+    "neverOnCreative": ["AdsPilot"],
+    "source": "project-rules"
+  },
+  "adCreatives": {
+    "rules": [
+      "Until the name and identity are final, product ads are drafts only: none is published.",
+      "Show the real product (a screen recording or screenshot), the approval step, and one plain benefit.",
+      "No claims beyond what is proven live (CURRENT-STATE.md)."
+    ],
+    "placements": [
+      { "id": "feed-1x1", "name": "Feed square", "ratio": "1:1", "widthPx": 1080, "heightPx": 1080, "safeZonePx": { "top": 72, "right": 72, "bottom": 72, "left": 72 }, "rules": ["72px margins."], "source": "prop-product" },
+      { "id": "feed-4x5", "name": "Feed portrait", "ratio": "4:5", "widthPx": 1080, "heightPx": 1350, "safeZonePx": { "top": 80, "right": 72, "bottom": 80, "left": 72 }, "rules": ["Default feed format."], "source": "prop-product" },
+      { "id": "story-9x16", "name": "Story / Reel", "ratio": "9:16", "widthPx": 1080, "heightPx": 1920, "safeZonePx": { "top": 250, "right": 72, "bottom": 340, "left": 72 }, "rules": ["Text out of the top 250px and bottom 340px."], "source": "prop-product" }
+    ],
+    "style": {
+      "background": "canvas",
+      "text": "ink",
+      "accent": "brand-soft",
+      "muted": "muted",
+      "headlineFamily": "system",
+      "bodyFamily": "system",
+      "headlineWeight": "650",
+      "logo": null,
+      "logoPosition": "top",
+      "ctaBackground": "action",
+      "ctaText": "white",
+      "ctaRadiusPx": 8
+    },
+    "sample": {
+      "eyebrow": "Example",
+      "headline": "Posts and ads from one AI chat",
+      "emphasis": "one AI chat",
+      "body": "Connect your accounts, ask in plain words, approve before anything goes live.",
+      "cta": "See how it works",
+      "note": "Placeholder copy and layout. The name, logo and launch message are not decided, so this is not an ad to publish.",
+      "source": "prop-product"
+    }
+  },
+  "socialTemplates": [
+    { "id": "how-it-works", "name": "How it works carousel", "format": "feed-4x5", "purpose": "Three steps from connecting to approving, with real screens.", "structure": ["Connect your accounts", "Ask your AI in plain words", "Approve the summary", "It posts, and tells you what happened"], "rules": ["Real screenshots only; the name stays a placeholder until final."], "source": "prop-product" },
+    { "id": "feature", "name": "Feature card", "format": "feed-1x1", "purpose": "One proven feature, one screen.", "structure": ["Feature in plain words", "One screenshot", "What the user stays in control of"], "rules": ["Only features marked verified live in CURRENT-STATE.md."], "source": "prop-product" }
+  ],
+  "components": [
+    { "id": "button-primary", "kind": "button-primary", "name": "Primary button", "label": "Schedule post", "spec": "Action violet fill (proposed), white semibold label, 8px radius.", "surface": "bg", "style": { "background": "action", "color": "white", "radiusPx": 8, "padding": "10px 16px", "fontWeight": "600", "fontSizePx": 15, "family": "system", "minHeightPx": 40 }, "rules": ["Disabled at 50% opacity with the reason nearby."], "source": "prop-product" },
+    { "id": "button-ghost", "kind": "button-secondary", "name": "Ghost button", "label": "Cancel", "spec": "Line border, ink label.", "surface": "bg", "style": { "color": "ink", "border": "line", "radiusPx": 8, "padding": "10px 16px", "fontWeight": "600", "fontSizePx": 15, "family": "system", "minHeightPx": 40 }, "rules": [], "source": "dashboard" },
+    { "id": "card", "kind": "card", "name": "Card", "label": "Facebook Page", "spec": "Surface, line border, 12px radius, 20px padding.", "surface": "bg", "style": { "background": "surface", "color": "ink", "border": "line", "radiusPx": 12, "padding": "20px", "family": "system" }, "rules": [], "source": "dashboard" },
+    { "id": "input", "kind": "input", "name": "Input", "label": "Post text", "spec": "Surface 2, line border, 8px radius; violet border on focus.", "surface": "surface", "style": { "background": "surface-2", "color": "ink", "border": "line", "radiusPx": 8, "padding": "10px 12px", "fontSizePx": 16, "family": "system" }, "rules": ["Visible focus everywhere: 2px violet outline."], "source": "dashboard" },
+    { "id": "status", "kind": "badge", "name": "Status pill", "label": "Ready", "spec": "OK text on surface 2, pill.", "surface": "surface", "style": { "background": "surface-2", "color": "ok", "radiusPx": 999, "padding": "2px 10px", "fontWeight": "600", "fontSizePx": 12, "family": "system" }, "rules": ["Always a word, never colour alone."], "source": "dashboard" },
+    { "id": "link", "kind": "link", "name": "Link", "label": "View the post", "spec": "Violet soft, underlined.", "surface": "bg", "style": { "color": "brand-soft", "radiusPx": 0, "fontWeight": "500", "family": "system" }, "rules": [], "source": "dashboard" }
+  ]
+}

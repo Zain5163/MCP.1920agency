@@ -1,0 +1,268 @@
+{
+  "$schema": "../../schema/brand.schema.json",
+  "schemaVersion": 1,
+  "slug": "muzaree",
+  "name": "Muzaree",
+  "status": "proposed",
+  "version": "0.1.0",
+  "updated": "2026-10-10",
+  "summary": "Men's leather footwear from Pakistan (Chelsea boots, suede and leather loafers), sold on muzaree.com with cash on delivery. No design system existed: this one is PROPOSED from the brand's real assets (the live store's logos and fonts, the theme's colours, and the best-performing Meta ads) and needs the owner's and the client's confirmation. Its main job is future ad creatives.",
+  "ownership": {
+    "tenant": "owner",
+    "note": "A client brand managed by the agency owner. Served only to the owner's tenant (BRANDS_OWNER_TENANT_ID)."
+  },
+  "approval": {
+    "approvers": ["Rana Zain Usman (owner)", "Muzaree (client) for anything that changes how the brand looks"],
+    "rule": "Everything here is proposed until the owner confirms it (and the client, for the logo, colours and type). Ads made with it still follow the Muzaree media-buying rules: the owner's yes on every new ad, true prices only."
+  },
+  "sources": [
+    { "id": "store-live", "kind": "live", "ref": "https://muzaree.com (home page HTML and CDN files)", "checked": "2026-10-10", "note": "Logo files Refined_MUZAREE_logo.png (header, light) and Muzaree_logo_wbg.png (gold, dark), downloaded unchanged; theme fonts --g-font-1 Jost (headings) and --g-font-2 Poppins (body)." },
+    { "id": "theme-settings", "kind": "file", "ref": "Websites/Muzaree-Shopify/deliverables/muzaree-optimized-theme-2026-09-05.zip (config/settings_data.json)", "checked": "2026-10-10", "note": "Theme export of 5 Sep 2026: color_primary #222222, color_body_text #414141, color_secondary #C79A2B, header/footer #282828, buttons uppercase 12px 600 with 0.1em tracking and 40px radius. The live theme may differ." },
+    { "id": "ad-winners", "kind": "file", "ref": "AI-Automation/Muzaree-Paid-Media/reference/feb-chelsea-winners/", "checked": "2026-10-10", "note": "The account's best-ever ads (Feb 2026; 'chalsea Sales Ad -3': 220 sales at PKR 601). Backdrop colours sampled from chalsea_Sales_Ad_-3." },
+    { "id": "ad-round2", "kind": "file", "ref": "AI-Automation/Muzaree-Paid-Media/creatives/2026-10-10-round2/ (README.md, copy-chelsea.md, source/remake_chelsea.py)", "checked": "2026-10-10", "note": "Remakes with true prices: text gold rgb(205,166,92), cream rgb(238,232,222), Playfair Display; copy facts checked on muzaree.com 2026-10-09." },
+    { "id": "media-rules", "kind": "file", "ref": "AI-Automation/Muzaree-Paid-Media/STATUS.md and MEDIA-BUYING-RULES.md", "checked": "2026-10-10", "note": "Footwear only; never advertise items under PKR 5,599 (below break-even); discounts must be the true ones." },
+    { "id": "gfonts", "kind": "live", "ref": "https://github.com/google/fonts (ofl/playfairdisplay, ofl/jost, ofl/poppins)", "checked": "2026-10-10", "note": "Font files and OFL texts. Jost and Poppins subset to Latin as WOFF; Playfair Display shipped unmodified because it has a Reserved Font Name." },
+    { "id": "prop-ads", "kind": "proposed", "ref": "Proposed from the Feb 2026 winners and the round-2 remakes: backdrop colours sampled from the images, gold and cream from remake_chelsea.py, serif from the posters.", "checked": "2026-10-10" },
+    { "id": "prop-store", "kind": "proposed", "ref": "Proposed from the live store and the theme export: Jost, Poppins, #222222, #414141, #C79A2B, black pill buttons.", "checked": "2026-10-10" },
+    { "id": "prop-rules", "kind": "proposed", "ref": "Rules proposed from the paid-media notes, the round-2 copy rules and the storefront blueprint (Websites/Muzaree-Shopify/deliverables/muzaree-storefront-transformation-blueprint.md).", "checked": "2026-10-10" }
+  ],
+  "colors": [
+    { "id": "night", "name": "Night", "hex": "#090807", "role": "Ad canvas", "use": "The near-black of the best ads' backdrop. Main background for ads and dark sections.", "source": "prop-ads" },
+    { "id": "walnut", "name": "Walnut", "hex": "#3A2919", "role": "Warm backdrop", "use": "The wood-panel glow behind the product; gradients and dark cards.", "source": "prop-ads" },
+    { "id": "charcoal", "name": "Charcoal", "hex": "#232122", "role": "Textured floor", "use": "The floor the shoes stand on; lower half of ads.", "source": "prop-ads" },
+    { "id": "cream", "name": "Cream", "hex": "#EEE8DE", "role": "Text on dark", "use": "Headlines and facts on dark ads.", "source": "prop-ads" },
+    { "id": "gold", "name": "Gold", "hex": "#CDA65C", "role": "Price and emphasis on dark", "use": "The price, one emphasis word, thin rules and the CTA on dark ads.", "source": "prop-ads" },
+    { "id": "logo-gold", "name": "Logo gold", "hex": "#FEC748", "role": "The gold logo file's colour", "use": "Reserved for the logo artwork; not a text or UI colour.", "source": "prop-store" },
+    { "id": "store-ink", "name": "Store ink", "hex": "#222222", "role": "Headings on the store", "use": "Store headings, prices and dark buttons on white.", "source": "prop-store" },
+    { "id": "store-body", "name": "Store body", "hex": "#414141", "role": "Body text on the store", "use": "Paragraphs and product details on white.", "source": "prop-store" },
+    { "id": "store-dark", "name": "Store dark", "hex": "#282828", "role": "Header and footer", "use": "Store header and footer background.", "source": "prop-store" },
+    { "id": "paper", "name": "White", "hex": "#FFFFFF", "role": "Store canvas", "use": "Store background and cards.", "source": "prop-store" },
+    { "id": "black", "name": "Black", "hex": "#000000", "role": "Store buttons", "use": "Primary button fill on the store.", "source": "prop-store" },
+    { "id": "store-gold", "name": "Store gold", "hex": "#C79A2B", "role": "Theme accent", "use": "Accent lines and icons on white; on dark it can carry text. Never small text on white.", "source": "prop-store" }
+  ],
+  "contrastPairs": [
+    { "fg": "cream", "bg": "night", "use": "text", "source": "prop-ads" },
+    { "fg": "gold", "bg": "night", "use": "text", "source": "prop-ads" },
+    { "fg": "cream", "bg": "walnut", "use": "text", "source": "prop-ads" },
+    { "fg": "gold", "bg": "walnut", "use": "text", "source": "prop-ads" },
+    { "fg": "cream", "bg": "charcoal", "use": "text", "source": "prop-ads" },
+    { "fg": "gold", "bg": "charcoal", "use": "text", "source": "prop-ads" },
+    { "fg": "logo-gold", "bg": "night", "use": "ui", "note": "The gold logo on the dark canvas.", "source": "prop-store" },
+    { "fg": "store-ink", "bg": "paper", "use": "text", "source": "prop-store" },
+    { "fg": "store-body", "bg": "paper", "use": "text", "source": "prop-store" },
+    { "fg": "paper", "bg": "store-dark", "use": "text", "source": "prop-store" },
+    { "fg": "paper", "bg": "black", "use": "text", "note": "Store button label.", "source": "prop-store" },
+    { "fg": "store-gold", "bg": "store-ink", "use": "text", "source": "prop-store" },
+    { "fg": "store-gold", "bg": "paper", "use": "avoid", "note": "2.60:1: gold text on white fails; use it for lines and icons there.", "source": "prop-store" }
+  ],
+  "gradients": [
+    { "id": "studio", "name": "Studio backdrop", "css": "radial-gradient(ellipse at 50% 22%, #3A2919 0%, #1A1410 38%, #090807 70%), #090807", "use": "Ad background when there is no photo yet: a warm walnut glow fading into night, like the winning ads.", "source": "prop-ads" }
+  ],
+  "typography": {
+    "families": [
+      {
+        "id": "playfair",
+        "name": "Playfair Display",
+        "role": "Ad and poster headlines, prices and fact lines: the classic serif of the logo and the winning posters.",
+        "stack": "'Playfair Display', Georgia, 'Times New Roman', serif",
+        "files": [{ "path": "fonts/PlayfairDisplay-Variable.ttf", "weight": "400 900", "style": "normal", "format": "truetype" }],
+        "licence": {
+          "name": "SIL Open Font License 1.1 (Reserved Font Name 'Playfair Display')",
+          "file": "fonts/OFL-PlayfairDisplay.txt",
+          "url": "https://github.com/clauseggers/Playfair-Display",
+          "notes": "Copyright 2017 The Playfair Display Project Authors. Shipped unmodified from google/fonts: a subset or converted copy would be a Modified Version, which may not use the Reserved Font Name."
+        },
+        "source": "gfonts"
+      },
+      {
+        "id": "jost",
+        "name": "Jost",
+        "role": "Store headings (the live theme's heading font).",
+        "stack": "Jost, Futura, 'Century Gothic', sans-serif",
+        "files": [{ "path": "fonts/Jost-Latin.woff", "weight": "100 900", "style": "normal", "format": "woff" }],
+        "licence": {
+          "name": "SIL Open Font License 1.1",
+          "file": "fonts/OFL-Jost.txt",
+          "url": "https://github.com/indestructible-type/Jost",
+          "notes": "Copyright 2020 The Jost Project Authors. No Reserved Font Name; subset to Latin and saved as WOFF for self-hosting."
+        },
+        "source": "store-live"
+      },
+      {
+        "id": "poppins",
+        "name": "Poppins",
+        "role": "Store body text, buttons and labels (the live theme's body font).",
+        "stack": "Poppins, 'Segoe UI', Arial, sans-serif",
+        "files": [
+          { "path": "fonts/Poppins-Regular-Latin.woff", "weight": "400", "style": "normal", "format": "woff" },
+          { "path": "fonts/Poppins-Medium-Latin.woff", "weight": "500", "style": "normal", "format": "woff" }
+        ],
+        "licence": {
+          "name": "SIL Open Font License 1.1",
+          "file": "fonts/OFL-Poppins.txt",
+          "url": "https://github.com/itfoundry/Poppins",
+          "notes": "Copyright 2020 The Poppins Project Authors. No Reserved Font Name; Regular and Medium subset to Latin as WOFF."
+        },
+        "source": "store-live"
+      }
+    ],
+    "scale": [
+      { "id": "ad-headline", "role": "Ad headline (1080px canvas)", "family": "playfair", "size": "80px", "weight": "500", "lineHeight": "1.1", "sample": "Confidence Starts From The Shoes", "source": "prop-ads" },
+      { "id": "ad-price", "role": "Ad price", "family": "playfair", "size": "136px", "weight": "600", "lineHeight": "1", "sample": "Rs. 5,999", "source": "prop-ads" },
+      { "id": "ad-fact", "role": "Ad fact line", "family": "playfair", "size": "44px", "weight": "500", "lineHeight": "1.3", "sample": "Free Delivery • Cash on Delivery", "source": "prop-ads" },
+      { "id": "store-h1", "role": "Store H1", "family": "jost", "size": "46px", "sizeMobile": "32px", "weight": "400", "lineHeight": "1.25", "transform": "capitalize", "sample": "Chelsea boots", "source": "prop-store" },
+      { "id": "store-h2", "role": "Store H2", "family": "jost", "size": "38px", "sizeMobile": "28px", "weight": "400", "lineHeight": "1.3", "transform": "capitalize", "sample": "Suede loafers", "source": "prop-store" },
+      { "id": "store-body", "role": "Store body", "family": "poppins", "size": "16px", "weight": "400", "lineHeight": "1.6", "sample": "Premium cow leather. Brown or matt black, sizes 39 to 44.", "source": "prop-store" },
+      { "id": "store-button", "role": "Store button", "family": "poppins", "size": "12px", "weight": "500", "lineHeight": "1", "tracking": "0.1em", "transform": "uppercase", "sample": "Add to cart", "source": "prop-store" }
+    ],
+    "rules": [
+      "Ads: one serif family (Playfair Display) for headline, price and facts, centred, generous letter spacing on the facts line.",
+      "Store: Jost for headings, Poppins for text. Body text 16px (the theme uses 14px; 16px is the proposed minimum).",
+      "Capitalised product headlines are the brand's habit ('Confidence Starts From The Shoes'); keep it for headlines only."
+    ]
+  },
+  "spacing": {
+    "unitPx": 8,
+    "scalePx": [4, 8, 12, 16, 24, 32, 48, 64, 96],
+    "rules": ["Ads: about 64px margins on a 1080px canvas, and air around the price.", "Store: 8px steps; more space between sections than inside them."],
+    "source": "prop-store"
+  },
+  "radii": [
+    { "id": "label", "px": 2, "use": "Product labels (theme radius_label).", "source": "prop-store" },
+    { "id": "card", "px": 4, "use": "Product cards and images.", "source": "prop-store" },
+    { "id": "button", "px": 40, "use": "Buttons and size chips (theme border_radius_btn 40).", "source": "prop-store" }
+  ],
+  "shadows": [
+    { "id": "product", "css": "0 18px 40px rgba(0, 0, 0, 0.45)", "use": "A grounded shadow under shoes cut out onto a dark canvas.", "source": "prop-ads" }
+  ],
+  "layout": {
+    "maxWidthPx": 1280,
+    "gutters": "16px mobile, 24px tablet, 32px desktop (proposed).",
+    "breakpointsPx": [576, 768, 992, 1200],
+    "grid": "Product grid: 2 columns mobile, 3 tablet, 4 desktop.",
+    "rules": [
+      "Mobile first: one focused value proposition, one primary CTA and one secondary path on the first screen.",
+      "Size, availability, delivery promise, exchange summary and payment options sit near the buy button.",
+      "No fake scarcity: show stock only when the count is accurate."
+    ],
+    "source": "prop-rules"
+  },
+  "logo": {
+    "files": [
+      { "id": "black", "name": "Muzaree logo, black (with 'Timeless Elegance')", "path": "assets/muzaree-logo-black.png", "format": "png", "widthPx": 1024, "heightPx": 286, "sha256": "ce146284c56413f44220ca621a937c0dcda5e0c8a0250c2a68acbfb94428ea98", "background": "light", "use": "The store header on white, light layouts, packaging inserts.", "source": "store-live" },
+      { "id": "gold", "name": "Muzaree logo, gold (with 'Timeless Elegance')", "path": "assets/muzaree-logo-gold.png", "format": "png", "widthPx": 300, "heightPx": 78, "sha256": "67ed187014d9cff9b087623155b07d80671f6934c55ae4eb8e331ba7b6328315", "background": "dark", "use": "Dark ads and the dark store header. Only 300px wide: ask the client for a larger gold master before using it bigger than that.", "source": "store-live" }
+    ],
+    "clearSpace": "Proposed: at least one third of the logo's height on every side.",
+    "clearSpaceRatio": 0.33,
+    "minSize": { "digitalPx": 140, "note": "Proposed: 140px wide on screen so 'TIMELESS ELEGANCE' stays readable; on a 1080px ad, 260-300px wide (the gold file's native width is 300px)." },
+    "do": [
+      "Use the two original files only: gold on dark, black on light.",
+      "Bottom-centre on ads, as in the winning posters, with clear space above it.",
+      "Keep the ring mark, the name and the tagline together and in proportion."
+    ],
+    "dont": [
+      "Never retype 'Muzaree' in a font as the logo. (The February posters set the word in a serif; use the real logo file instead.)",
+      "Never recolour, stretch, outline or add effects; never separate the ring mark from the name without a client-approved mark.",
+      "Never put the black logo on dark or the gold logo on white.",
+      "Never enlarge the 300px gold file past its size."
+    ],
+    "licence": "Muzaree's trademark, downloaded unchanged from the live store's CDN on 2026-10-10 for the agency's work for Muzaree. Not for any other use.",
+    "source": "prop-rules"
+  },
+  "imagery": {
+    "style": "Low-key studio product photography: the real shoes in pairs (brown beside matt black), on a dark textured floor against warm walnut wood, lit from the side so the leather shines, with small gold props (a lantern, a tray, the gold-marked box). The product fills the lower two-thirds; the upper third is quiet for the headline.",
+    "do": [
+      "Real product photos only, in the shoe's true colour; show the pair, the sole and the leather texture.",
+      "Two colourways side by side when both are on sale.",
+      "Leave the top third calm and dark enough for cream and gold type.",
+      "Recompose for each format; never stretch a 4:5 into 9:16."
+    ],
+    "dont": [
+      "No AI-generated shoes or details that differ from the real product.",
+      "No watches or replica-brand products in ads (footwear only).",
+      "No busy backgrounds, bright colours or white studio sweeps on ads.",
+      "No product photo that shows a colour, size or price not currently on the store."
+    ],
+    "source": "prop-ads"
+  },
+  "icons": {
+    "style": "Simple line icons for the service promises (free delivery, cash on delivery, warranty), as on the live store; one stroke weight, in gold on dark or ink on white.",
+    "rules": [
+      "Each icon sits beside its words; never an icon alone.",
+      "No '24/7' or 'money-back' icons unless the promise is confirmed (the blueprint flags both)."
+    ],
+    "source": "prop-store"
+  },
+  "voice": {
+    "personality": ["Confident", "Classic", "Aspirational", "Direct", "Honest about price"],
+    "rules": [
+      "Lead with how the shoes make him look and feel, then the facts: material, colours, sizes, price, delivery, payment.",
+      "Price format: 'Rs. 5,999 (was Rs. 10,999)'. Only the true current price and the true discount (10,999 to 5,999 is 45%).",
+      "Name occasions that matter to the buyer: office, dinner, a wedding, a mehndi.",
+      "Roman Urdu versions are welcome for the same facts.",
+      "No false urgency ('limited time', 'selling fast', 'only a few left') unless the store shows it is true.",
+      "No promise that is not confirmed: 'easy exchange', '24/7 support', '100% money-back'.",
+      "Footwear only. Never advertise items priced under PKR 5,599 (they lose money after ad costs).",
+      "One brand name once: never 'Muzaree Muzaree'."
+    ],
+    "examples": [
+      { "say": "Rs. 5,999 (was Rs. 10,999). Free delivery. Cash on delivery.", "avoid": "Up to 70% OFF (when the biggest real discount is 57%)" },
+      { "say": "Confidence Starts From The Shoes", "avoid": "Limited time offer! Selling fast!" },
+      { "say": "Premium cow leather Chelsea boots, sizes 39 to 44.", "avoid": "Best quality guaranteed, 100% money back" }
+    ],
+    "neverOnCreative": ["AdsPilot", "Up to 70%", "Flat 50%"],
+    "source": "prop-rules"
+  },
+  "adCreatives": {
+    "rules": [
+      "Layout of the best-ever ads: serif headline centred at the top, one large gold price, one or two fact lines, the real shoes in the lower two-thirds, the gold logo bottom-centre.",
+      "One message and one price per ad. The price and any discount must match the live store on the day the ad goes live.",
+      "Link to the product page of the advertised shoe, never to /collections/bags.",
+      "Text stays inside the safe area of every placement; check the Ads Manager preview before asking for approval.",
+      "Let Meta's CTA button (Order Now / Shop Now) do the action; a drawn button is optional.",
+      "Every new ad needs the owner's yes on the summary; nothing launches on its own."
+    ],
+    "placements": [
+      { "id": "feed-1x1", "name": "Feed square", "ratio": "1:1", "widthPx": 1080, "heightPx": 1080, "safeZonePx": { "top": 64, "right": 64, "bottom": 64, "left": 64 }, "rules": ["Headline and price in the top 40%, shoes below, logo at the bottom."], "source": "prop-rules" },
+      { "id": "feed-4x5", "name": "Feed portrait", "ratio": "4:5", "widthPx": 1080, "heightPx": 1350, "safeZonePx": { "top": 80, "right": 64, "bottom": 80, "left": 64 }, "rules": ["The winners' format: the default for feed ads."], "source": "prop-rules" },
+      { "id": "story-9x16", "name": "Story / Reel", "ratio": "9:16", "widthPx": 1080, "heightPx": 1920, "safeZonePx": { "top": 250, "right": 64, "bottom": 340, "left": 64 }, "rules": ["Keep text and logo out of the top 250px and the bottom 340px; recheck in the placement preview.", "Rebuild from the photo; do not stretch the 4:5."], "source": "prop-rules" }
+    ],
+    "style": {
+      "background": "studio",
+      "text": "cream",
+      "accent": "gold",
+      "muted": "cream",
+      "headlineFamily": "playfair",
+      "bodyFamily": "playfair",
+      "headlineWeight": "500",
+      "logo": "gold",
+      "logoPosition": "bottom",
+      "ctaBackground": "gold",
+      "ctaText": "night",
+      "ctaRadiusPx": 40
+    },
+    "sample": {
+      "eyebrow": "Chelsea Boots",
+      "headline": "Confidence Starts From The Shoes",
+      "price": "Rs. 5,999",
+      "body": "Free Delivery • Cash on Delivery",
+      "cta": "Order Now",
+      "note": "Example from the round-2 copy (price checked on muzaree.com 2026-10-09). Re-check the live price and discount before any use.",
+      "source": "ad-round2"
+    }
+  },
+  "socialTemplates": [
+    { "id": "price-poster", "name": "Price poster", "format": "feed-4x5", "purpose": "One product, one true price: the format of the 220-sale February winner.", "structure": ["Serif headline (offer or occasion)", "'Every pair only' or the product name", "Large gold price", "Fact lines: delivery, payment, material, sizes", "The real shoes", "Gold logo, bottom-centre"], "rules": ["Remake of chalsea Sales Ad -3 (creatives/2026-10-10-round2/chelsea-5999-poster.jpg)."], "source": "ad-round2" },
+    { "id": "sale-poster", "name": "Sale poster", "format": "feed-4x5", "purpose": "A season or sale message with the true discount.", "structure": ["Small caps line (what is included)", "One large word (SALE)", "The real shoes", "The true discount or price", "Gold logo"], "rules": ["Only the real discount: never 'flat' when it varies by item."], "source": "ad-winners" },
+    { "id": "product-carousel", "name": "Product carousel", "format": "feed-1x1", "purpose": "Several models, one per card, each with its own price.", "structure": ["One shoe per card on the studio backdrop", "Model name and price", "Logo on the first and last card"], "rules": ["Every card links to its own product page."], "source": "prop-rules" },
+    { "id": "story-price", "name": "Story price card", "format": "story-9x16", "purpose": "The price poster rebuilt for stories and reels.", "structure": ["Headline below the top 250px", "Price in the middle", "Shoes", "Logo above the bottom 340px"], "rules": ["Rebuild, never stretch, the 4:5 poster."], "source": "prop-rules" }
+  ],
+  "components": [
+    { "id": "button-primary", "kind": "button-primary", "name": "Store button", "label": "Add to cart", "spec": "Black pill, white uppercase Poppins 12px, 0.1em tracking; at least 44px tall.", "surface": "paper", "style": { "background": "black", "color": "paper", "radiusPx": 40, "padding": "14px 28px", "fontWeight": "500", "fontSizePx": 12, "family": "poppins", "transform": "uppercase", "letterSpacing": "0.1em", "minHeightPx": 44 }, "rules": ["One primary action per product page: add to cart or buy now."], "source": "prop-store" },
+    { "id": "button-secondary", "kind": "button-secondary", "name": "Outline button", "label": "Size guide", "spec": "Ink outline pill on white.", "surface": "paper", "style": { "color": "store-ink", "border": "store-ink", "radiusPx": 40, "padding": "14px 28px", "fontWeight": "500", "fontSizePx": 12, "family": "poppins", "transform": "uppercase", "letterSpacing": "0.1em", "minHeightPx": 44 }, "rules": ["Secondary paths only (size guide, details)."], "source": "prop-store" },
+    { "id": "product-card", "kind": "card", "name": "Product card", "label": "Matt black Chelsea boots", "spec": "White card, image first, name in Jost, price in ink; sale price beside the struck-through was-price.", "surface": "paper", "style": { "background": "paper", "color": "store-ink", "border": "1px solid #E6E6E6", "radiusPx": 4, "padding": "16px", "family": "poppins" }, "rules": ["Consistent names (no 'Muzaree Muzaree'), real prices, readable touch targets."], "source": "prop-rules" },
+    { "id": "size-chip", "kind": "chip", "name": "Size chip", "label": "42", "spec": "Pill chip for sizes 39-44; selected state filled ink.", "surface": "paper", "style": { "color": "store-ink", "border": "store-body", "radiusPx": 40, "padding": "6px 14px", "fontWeight": "500", "fontSizePx": 14, "family": "poppins" }, "rules": ["Sold-out sizes say so in words, not only with a strike."], "source": "prop-store" },
+    { "id": "sale-badge", "kind": "badge", "name": "Sale badge", "label": "Save 45%", "spec": "Ink label with white text: the true percentage only.", "surface": "paper", "style": { "background": "store-ink", "color": "paper", "radiusPx": 2, "padding": "3px 8px", "fontWeight": "500", "fontSizePx": 12, "family": "poppins" }, "rules": ["Replaces the theme's mint sale label, which is off-palette."], "source": "prop-store" },
+    { "id": "input", "kind": "input", "name": "Text field", "label": "Phone number", "spec": "Label above, 16px text, visible border.", "surface": "paper", "style": { "background": "paper", "color": "store-ink", "border": "store-body", "radiusPx": 4, "padding": "12px 14px", "fontSizePx": 16, "family": "poppins" }, "rules": ["Ask only for what delivery needs."], "source": "prop-rules" }
+  ]
+}

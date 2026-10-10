@@ -1,0 +1,265 @@
+{
+  "$schema": "../../schema/brand.schema.json",
+  "schemaVersion": 1,
+  "slug": "1920-agency",
+  "name": "1920 Agency",
+  "status": "mixed",
+  "version": "1.0.0",
+  "updated": "2026-10-10",
+  "summary": "A full-service marketing team helping businesses with ads, search, social media, video, websites and AI tools. Editorial typography on near-black surfaces, controlled violet accents, real project imagery. Imported from the approved website foundation v1.0 (locked 28 Sep 2026); ad and social rules added where the source is silent are marked proposed.",
+  "ownership": {
+    "tenant": "owner",
+    "note": "The agency owner's own brand. Served only to the owner's tenant (BRANDS_OWNER_TENANT_ID)."
+  },
+  "approval": {
+    "approvers": ["Rana Zain Usman (owner)"],
+    "rule": "Changes to the colours, type, logo or signature graphics are a new version of the approved foundation and need the owner's explicit yes; record the date and reason. Proposed values are not approved until the owner confirms them."
+  },
+  "sources": [
+    { "id": "guide", "kind": "file", "ref": "Websites/1920-agency/design-system/BRAND-DESIGN-SYSTEM.md", "checked": "2026-10-10", "note": "Version 1.3, approved foundation v1.0 (28 Sep 2026). Its v1.3 'current adopted website rules' take precedence over its older component measurements." },
+    { "id": "tokens", "kind": "file", "ref": "Websites/1920-agency/design-system/tokens.css", "checked": "2026-10-10", "note": "The guide's implementation values (v1.3)." },
+    { "id": "homepage", "kind": "file", "ref": "Websites/1920-agency/prototypes/growth-modern-fusion/ (refinement.css, design-tokens.css)", "checked": "2026-10-10", "note": "The approved, locked homepage. FOUNDATION-LOCK.md: its rendered CSS takes precedence over conflicting guide examples." },
+    { "id": "logo-kit", "kind": "file", "ref": "Websites/1920-agency/deliverables/original-logos/ (README.md, sources.json)", "checked": "2026-10-10", "note": "Untouched originals; the copies here match the SHA-256 values in sources.json." },
+    { "id": "font", "kind": "file", "ref": "Websites/1920-agency/assets/manrope.woff2", "checked": "2026-10-10", "note": "The site's self-hosted Manrope (weights 200-800 per the homepage @font-face). Licence text from github.com/google/fonts ofl/manrope/OFL.txt." },
+    { "id": "social-render", "kind": "file", "ref": "AI-Automation/Social-Render (config.json, PROJECT-CONTEXT.md, templates/brand.css)", "checked": "2026-10-10", "note": "Only its formats, story safe zones, minimum text sizes and never-on-image list are used here. Its colours and Geist type are the owner's PERSONAL brand (Zain-Personal-Branding), not 1920 Agency, so none of them are imported." },
+    { "id": "proposed", "kind": "proposed", "ref": "Rules written for ads and social posts where the 1920 sources say nothing, built only from the values above.", "checked": "2026-10-10" }
+  ],
+  "colors": [
+    { "id": "onyx", "name": "Deep Onyx", "hex": "#0D0C10", "role": "Authoritative background", "use": "Main canvas, navigation, large dark surfaces. About 75-85% of a composition.", "source": "guide" },
+    { "id": "violet", "name": "Electric Violet", "hex": "#7B2CBF", "role": "Authoritative action and identity colour", "use": "Primary actions, selected states, signature graphics. 5-8% of a composition. Never for text on Onyx.", "source": "guide" },
+    { "id": "amethyst", "name": "Amethyst Tint", "hex": "#C77DFF", "role": "Authoritative highlight", "use": "Eyebrows, secondary emphasis, icons, highlights, glow, focus rings. 2-5% of a composition.", "source": "guide" },
+    { "id": "white", "name": "Pure Stark White", "hex": "#FFFFFF", "role": "Authoritative high-contrast text", "use": "Headings, body copy, proof points. 8-15% of a composition.", "source": "guide" },
+    { "id": "bg-subtle", "name": "Onyx subtle", "hex": "#100F13", "role": "Derived section variation", "use": "Alternate section backgrounds.", "source": "tokens" },
+    { "id": "surface", "name": "Surface", "hex": "#151319", "role": "Derived raised panel", "use": "Cards and raised panels.", "source": "tokens" },
+    { "id": "surface-alt", "name": "Surface alt", "hex": "#121015", "role": "Derived supporting section", "use": "Supporting sections.", "source": "tokens" },
+    { "id": "text-secondary", "name": "Text secondary", "hex": "#C8C4CC", "role": "Derived supporting copy", "use": "Lead and supporting paragraphs.", "source": "tokens" },
+    { "id": "text-muted", "name": "Text muted", "hex": "#AAA4B0", "role": "Derived labels and metadata", "use": "Labels, captions, metadata.", "source": "tokens" },
+    { "id": "display-muted", "name": "Display muted", "hex": "#79757F", "role": "Large secondary headline treatment", "use": "Only for large display text; never small or critical text.", "source": "tokens" },
+    { "id": "text-on-light", "name": "Text on light", "hex": "#1B1423", "role": "Labels on lavender project backgrounds", "use": "Text on the lavender and pearl project stages.", "source": "tokens" },
+    { "id": "violet-deep", "name": "Violet deep", "hex": "#5D1F95", "role": "Gradient end for actions", "use": "Second stop of the CTA gradient; not a separate brand colour.", "source": "guide" },
+    { "id": "lavender", "name": "Lavender stage", "hex": "#DED0F4", "role": "Project stage highlight", "use": "Light stop of the lavender project-stage gradient only.", "source": "guide" }
+  ],
+  "contrastPairs": [
+    { "fg": "white", "bg": "onyx", "use": "text", "documentedRatio": 19.5, "note": "Approved for all text sizes and essential UI.", "source": "guide" },
+    { "fg": "amethyst", "bg": "onyx", "use": "text", "documentedRatio": 7.25, "note": "Approved for body text, labels, icons and focus states.", "source": "guide" },
+    { "fg": "white", "bg": "violet", "use": "text", "documentedRatio": 7.11, "note": "Approved for CTA labels and selected controls.", "source": "guide" },
+    { "fg": "violet", "bg": "onyx", "use": "decorative", "documentedRatio": 2.74, "note": "Decorative shapes only: use White or Amethyst for meaningful text and interaction cues.", "source": "guide" },
+    { "fg": "text-secondary", "bg": "onyx", "use": "text", "source": "tokens" },
+    { "fg": "text-muted", "bg": "onyx", "use": "text", "source": "tokens" },
+    { "fg": "display-muted", "bg": "onyx", "use": "large-text", "note": "4.33:1: large display text only, as the guide says.", "source": "tokens" },
+    { "fg": "white", "bg": "surface", "use": "text", "source": "tokens" },
+    { "fg": "text-muted", "bg": "surface", "use": "text", "source": "tokens" },
+    { "fg": "white", "bg": "violet-deep", "use": "text", "note": "The CTA label stays readable across the whole gradient.", "source": "guide" },
+    { "fg": "text-on-light", "bg": "lavender", "use": "text", "source": "tokens" }
+  ],
+  "gradients": [
+    { "id": "cta", "name": "Primary CTA", "css": "linear-gradient(125deg, #7B2CBF, #602295)", "use": "Primary buttons, with White text. The guide writes linear-gradient(115deg, #7B2CBF, #5D1F95); the approved homepage renders this one, and the homepage wins.", "source": "homepage" },
+    { "id": "hero-text", "name": "Hero text", "css": "linear-gradient(110deg, #FFFFFF 0%, #C77DFF 85%)", "use": "One short phrase in a major heading. Never on paragraphs. The guide's three-stop version (to #7B2CBF) is superseded by the homepage.", "source": "homepage" },
+    { "id": "glow", "name": "Ambient glow", "css": "radial-gradient(ellipse, #7B2CBF42, transparent 66%)", "use": "Soft background glow behind a focal point.", "source": "guide" },
+    { "id": "onyx-glow", "name": "Onyx with glow", "css": "radial-gradient(ellipse at 30% 0%, #7B2CBF42, transparent 62%), #0D0C10", "use": "Canvas for ads and social posts: Onyx with one soft violet glow at the top.", "source": "proposed" },
+    { "id": "lavender-stage", "name": "Lavender project stage", "css": "radial-gradient(ellipse at 30% 10%, #DED0F4, #AA8CCB 55%, #6D528C)", "use": "Behind real project screenshots.", "source": "guide" },
+    { "id": "charcoal-stage", "name": "Charcoal project stage", "css": "radial-gradient(ellipse at top, #3D3845, #1C1A20)", "use": "Behind real project screenshots.", "source": "guide" },
+    { "id": "pearl-stage", "name": "Pearl project stage", "css": "linear-gradient(130deg, #D3C7DF, #AAA1B5)", "use": "Behind real project screenshots.", "source": "guide" }
+  ],
+  "typography": {
+    "families": [
+      {
+        "id": "manrope",
+        "name": "Manrope",
+        "role": "The only brand family: display, headings, body and labels. No second display font.",
+        "stack": "Manrope, Arial, sans-serif",
+        "files": [{ "path": "fonts/Manrope.woff2", "weight": "200 800", "style": "normal", "format": "woff2" }],
+        "licence": {
+          "name": "SIL Open Font License 1.1",
+          "file": "fonts/OFL-Manrope.txt",
+          "url": "https://github.com/googlefonts/manrope",
+          "notes": "Copyright 2018 The Manrope Project Authors. No Reserved Font Name, so self-hosting and subsetting are allowed; keep the licence text with every copy. The file is the site's own copy, unchanged."
+        },
+        "source": "font"
+      }
+    ],
+    "scale": [
+      { "id": "display", "role": "Hero display", "family": "manrope", "size": "clamp(68px, 6.8vw, 108px)", "sizeMobile": "clamp(48px, 12vw, 72px)", "weight": "600", "lineHeight": "1.06", "tracking": "-0.055em", "sample": "We help your business grow online", "source": "guide" },
+      { "id": "heading", "role": "Section heading", "family": "manrope", "size": "clamp(36px, 3.4vw, 54px)", "sizeMobile": "32-38px", "weight": "500", "lineHeight": "1.18", "tracking": "-0.035em", "sample": "Websites designed around your customers", "source": "guide" },
+      { "id": "component-heading", "role": "Component heading", "family": "manrope", "size": "22px", "sizeMobile": "18-22px", "weight": "600", "lineHeight": "1.3", "sample": "Search engine optimization", "source": "tokens" },
+      { "id": "lead", "role": "Lead paragraph", "family": "manrope", "size": "20px", "sizeMobile": "18-20px", "weight": "400", "lineHeight": "1.6", "sample": "One team to bring it all together.", "source": "guide" },
+      { "id": "body", "role": "Body", "family": "manrope", "size": "16px", "weight": "400", "lineHeight": "1.7", "sample": "Tell us what you have in mind. Save time with AI.", "source": "guide" },
+      { "id": "label", "role": "Navigation and controls", "family": "manrope", "size": "14px", "weight": "600", "lineHeight": "1.5", "sample": "Talk to us", "source": "tokens" },
+      { "id": "eyebrow", "role": "Eyebrow / section label", "family": "manrope", "size": "12px", "weight": "600", "lineHeight": "1.5", "tracking": "0.16em", "transform": "uppercase", "sample": "05 · Talk to us", "source": "tokens" }
+    ],
+    "rules": [
+      "Sentence case for headings and buttons. Uppercase only for short section labels, category tags and decorative bands.",
+      "Tracking: display about -0.055em, section headings -0.035em, body normal, uppercase eyebrows +0.14em to +0.20em.",
+      "16px for substantive body copy; meaningful labels and controls 14-16px; never put essential meaning in 6-10px microtype.",
+      "Body reading width 45-70 characters; hero description about 390px wide.",
+      "One H1 per page and a logical H2/H3 outline. Avoid em dashes in website headings.",
+      "Gradient text on one short phrase within a major heading only; paragraphs stay solid."
+    ]
+  },
+  "spacing": {
+    "unitPx": 4,
+    "scalePx": [4, 8, 12, 16, 20, 24, 32, 40, 48, 64, 80, 104, 120],
+    "rules": [
+      "Section spacing 105px desktop, 80px intermediate, 65px mobile; major features 120-140px where the content justifies it.",
+      "Component gaps 16-32px. Large split sections 48-100px desktop, 24-40px mobile.",
+      "Generous margins and a quiet background around major statements: space creates emphasis."
+    ],
+    "source": "guide"
+  },
+  "radii": [
+    { "id": "chip", "px": 4, "use": "Informational tags and chips.", "source": "tokens" },
+    { "id": "card", "px": 20, "use": "Cards (18-22px in v1.3).", "source": "tokens" },
+    { "id": "panel", "px": 28, "use": "Major panels.", "source": "guide" },
+    { "id": "pill", "px": 999, "use": "Actions, filters and round icon controls (v1.3: pill actions).", "source": "tokens" }
+  ],
+  "shadows": [
+    { "id": "button", "css": "inset 0 1px 0 #FFFFFF26, 0 12px 36px #7B2CBF25", "use": "Primary CTA resting glow (homepage).", "source": "homepage" },
+    { "id": "button-hover", "css": "0 8px 36px #7B2CBF66", "use": "CTA hover glow.", "source": "tokens" },
+    { "id": "project", "css": "0 22px 60px #10071F66", "use": "Project browser frame depth.", "source": "tokens" }
+  ],
+  "layout": {
+    "maxWidthPx": 1320,
+    "gutters": "5% desktop, 6% mobile, never under 20px. Outer page wrapper 1600px at most.",
+    "breakpointsPx": [760, 1100, 1700],
+    "grid": "Planning grid of 12 columns desktop, 8 intermediate, 4 mobile; pages use purpose-built CSS grids.",
+    "rules": [
+      "Hero: about half copy and half art, heading clear of the sculpture; on mobile stack copy, actions, then art.",
+      "Never overlay essential body copy on artwork. No fixed heights on text containers.",
+      "Test 320, 390, 768, 1024, 1440 and 1920px widths, plus zoom and long content."
+    ],
+    "source": "guide"
+  },
+  "logo": {
+    "files": [
+      { "id": "primary-white", "name": "Primary logo, white horizontal (transparent)", "path": "assets/primary-white.png", "format": "png", "widthPx": 200, "heightPx": 80, "sha256": "05d9cfe316b2b027045a4e14c876952f0cc80a6d4a7ca753f47bf6492b31dd07", "background": "dark", "use": "The website primary and the default on every creative. Header 156px wide desktop / 128px mobile; footer 180px / 156px.", "source": "logo-kit" },
+      { "id": "alternate-purple", "name": "Alternate logo, purple horizontal", "path": "assets/alternate-purple.png", "format": "png", "widthPx": 200, "heightPx": 80, "sha256": "f4de0247d6e943d6f89c3f87bb18c2f7019326e37f3b24bfd4fb8183b4bf380f", "background": "dark", "use": "Alternate for dark backgrounds.", "source": "logo-kit" },
+      { "id": "compact-square", "name": "Square icon (four circles)", "path": "assets/compact-square.png", "format": "png", "widthPx": 500, "heightPx": 500, "sha256": "04d46ce6eaf197f0283e002d215adbf17283e4289edff2fc291af20400b7e79c", "background": "dark", "use": "Avatars, app icons and favicons. Fine detail softens at very small sizes.", "source": "logo-kit" }
+    ],
+    "clearSpace": "At least 25% of the displayed logo height on every side.",
+    "clearSpaceRatio": 0.25,
+    "minSize": { "digitalPx": 128, "note": "128px wide is the mobile header size. The horizontal originals are 200px rasters: do not enlarge them past native size for print, and do not call the display SVGs vector masters." },
+    "do": [
+      "Use the supplied original files exactly as they are.",
+      "Place them on Deep Onyx or another dark brand panel; on a light layout, put the original on a dark panel.",
+      "Keep the aspect ratio and the clear space.",
+      "Use the square four-circle version for avatars and icons."
+    ],
+    "dont": [
+      "Never trace, recolour, redraw, outline or add effects to the logo.",
+      "Never recreate the lettering in a font, or type '1920 Agency' as a logo.",
+      "Never stretch, rotate or animate the letters independently (the website's approved reveal is the only motion).",
+      "Never use the retired Connected Progress or other generated logo concepts.",
+      "Never use the 500px black-canvas reference image in place of the transparent original."
+    ],
+    "licence": "The agency's own trademark artwork, supplied by the owner. For 1920 Agency work only; not a general redistribution kit.",
+    "source": "logo-kit"
+  },
+  "imagery": {
+    "style": "Authentic project, team and process imagery on near-black: real screenshots in dark browser frames over lavender, charcoal or pearl stages; soft, directional lighting; sculptural violet geometry (orbits, signal star, flow ribbon) as one dominant graphic per composition.",
+    "do": [
+      "Use real portfolio screenshots with accurate project names; client colours stay inside their frame.",
+      "Use one dominant graphic per composition; secondary shapes faint and at the edges.",
+      "Natural skin tones and quiet, thoughtful framing for people.",
+      "SVG for vectors and icons, WebP or AVIF for new photography, explicit dimensions."
+    ],
+    "dont": [
+      "No stock portraits presented as clients, staff or testimonials.",
+      "No rainbow iridescence, cyan highlights, metallic gold or bright green as brand decoration.",
+      "No generic stock business illustrations, clutter or glass on every card.",
+      "Never manufacture or alter client results in a screenshot."
+    ],
+    "source": "guide"
+  },
+  "icons": {
+    "style": "Small, authentic tool and platform marks (original SVG geometry, monochrome white, 14-18px) inside illustrations; Adobe marks keep their colours on 20px tiles.",
+    "rules": [
+      "Icons supplement labels; never replace a label without an accessible name.",
+      "Use 2-5 marks around an illustration and keep the central message clear.",
+      "Keep each mark's original geometry; sources and licences are recorded in the site's assets/tools/. No partnership is implied."
+    ],
+    "source": "guide"
+  },
+  "voice": {
+    "personality": ["Confident", "Thoughtful", "Precise", "Inventive", "Approachable"],
+    "rules": [
+      "Write like an informed creative partner: clear, energetic, specific and human. Use 'we' for the agency and 'you' for the reader.",
+      "Plain language a grade 7-8 reader can follow: short sentences, familiar words, one idea at a time.",
+      "Explain what a service does before listing tools. Explain AI with practical examples (answering questions, handling repeat tasks).",
+      "Headings 3-8 words; CTAs a clear action of 2-5 words.",
+      "Keep claims, reach, response times, ratings and client outcomes evidence-led. Never invent scale, results, reviews or dates.",
+      "Spell services out: 'Search engine optimization', not 'SEO', in headings and rotating service lines.",
+      "Markets served are 'Pakistan, Bahrain, the UK and the USA'; the base is Islamabad. Never imply an office where there is none."
+    ],
+    "examples": [
+      { "say": "We help your business grow online.", "avoid": "Measurable momentum for your digital ambition." },
+      { "say": "Save time with AI.", "avoid": "Unlock intelligent workflow orchestration." },
+      { "say": "Websites designed around your customers.", "avoid": "Guaranteed 10x conversions." },
+      { "say": "Tell us what you have in mind.", "avoid": "Submit your requirements immediately." },
+      { "say": "Prepare my enquiry (when nothing is sent)", "avoid": "Send message (when nothing is actually sent)" }
+    ],
+    "neverOnCreative": ["AdsPilot"],
+    "source": "guide"
+  },
+  "adCreatives": {
+    "rules": [
+      "Recipe from the guide: logo with clear space, one short message, one signature graphic or genuine project image, a restrained CTA.",
+      "Rebuild the hierarchy for each format; never crop a whole web page into a post.",
+      "Gradient text on one phrase only; everything else solid White or Amethyst on Onyx.",
+      "At 1080px wide: body text at least 34px and no text under 24px (Social-Render's checks).",
+      "Never on an image: links, digit runs of 8 or more (account, campaign or pixel IDs), tokens, 'swipe', or the product's working name.",
+      "Static compositions where the channel ignores reduced-motion settings.",
+      "Every result, rating or client claim on an ad needs evidence; otherwise leave it out."
+    ],
+    "placements": [
+      { "id": "feed-1x1", "name": "Feed square", "ratio": "1:1", "widthPx": 1080, "heightPx": 1080, "safeZonePx": { "top": 72, "right": 80, "bottom": 76, "left": 80 }, "rules": ["Social-Render square margins: 80px sides, 72px top, 76px bottom."], "source": "social-render" },
+      { "id": "feed-4x5", "name": "Feed portrait", "ratio": "4:5", "widthPx": 1080, "heightPx": 1350, "safeZonePx": { "top": 84, "right": 88, "bottom": 96, "left": 88 }, "rules": ["The default for feed posts and carousels (Social-Render's portrait format).", "Margins: 88px sides, 84px top, 96px bottom."], "source": "social-render" },
+      { "id": "story-9x16", "name": "Story / Reel", "ratio": "9:16", "widthPx": 1080, "heightPx": 1920, "safeZonePx": { "top": 250, "right": 96, "bottom": 340, "left": 96 }, "rules": ["Keep copy out of the top 250px and bottom 340px app overlays.", "Check the real placement preview before launch; overlay sizes change."], "source": "social-render" }
+    ],
+    "style": {
+      "background": "onyx-glow",
+      "text": "white",
+      "accent": "amethyst",
+      "muted": "text-secondary",
+      "headlineFamily": "manrope",
+      "bodyFamily": "manrope",
+      "headlineWeight": "600",
+      "logo": "primary-white",
+      "logoPosition": "top",
+      "ctaBackground": "violet",
+      "ctaText": "white",
+      "ctaRadiusPx": 999
+    },
+    "sample": {
+      "eyebrow": "Online ads · Search · Social · Websites",
+      "headline": "We help your business grow online",
+      "emphasis": "grow online",
+      "emphasisGradient": "hero-text",
+      "body": "One team to bring it all together.",
+      "cta": "Talk to us",
+      "note": "Sample built only from approved wording (the core expression, the supporting line and the header CTA). The layout is a proposed ad recipe, not an approved campaign.",
+      "source": "proposed"
+    }
+  },
+  "socialTemplates": [
+    { "id": "brand-statement", "name": "Brand statement", "format": "feed-1x1", "purpose": "One short brand message with the logo and one signature graphic.", "structure": ["Logo with clear space", "One short message with one gradient phrase", "One signature graphic (orbit, signal star or flow ribbon)", "A restrained CTA or none"], "rules": ["Matches design-system/social-examples/01-brand-statement-square.svg."], "source": "guide" },
+    { "id": "service", "name": "Service post", "format": "feed-4x5", "purpose": "Explain one service in plain words, then name the tools.", "structure": ["Eyebrow with the service name, spelled out", "Benefit-led heading, 3-8 words", "What we do, in one sentence", "Two to five tool marks in the illustration"], "rules": ["Matches design-system/social-examples/02-service-portrait.svg.", "Explain the service before listing tools; promise no result."], "source": "guide" },
+    { "id": "creative-story", "name": "Creative story", "format": "story-9x16", "purpose": "A vertical story built for the format, not a cropped post.", "structure": ["Logo inside the top safe area", "One statement in the middle third", "Real project image or signature graphic", "CTA above the bottom 340px"], "rules": ["Matches design-system/social-examples/03-creative-story.svg."], "source": "guide" },
+    { "id": "carousel", "name": "Carousel", "format": "feed-4x5", "purpose": "One idea per slide, the way the guide asks for presentations.", "structure": ["Cover: the question or promise", "One point per slide", "A real example or evidence", "Closing slide with one next step"], "rules": ["Dark slides throughout; one gradient phrase per slide.", "A counter (01 / 06) is allowed; no 'swipe'."], "source": "proposed" }
+  ],
+  "components": [
+    { "id": "button-primary", "kind": "button-primary", "name": "Primary button", "label": "Talk to us", "spec": "Violet gradient, White text, pill, semibold, optional north-east arrow. 17px 23px padding; at least 44px tall.", "surface": "onyx", "style": { "background": "cta", "color": "white", "radiusPx": 999, "padding": "17px 23px", "fontWeight": "600", "fontSizePx": 15, "family": "manrope", "shadow": "button", "minHeightPx": 44 }, "rules": ["Hover: up to 3px lift and a brighter glow.", "Focus: 2px light-purple outline, 4-5px offset.", "Loading keeps its width and says what it is doing."], "source": "homepage" },
+    { "id": "button-secondary", "kind": "button-secondary", "name": "Quiet button", "label": "See our work", "spec": "Transparent, visible neutral border, White text, pill.", "surface": "onyx", "style": { "color": "white", "border": "1px solid #FFFFFF24", "radiusPx": 999, "padding": "17px 23px", "fontWeight": "600", "fontSizePx": 15, "family": "manrope", "minHeightPx": 44 }, "rules": ["Use a link for navigation and a button for an action."], "source": "homepage" },
+    { "id": "card", "kind": "card", "name": "Card", "label": "Search engine optimization", "spec": "Raised panel on Surface with a subtle border, 20px radius.", "surface": "onyx", "style": { "background": "surface", "color": "white", "border": "1px solid #FFFFFF14", "radiusPx": 20, "padding": "20px", "family": "manrope" }, "rules": ["Do not nest interactive elements inside a fully clickable card.", "Glass only for small floating annotations."], "source": "tokens" },
+    { "id": "tag", "kind": "chip", "name": "Informational tag", "label": "GEO / AI search", "spec": "Small text, 4px radius, quiet border; not interactive.", "surface": "onyx", "style": { "color": "text-muted", "border": "1px solid #FFFFFF29", "radiusPx": 4, "padding": "4px 10px", "fontWeight": "500", "fontSizePx": 12, "family": "manrope" }, "rules": ["Never make an informational tag look clickable."], "source": "guide" },
+    { "id": "input", "kind": "input", "name": "Text field", "label": "Your email", "spec": "Persistent label above, 16px input text, visible boundary.", "surface": "surface", "style": { "background": "onyx", "color": "white", "border": "1px solid #FFFFFF29", "radiusPx": 12, "padding": "12px 14px", "fontSizePx": 16, "family": "manrope" }, "rules": ["Placeholder is an example, never the only label.", "Errors in words, linked with aria-describedby."], "source": "guide" },
+    { "id": "link", "kind": "link", "name": "Text link", "label": "Read the case study", "spec": "Amethyst text with a directional arrow.", "surface": "onyx", "style": { "color": "amethyst", "radiusPx": 0, "fontWeight": "500", "family": "manrope" }, "rules": ["Active links use purple text plus an underline, never colour alone."], "source": "guide" }
+  ],
+  "motion": {
+    "rules": [
+      "Hover 200-300ms; reveal 750ms with 24px travel, once per element; easing cubic-bezier(.2,.7,.2,1).",
+      "No more than one dominant moving element in a viewport. No scroll hijacking, cursor replacement or flashing.",
+      "Respect prefers-reduced-motion from the first frame; offer pause where motion is continuous."
+    ],
+    "source": "guide"
+  }
+}

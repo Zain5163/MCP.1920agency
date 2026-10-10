@@ -1,0 +1,260 @@
+{
+  "$schema": "../../schema/brand.schema.json",
+  "schemaVersion": 1,
+  "slug": "psx-ascend",
+  "name": "PSX Ascend",
+  "status": "mixed",
+  "version": "2.0.0",
+  "updated": "2026-10-10",
+  "summary": "A connected powersports dealership growth platform (CRM, inventory, websites, marketing automation, multi-location BDC). Forest and paper structure with green for action, Geist type, the original logo file only. Imported from the approved v2.0 design system; rules from the unapproved v3 candidate and social toolkit are marked proposed.",
+  "ownership": {
+    "tenant": "owner",
+    "note": "A client brand managed by the agency owner. Served only to the owner's tenant (BRANDS_OWNER_TENANT_ID)."
+  },
+  "approval": {
+    "approvers": ["Jeff Loos (jeff@psxascend.ai)", "Dan (dan@psxascend.ai)", "Rick (rick@psxascend.ai)", "Rana Zain Usman (owner, sends the review)"],
+    "rule": "Anything made with this brand that will be published (a post, ad, email, page or graphic) goes to Jeff, Dan and Rick for review by email from rana@psxascend.ai before it goes live. Changes to this design system itself follow the same review. Nothing is sent or published automatically."
+  },
+  "sources": [
+    { "id": "psx-v2", "kind": "file", "ref": "Websites/PSX-Ascend/docs/PSX_DESIGN_SYSTEM.md", "checked": "2026-10-10", "note": "Version 2.0 (consolidated 2026-09-09): the approved baseline until v3 is adopted." },
+    { "id": "psx-css", "kind": "file", "ref": "Websites/PSX-Ascend/app/globals.css", "checked": "2026-10-10", "note": "The implementation of v2 (custom properties, .button, .eyebrow, shadows)." },
+    { "id": "psx-logo", "kind": "file", "ref": "Websites/PSX-Ascend/public/media/logos/brand/psx-ascend-logo.webp", "checked": "2026-10-10", "note": "The original logo file and the only one allowed (STATUS.md and the owner's rule of 2 Oct 2026). A 323x121 raster; no vector master exists." },
+    { "id": "psx-font", "kind": "file", "ref": "Websites/PSX-Ascend/public/fonts/geist-variable.woff2", "checked": "2026-10-10", "note": "The site's Geist file, unchanged. Licence text from github.com/vercel/geist-font OFL.txt." },
+    { "id": "psx-v3", "kind": "proposed", "ref": "Websites/PSX-Ascend/docs/design-system/ (tokens.json, FOUNDATIONS.md, COMPONENTS.md)", "checked": "2026-10-10", "note": "v3 candidate of 10 Sep 2026: 'local candidate, not deployed or approved as a replacement for v2'." },
+    { "id": "psx-handbook", "kind": "proposed", "ref": "Websites/PSX-Ascend/docs/design-system/BRAND-HANDBOOK.md", "checked": "2026-10-10", "note": "Candidate logo clear-space and minimum-size rules, written as candidates in the source." },
+    { "id": "psx-social", "kind": "proposed", "ref": "Websites/PSX-Ascend/docs/design-system/SOCIAL-PLAYBOOK.md", "checked": "2026-10-10", "note": "'A proposed content and design system, not a scheduled or activated campaign.'" },
+    { "id": "proposed", "kind": "proposed", "ref": "Additions written here from the values above (ad canvas and CTA treatment).", "checked": "2026-10-10" }
+  ],
+  "colors": [
+    { "id": "ink", "name": "Ink", "hex": "#0B1710", "role": "Main text", "use": "Body and heading text on light surfaces, dark buttons, links on light surfaces (underlined).", "source": "psx-v2" },
+    { "id": "ink-2", "name": "Ink 2", "hex": "#14241A", "role": "Secondary dark surface", "use": "Secondary dark surfaces.", "source": "psx-v2" },
+    { "id": "forest", "name": "Forest", "hex": "#07130D", "role": "Premium dark surface", "use": "Hero, footer and premium dark sections.", "source": "psx-v2" },
+    { "id": "forest-soft", "name": "Forest soft", "hex": "#0F2116", "role": "Layered dark cards", "use": "Cards on Forest.", "source": "psx-v2" },
+    { "id": "green", "name": "Green", "hex": "#62D044", "role": "Primary action", "use": "Primary CTA fill and active state. Directs attention; never fills whole pages.", "source": "psx-v2" },
+    { "id": "green-bright", "name": "Green bright", "hex": "#75E452", "role": "Dark-surface accent", "use": "Accent text and status on dark surfaces.", "source": "psx-v2" },
+    { "id": "green-soft", "name": "Green soft", "hex": "#DFF7D7", "role": "Light badges", "use": "Light badges and selected states.", "source": "psx-v2" },
+    { "id": "cream", "name": "Cream", "hex": "#F4F5EF", "role": "Warm section background", "use": "Supporting sections.", "source": "psx-v2" },
+    { "id": "paper", "name": "Paper", "hex": "#FBFCF8", "role": "Primary light surface", "use": "The default reading canvas.", "source": "psx-v2" },
+    { "id": "white", "name": "White", "hex": "#FFFFFF", "role": "Cards and dark-surface text", "use": "Raised cards; text on dark surfaces.", "source": "psx-v2" },
+    { "id": "muted", "name": "Muted", "hex": "#607066", "role": "Supporting copy", "use": "Supporting text; the boundary of form controls.", "source": "psx-v2" },
+    { "id": "line", "name": "Line", "hex": "#DCE3DB", "role": "Light dividers", "use": "Decorative dividers and card borders only; never a control boundary.", "source": "psx-v2" },
+    { "id": "focus", "name": "Focus green", "hex": "#96ED7C", "role": "Focus ring", "use": "3px solid focus outline with 3px offset.", "source": "psx-v2" },
+    { "id": "eyebrow-green", "name": "Eyebrow green (site CSS)", "hex": "#3A9C2A", "role": "Eyebrow text on light surfaces in the current site", "use": "Recorded because the site uses it; see the contrast table before reusing it.", "source": "psx-css" }
+  ],
+  "contrastPairs": [
+    { "fg": "ink", "bg": "paper", "use": "text", "note": "Primary reading.", "source": "psx-v3" },
+    { "fg": "muted", "bg": "paper", "use": "text", "note": "Supporting text.", "source": "psx-v3" },
+    { "fg": "forest", "bg": "green", "use": "text", "note": "Primary action: forest text on green, never white.", "source": "psx-v3" },
+    { "fg": "paper", "bg": "forest", "use": "text", "note": "Inverse reading.", "source": "psx-v3" },
+    { "fg": "green-bright", "bg": "forest", "use": "text", "note": "Inverse accent.", "source": "psx-v3" },
+    { "fg": "ink", "bg": "cream", "use": "text", "source": "psx-v2" },
+    { "fg": "muted", "bg": "cream", "use": "text", "source": "psx-v2" },
+    { "fg": "white", "bg": "ink", "use": "text", "note": "Dark primary button on light pages.", "source": "psx-v2" },
+    { "fg": "ink", "bg": "green-soft", "use": "text", "note": "Light badges.", "source": "psx-v2" },
+    { "fg": "focus", "bg": "forest", "use": "ui", "note": "Focus ring on dark.", "source": "psx-v2" },
+    { "fg": "white", "bg": "green", "use": "avoid", "note": "1.98:1. 'Use forest text on green, never white body text on green.'", "source": "psx-v3" },
+    { "fg": "green", "bg": "paper", "use": "avoid", "note": "1.92:1. Green text is for dark surfaces only.", "source": "psx-v3" },
+    { "fg": "eyebrow-green", "bg": "paper", "use": "avoid", "note": "3.41:1 for 12px eyebrows in the current site CSS: under the 4.5:1 AA minimum. Use ink or muted for eyebrows on light surfaces; keep green eyebrows for dark ones.", "source": "psx-v3" },
+    { "fg": "line", "bg": "paper", "use": "decorative", "note": "Dividers only; a control boundary uses muted.", "source": "psx-v3" }
+  ],
+  "gradients": [
+    { "id": "forest-glow", "name": "Forest with green glow", "css": "radial-gradient(circle at 85% 8%, #62D04424, transparent 46%), #07130D", "use": "Canvas for dark ads and social posts: Forest with one soft green glow, echoing the hero's rings.", "source": "proposed" }
+  ],
+  "typography": {
+    "families": [
+      {
+        "id": "geist",
+        "name": "Geist",
+        "role": "The only brand family: display, headings, body and labels.",
+        "stack": "Geist, Arial, sans-serif",
+        "files": [{ "path": "fonts/Geist-Variable.woff2", "weight": "100 900", "style": "normal", "format": "woff2" }],
+        "licence": {
+          "name": "SIL Open Font License 1.1",
+          "file": "fonts/OFL-Geist.txt",
+          "url": "https://github.com/vercel/geist-font",
+          "notes": "Copyright 2024 The Geist Project Authors. No Reserved Font Name. The file is the site's copy, unchanged; the handbook asks that the licence travel with any external copy, which OFL-Geist.txt does. Office fallback: Arial (a compatibility option, not a brand font)."
+        },
+        "source": "psx-font"
+      }
+    ],
+    "scale": [
+      { "id": "display", "role": "H1 / hero display", "family": "geist", "size": "clamp(48px, 5.5vw, 82px)", "weight": "680", "lineHeight": "0.98", "tracking": "-0.03em", "sample": "Before the next follow-up.", "source": "psx-v2" },
+      { "id": "heading", "role": "Large H2 (editorial)", "family": "geist", "size": "clamp(42px, 5vw, 70px)", "weight": "400", "lineHeight": "1.03", "sample": "One customer view across every rooftop", "source": "psx-v2" },
+      { "id": "card-title", "role": "Card H3", "family": "geist", "size": "24px", "sizeMobile": "22px", "weight": "500", "lineHeight": "1.2", "sample": "Inventory connected to demand", "source": "psx-v2" },
+      { "id": "lead", "role": "Lead", "family": "geist", "size": "19px", "sizeMobile": "17px", "weight": "400", "lineHeight": "1.6", "sample": "Help dealership teams recognize customer intent and respond with context.", "source": "psx-v2" },
+      { "id": "body", "role": "Body", "family": "geist", "size": "16px", "weight": "400", "lineHeight": "1.65", "sample": "Review the conversation, confirm the owner and the next step, then follow up.", "source": "psx-v2" },
+      { "id": "eyebrow", "role": "Eyebrow", "family": "geist", "size": "12px", "weight": "750", "lineHeight": "1.5", "tracking": "0.13em", "transform": "uppercase", "sample": "AI-Powered CRM", "source": "psx-css" },
+      { "id": "button", "role": "Button label", "family": "geist", "size": "14px", "weight": "700", "lineHeight": "1", "sample": "Request a demo", "source": "psx-css" }
+    ],
+    "rules": [
+      "Exactly one H1 and a logical H2/H3 order. Negative tracking for large headings only.",
+      "Body at least 16px; meaningful UI copy at least 12px; body lines about 55-75 characters.",
+      "No heavy bold headings across body sections. Hero/display weight 680, editorial headings 400, card titles 500.",
+      "Mobile headings wrap naturally: no clipping, no one-word columns, no manual breaks for one desktop width."
+    ]
+  },
+  "spacing": {
+    "unitPx": 8,
+    "scalePx": [4, 8, 12, 16, 20, 24, 32, 40, 48, 56, 64, 80, 96, 120],
+    "rules": [
+      "8px rhythm: micro 4/8/12, component 16/20/24/32, content 40/48/56/64, sections 78-120, hero padding 88-110px.",
+      "Whitespace clarifies hierarchy; it must not separate eyebrows from headings or make cards feel empty."
+    ],
+    "source": "psx-v2"
+  },
+  "radii": [
+    { "id": "control", "px": 12, "use": "Small UI (9-14px).", "source": "psx-v2" },
+    { "id": "card", "px": 18, "use": "Cards.", "source": "psx-css" },
+    { "id": "dashboard", "px": 24, "use": "Premium dashboards (22-26px).", "source": "psx-v2" },
+    { "id": "pill", "px": 999, "use": "CTAs and buttons.", "source": "psx-v2" }
+  ],
+  "shadows": [
+    { "id": "button-primary", "css": "0 8px 22px rgba(73, 194, 44, 0.18)", "use": "Green primary button.", "source": "psx-css" },
+    { "id": "card-hover", "css": "0 26px 68px rgba(11, 23, 16, 0.11)", "use": "Premium hover card, lifted (5-7px).", "source": "psx-css" },
+    { "id": "header", "css": "0 10px 30px rgba(7, 19, 13, 0.045)", "use": "Sticky warm-white header.", "source": "psx-css" }
+  ],
+  "layout": {
+    "maxWidthPx": 1200,
+    "gutters": "At least 24px desktop, 17px tablet, 14px mobile.",
+    "breakpointsPx": [360, 390, 768, 1024, 1366, 1440],
+    "grid": "Grid for page structure, Flexbox for compact alignment. Standard split about 1.1fr / .55fr; card grids go 4 or 3, then 2, then 1.",
+    "rules": [
+      "Product heroes pair copy with a meaningful interface or image.",
+      "Never remove, crop or hide meaningful dashboard content on mobile; stack it.",
+      "No horizontal page scrolling at any tested width (360-1440px)."
+    ],
+    "source": "psx-v2"
+  },
+  "logo": {
+    "files": [
+      { "id": "horizontal", "name": "PSX Ascend horizontal logo (original)", "path": "assets/psx-ascend-logo.webp", "format": "webp", "widthPx": 323, "heightPx": 121, "sha256": "e4bfcc681d868f80c02fccac55c5d1c58ee1f11d34b77b2d537bd9b98373ffe1", "background": "light", "use": "The only logo. Site header and footer, and every graphic, email and post. On dark or busy backgrounds, place it on a warm-white (Paper) field.", "source": "psx-logo" }
+    ],
+    "clearSpace": "Candidate rule: at least the capital-letter height of the wordmark on every side.",
+    "clearSpaceRatio": 0.3,
+    "minSize": { "digitalPx": 154, "note": "Candidate: 154 CSS px wide on screen; at least 240px wide on a 1080px social export, reviewed at feed size; 32mm in print." },
+    "do": [
+      "Use only this original file, or write 'PSX Ascend' in plain text.",
+      "Preserve its ratio, colours and clear space.",
+      "On dark or photo backgrounds, put the full-colour logo on a Paper field.",
+      "Image alt text 'PSX Ascend'; a linked logo's accessible name 'PSX Ascend home'."
+    ],
+    "dont": [
+      "Never draw, typeset or AI-generate a 'PSX ASCEND' wordmark, and never set 'PSX' and 'ASCEND' in two colours.",
+      "Never reuse the archived old og.png wordmark.",
+      "Never stretch, crop, rotate, recolour, outline, shadow or remove part of the name.",
+      "Never extract an icon or avatar from the lockup; no approved symbol master exists.",
+      "Never fuse a partner or OEM mark with it, place it on conflicting green, or crowd it with a CTA."
+    ],
+    "licence": "PSX Ascend's trademark, used by the agency for PSX Ascend work only. Only the horizontal raster exists: vector, reversed, stacked, symbol and monochrome masters are missing, and a missing variant is not permission to make one.",
+    "source": "psx-logo"
+  },
+  "imagery": {
+    "style": "Powersports showrooms, machines, dealership teams, customer conversations, deliveries and inventory workflows, with faces and vehicles kept in every crop. Product views show real operating context with labelled demo data.",
+    "do": [
+      "Use images that add context, evidence or understanding.",
+      "WebP/AVIF, descriptive file names, explicit dimensions, accurate alt text.",
+      "Caption illustrative or generated imagery when it could be mistaken for evidence.",
+      "Label demonstration data as such; attribute real results as dealer-reported."
+    ],
+    "dont": [
+      "No generic corporate stock or generic SaaS dashboards.",
+      "Existing images are references, not proof of named people or events.",
+      "No neon gradients, arbitrary blues or purples, or a feed that turns neon green."
+    ],
+    "source": "psx-v2"
+  },
+  "icons": {
+    "style": "One existing licensed icon family with a consistent stroke and size.",
+    "rules": [
+      "Icons accompany text for meaningful controls; never replace a label with an unexplained icon.",
+      "Decorative arrows are hidden from assistive technology. Up-right arrow means navigate or act; down-right means continue on the page.",
+      "Never draw new product logos; OEM and dealer marks are proof, shown as original artwork with accurate names."
+    ],
+    "source": "psx-v3"
+  },
+  "voice": {
+    "personality": ["Premium", "Capable", "Focused", "Calm", "Powersports-specific", "Human", "Intelligent without hype"],
+    "rules": [
+      "Lead with the dealership problem, decision or outcome. Concrete nouns: customer, salesperson, unit, inventory, rooftop, conversation, appointment, next action.",
+      "Explain AI through useful dealership behaviour, with people and manager control visible.",
+      "Approved names only: PSX Ascend; CXMAi; ALMA, the Automated Lead Management Assistant; AI-Powered CRM; Inventory Management; AI-Powered Websites; Marketing Automation; Multi-Location BDC.",
+      "Never invent metrics, results, integrations, awards, quotes or capabilities. Label customer results as dealer-reported and keep verified wording.",
+      "No em dashes in headings, decorative hashes, vague hype or generic AI language.",
+      "Copy sequence: eyebrow, direct heading, practical description, action, then proof or operating context.",
+      "Stable action language: Request a demo, Visit support, Continue to secure login. US English."
+    ],
+    "examples": [
+      { "say": "Help dealership teams recognize customer intent and respond with context.", "avoid": "Revolutionary AI that transforms your dealership overnight." },
+      { "say": "One view across every rooftop.", "avoid": "The number one AI platform for every dealer." },
+      { "say": "Request a demo", "avoid": "Get started now!!!" }
+    ],
+    "neverOnCreative": ["AdsPilot"],
+    "source": "psx-v2"
+  },
+  "adCreatives": {
+    "rules": [
+      "One main point per creative; the caption carries the detail.",
+      "At 1080px wide: headline 76-104px, body 34-44px, essential metadata at least 28px; check at about one-third size.",
+      "The logo sits in a predictable place with clear space; on dark or photo backgrounds it goes on a Paper field.",
+      "Green for one word, one rule or one small area of emphasis only.",
+      "A drawn CTA on a static image is not a button: the caption and destination complete the action.",
+      "Proof, events, hiring and partner posts only with verified source material; never fictional details.",
+      "Meta placement specs are not certified in the source: preview every feed, story and reel placement before release.",
+      "Every PSX creative goes to Jeff, Dan and Rick for review before it is published."
+    ],
+    "placements": [
+      { "id": "feed-1x1", "name": "Square", "ratio": "1:1", "widthPx": 1080, "heightPx": 1080, "safeZonePx": { "top": 72, "right": 72, "bottom": 72, "left": 72 }, "rules": ["Flexible feed adaptation; 72px internal margins."], "source": "psx-social" },
+      { "id": "feed-4x5", "name": "Portrait", "ratio": "4:5", "widthPx": 1080, "heightPx": 1350, "safeZonePx": { "top": 72, "right": 72, "bottom": 72, "left": 72 }, "rules": ["Feed and organic carousel master; 72px internal margins."], "source": "psx-social" },
+      { "id": "story-9x16", "name": "Vertical", "ratio": "9:16", "widthPx": 1080, "heightPx": 1920, "safeZonePx": { "top": 250, "right": 120, "bottom": 320, "left": 72 }, "rules": ["Essential copy in the central area: at least 250px top and 320px bottom reserve, extra room on the right for platform controls.", "Conservative internal guide, not an official safe zone: recheck in the composer."], "source": "psx-social" },
+      { "id": "landscape", "name": "LinkedIn landscape", "ratio": "300:157", "widthPx": 1200, "heightPx": 628, "safeZonePx": { "top": 48, "right": 60, "bottom": 48, "left": 60 }, "rules": ["LinkedIn landscape-ad adaptation (1200x628)."], "source": "psx-social" }
+    ],
+    "style": {
+      "background": "forest-glow",
+      "text": "paper",
+      "accent": "green-bright",
+      "muted": "white",
+      "headlineFamily": "geist",
+      "bodyFamily": "geist",
+      "headlineWeight": "680",
+      "logo": "horizontal",
+      "logoField": "paper",
+      "logoPosition": "top",
+      "ctaBackground": "green",
+      "ctaText": "forest",
+      "ctaRadiusPx": 999
+    },
+    "sample": {
+      "eyebrow": "Follow-up",
+      "headline": "Before the next follow-up.",
+      "emphasis": "next follow-up",
+      "body": "Review the conversation. Confirm the owner and the next step.",
+      "cta": "Request a demo",
+      "note": "Sample from the social playbook's 15-second storyboard wording and the approved CTA. It is a layout example, not an approved campaign: review with Jeff, Dan and Rick before any use.",
+      "source": "psx-social"
+    }
+  },
+  "socialTemplates": [
+    { "id": "practical-checklist", "name": "Practical checklist carousel", "format": "feed-4x5", "purpose": "Three or four clear steps, one per slide.", "structure": ["Cover: a useful problem or question", "Step: review the conversation", "Step: identify the responsible person", "Step: confirm the next action", "Summary with a related next step"], "rules": ["A small sequence indicator on each page.", "Every middle slide makes sense if shared alone; no fixed slide count."], "source": "psx-social" },
+    { "id": "brand-statement", "name": "Brand statement", "format": "feed-1x1", "purpose": "One concise theme and a recognizable showroom image.", "structure": ["Logo on a Paper field", "One short statement", "Showroom image"], "rules": ["One dominant statement per post."], "source": "psx-social" },
+    { "id": "dealership-question", "name": "Dealership question", "format": "feed-4x5", "purpose": "One operating question that invites useful discussion.", "structure": ["Eyebrow with the topic", "The question", "One line of context"], "rules": ["No engagement bait; the question must be genuinely useful."], "source": "psx-social" },
+    { "id": "workflow", "name": "Workflow explanation", "format": "feed-4x5", "purpose": "Situation, ownership and next action, with illustrative data labelled.", "structure": ["Situation", "Who owns it", "The next action"], "rules": ["Demo data never impersonates real customer data."], "source": "psx-social" },
+    { "id": "story-cover", "name": "Story or video cover", "format": "story-9x16", "purpose": "A clear first frame for a short video.", "structure": ["Headline in the central safe area", "Showroom context", "Logo on a Paper field"], "rules": ["Readable captions; calm end frame on the logo and one verified destination."], "source": "psx-social" }
+  ],
+  "components": [
+    { "id": "button-primary", "kind": "button-primary", "name": "Primary button", "label": "Request a demo", "spec": "Green fill, Forest text, pill, 14px bold, at least 50px tall (46px compact header), circular arrow.", "surface": "paper", "style": { "background": "green", "color": "forest", "radiusPx": 999, "padding": "0 22px", "fontWeight": "700", "fontSizePx": 14, "family": "geist", "shadow": "button-primary", "minHeightPx": 50 }, "rules": ["Lift at most 2px; the arrow shifts gently up-right.", "Focus: 3px solid #96ED7C with 3px offset.", "Adjacent mobile buttons become full width with visible spacing."], "source": "psx-css" },
+    { "id": "button-dark", "kind": "button-primary", "name": "Dark primary on light", "label": "Visit support", "spec": "Ink fill, White text, pill: the primary action on light sections where green would compete.", "surface": "cream", "style": { "background": "ink", "color": "white", "radiusPx": 999, "padding": "0 22px", "fontWeight": "700", "fontSizePx": 14, "family": "geist", "minHeightPx": 50 }, "rules": ["One primary intent per page."], "source": "psx-v2" },
+    { "id": "button-outline", "kind": "button-secondary", "name": "Light outline on dark", "label": "Continue to secure login", "spec": "Transparent, light outline, White text, pill: secondary action on dark.", "surface": "forest", "style": { "color": "white", "border": "1px solid rgba(255, 255, 255, 0.4)", "radiusPx": 999, "padding": "0 22px", "fontWeight": "700", "fontSizePx": 14, "family": "geist", "minHeightPx": 50 }, "rules": ["Never put two adjacent dark CTAs together."], "source": "psx-v2" },
+    { "id": "card", "kind": "card", "name": "Premium hover card", "label": "One customer view", "spec": "White card, Line border, 18px radius; on hover lifts 5-7px over 720ms with a soft forest shadow.", "surface": "cream", "style": { "background": "white", "color": "ink", "border": "line", "radiusPx": 18, "padding": "20px", "family": "geist", "shadow": "card-hover" }, "rules": ["Every card has a purpose, a name, a concise description and a meaningful visual or state.", "Hover never moves neighbouring layout or hides content."], "source": "psx-css" },
+    { "id": "badge", "kind": "badge", "name": "Light badge", "label": "Dealer-reported", "spec": "Green soft fill with Ink text.", "surface": "paper", "style": { "background": "green-soft", "color": "ink", "radiusPx": 999, "padding": "4px 10px", "fontWeight": "650", "fontSizePx": 12, "family": "geist" }, "rules": ["Green never communicates success alone: add the word."], "source": "psx-v2" },
+    { "id": "input", "kind": "input", "name": "Form field", "label": "Dealership email", "spec": "Visible label, 16px input, Muted boundary (not the faint Line).", "surface": "paper", "style": { "background": "white", "color": "ink", "border": "muted", "radiusPx": 12, "padding": "12px 14px", "fontSizePx": 16, "family": "geist" }, "rules": ["Required state programmatic; clear errors; privacy context near submit.", "Never capture or imitate platform passwords in marketing pages."], "source": "psx-v3" },
+    { "id": "link", "kind": "link", "name": "Inline link", "label": "See how ALMA works", "spec": "Ink, underlined on light surfaces.", "surface": "paper", "style": { "color": "ink", "radiusPx": 0, "fontWeight": "500", "family": "geist" }, "rules": ["Green text only on dark surfaces."], "source": "psx-v3" }
+  ],
+  "motion": {
+    "rules": [
+      "Reveal about 720ms, cubic-bezier(.22,1,.36,1), stagger 60-90ms; card lift 5-7px; button lift at most 2px.",
+      "Gentle breathing only for live statuses and popup cards; animate transform and opacity.",
+      "Respect prefers-reduced-motion; all content visible without animation; pause continuous work off-screen."
+    ],
+    "source": "psx-v2"
+  }
+}

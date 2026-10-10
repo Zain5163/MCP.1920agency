@@ -214,6 +214,9 @@ importers:
       '@social-publisher/auth':
         specifier: workspace:*
         version: link:../../packages/auth
+      '@social-publisher/brands':
+        specifier: workspace:*
+        version: link:../../packages/brands
       '@social-publisher/config':
         specifier: workspace:*
         version: link:../../packages/config
@@ -359,6 +362,15 @@ importers:
       '@social-publisher/db':
         specifier: workspace:*
         version: link:../db
+    devDependencies:
+      '@types/node':
+        specifier: ^22.9.0
+        version: 22.20.4
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+
+  packages/brands:
     devDependencies:
       '@types/node':
         specifier: ^22.9.0

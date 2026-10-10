@@ -14,6 +14,7 @@
     "@posthog/mcp": "0.22.1",
     "@social-publisher/adapters": "workspace:*",
     "@social-publisher/auth": "workspace:*",
+    "@social-publisher/brands": "workspace:*",
     "@social-publisher/config": "workspace:*",
     "@social-publisher/core": "workspace:*",
     "@social-publisher/db": "workspace:*",
