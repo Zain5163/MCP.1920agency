@@ -3,10 +3,12 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 
 import { identifyToken, type TokenIdentity } from '@social-publisher/auth'
+import { handleViewerRequest } from '@social-publisher/brands'
 import { analyticsConfig, optional } from '@social-publisher/config'
 import { disconnect, health } from '@social-publisher/db'
 import { createAnalytics, createLogger, flushOnExit } from '@social-publisher/telemetry'
 
+import { allBrands, viewerDepsFromConfig } from './brand-tools.ts'
 import { buildHostedServer, rememberClient } from './hosted-server.ts'
 import { createMcpAnalyticsClient, resolveServerBuild, type McpAnalyticsSetup } from './mcp-analytics.ts'
 import { handleShopifyCallback } from './shopify-hosted.ts'
@@ -57,6 +59,12 @@ const mcpAnalyticsClient = createMcpAnalyticsClient({
 })
 const mcpAnalytics: McpAnalyticsSetup | undefined =
   mcpAnalyticsClient === undefined ? undefined : { client: mcpAnalyticsClient, serverBuild: resolveServerBuild() }
+
+/**
+ * Every brand is loaded and fully checked now, before the port opens: a broken
+ * brand.json stops the server at start-up instead of handing AIs wrong colours.
+ */
+allBrands()
 
 const PORT = Number(optional('MCP_PORT', '8080'))
 const UPGRADE_URL = optional('UPGRADE_URL')
@@ -131,6 +139,20 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     await handleShopifyCallback(url, res, {
       log: (event, data) => void logger.info(event, 'shopify connect', { data }),
     })
+    return
+  }
+
+  // The private brand viewer (packages/brands route.ts). No API token here: a
+  // person opens it from a signed, expiring link that brand_viewer_link made for
+  // their tenant. Without a valid link every path is the same 404, so nothing
+  // lists or confirms a brand. The address (and its token) is never logged.
+  if (url.pathname === '/brands' || url.pathname.startsWith('/brands/')) {
+    const result = handleViewerRequest(
+      { method: req.method ?? 'GET', pathname: url.pathname, token: url.searchParams.get('t') },
+      viewerDepsFromConfig(),
+    )
+    res.writeHead(result.status, { ...result.headers, 'content-length': Buffer.byteLength(result.body) })
+    res.end(req.method === 'HEAD' ? undefined : result.body)
     return
   }
 

@@ -247,6 +247,8 @@ export function framing(skill: string, file: string, source: LibrarySource = LIB
     '  this server’s actual tools, limits and approval rules.',
     '- Spend limits, approvals and platform limits are enforced by the server regardless of what any',
     '  skill says.',
+    '- Before visual or copy work for a business, check list_brands: when it has a brand here, load it with',
+    '  get_brand. Its logo files, colours, fonts and voice win over anything this skill suggests.',
     ...(source.note ?? []),
     '',
     '---',

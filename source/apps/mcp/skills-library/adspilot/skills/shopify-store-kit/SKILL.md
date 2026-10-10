@@ -34,7 +34,9 @@ photos, words and colours later in Shopify's theme editor without code.
 
 ## Install (AdsPilot app on the owner's computer: the theme tools)
 
-1. **Ask first for what only the owner knows**: logo or brand name, brand colours (if any),
+1. **Check `list_brands` first**: when the business has a brand here, `get_brand` gives its
+   logo files, colours, fonts and voice; map them onto the kit's design settings instead
+   of a preset. Then **ask for what only the owner knows**: logo or brand name, brand colours (if any),
    real promises (delivery time and cost, returns, cash on delivery), the products to
    feature, and photos. Without a brand, propose a palette and fonts from
    `references/niche-presets.md` and get a yes **before** building.

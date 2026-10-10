@@ -37,7 +37,8 @@ the business's legal details the market requires on the page (selling-by-country
 the offer and price; what is included; delivery or service area and times; payment
 options; guarantee, exchange or refund terms; real proof (reviews, photos, client names
 with permission, numbers the business can stand behind); the brand's logo, colours and
-fonts; who answers leads or chats, and how fast; the ad or ads that will point here
+fonts (call `list_brands` first: when the business has a brand here, `get_brand` already
+holds them, and the page follows it); who answers leads or chats, and how fast; the ad or ads that will point here
 (their headline, image and promise).
 
 ## 3. Message match, ad by ad

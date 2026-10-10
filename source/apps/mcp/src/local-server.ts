@@ -1,11 +1,12 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 
-import { checkConfig } from '@social-publisher/config'
+import { checkConfig, optional } from '@social-publisher/config'
 import { PLATFORMS, type ErrorCode } from '@social-publisher/core'
 import { health, queueStats, type TenantScope } from '@social-publisher/db'
 
 import { registerAdsTools } from './ads-tools.ts'
+import { DEFAULT_PUBLIC_BASE_URL, productSettings, registerBrandTools } from './brand-tools.ts'
 import { registerImageTools } from './image-tools.ts'
 import { registerPageTools } from './page-tools.ts'
 import { registerPerformanceTools } from './performance-tools.ts'
@@ -279,6 +280,19 @@ export function buildLocalServer(meter: MeterOptions): McpServer {
   // Expertise is served on both transports; it is static text and holds no secrets.
   registerPlaybooks(server)
   registerSkillsLibrary(server)
+  // Brand design systems. Local is the owner's own machine, so the owner's
+  // tenant asks: BRANDS_OWNER_TENANT_ID when set, otherwise the one local tenant.
+  // File paths are given here (localPaths) so the AI can use the logo files.
+  registerBrandTools(server, {
+    viewer: async () => {
+      const owner = optional('BRANDS_OWNER_TENANT_ID') ?? (await currentScope()).tenantId
+      return { tenantId: owner, ownerTenantId: owner }
+    },
+    settings: productSettings,
+    viewerSecret: () => optional('BRAND_VIEW_SECRET'),
+    publicBaseUrl: () => optional('PUBLIC_BASE_URL', DEFAULT_PUBLIC_BASE_URL)!,
+    localPaths: true,
+  })
 
   return server
 }

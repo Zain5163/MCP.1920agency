@@ -13,7 +13,10 @@ accessibility in depth, `get_skill accessibility`.
 
 ## 1. Start from the brand and the buyer, not from a template
 
-Ask for, and use: the logo file, brand colours, fonts, product photos, and two or three
+First call `list_brands`: when the business has a brand design system on this server,
+load it with `get_brand` and use its colours, fonts, logo files, components and voice
+exactly (values marked proposed need the owner's yes before they go live). Otherwise ask
+for, and use: the logo file, brand colours, fonts, product photos, and two or three
 sites the owner likes (and why). The brand's own assets always win over a new idea. If
 there is no brand yet, propose a small system (section 2) and get it approved before
 designing pages.

@@ -111,7 +111,9 @@ Ask first for what only the owner knows: the countries it will sell to and the c
 the products (names, prices, sizes, real photos); delivery times and costs; the return or
 exchange terms; payment methods; contact details; and the business details the market
 requires on the site (legal name, address, registration or VAT number where required; see
-selling-by-country). Never fill those in yourself. Then, in this order, each step approved by the owner:
+selling-by-country). Never fill those in yourself. If the business has a brand on this server
+(`list_brands`), load it with `get_brand` and build in it: its logo files, colours, fonts and
+voice, never a recoloured or retyped logo. Then, in this order, each step approved by the owner:
 
 1. **Theme:** for a premium look in one pass, install `get_skill shopify-store-kit` (Horizon
    sections, design settings, example home page). Otherwise:

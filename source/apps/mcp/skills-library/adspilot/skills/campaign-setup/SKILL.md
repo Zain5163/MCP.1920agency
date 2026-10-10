@@ -86,7 +86,8 @@ result being paid for, and optimise for its event, never a proxy.
 - Ads about credit, employment, housing, or social issues, elections and politics fall
   under the platform's special or restricted categories in many countries; read the
   platform's playbook before building.
-- Supply the creative shapes each placement needs. Keep claims the business can stand behind.
+- Supply the creative shapes each placement needs, built from the brand's own system when it
+  has one (`get_brand`, section `ad-creatives`). Keep claims the business can stand behind.
 
 ## Step 4: Three assessments before anything goes live (and before saying "done")
 

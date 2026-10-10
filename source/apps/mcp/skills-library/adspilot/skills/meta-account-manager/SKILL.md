@@ -84,6 +84,9 @@ the account's own average and say that "better than average" is not "profitable"
 
 ## 3. Creative: the main lever
 
+Build every creative in the brand: `get_brand { brand, section: "ad-creatives" }` gives the
+layout, placements and safe zones, the logo file to use and the words never to print.
+
 - **8–12 genuinely different concepts live** in the scaling ad set. Meta groups
   near-identical ads and treats them as one; differ on at least 3 of: style, message,
   hook, format, person on screen. Five headline swaps on one image is one concept.

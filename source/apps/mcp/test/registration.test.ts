@@ -77,6 +77,14 @@ for (const [label, build] of transports) {
       }
     })
 
+    test('serves the brand tools, metered like every other', () => {
+      // Named so that dropping them from a transport fails loudly (decision 0009: every tool is metered).
+      for (const name of ['list_brands', 'get_brand', 'brand_viewer_link']) {
+        assert.ok(names.includes(name), `${label} is missing ${name}`)
+        assert.equal(markOf(tools[name]!.handler), 'counted', `${label}: ${name} is not counted`)
+      }
+    })
+
     test('has the free account tools', () => {
       for (const name of FREE_TOOLS) assert.ok(names.includes(name), `${label} is missing ${name}`)
     })

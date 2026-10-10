@@ -156,8 +156,8 @@ reads as a template: Inter for every font role, 14 px body text, pill-shaped but
 badges, a narrow page, an empty hero, placeholder social links. A redesign is not ready to
 show until all of this is done:
 
-1. **Design system set in `config/settings_data.json`** (from `web-ui-design` section 2,
-   approved by the owner when there is no brand yet): heading and body fonts from Shopify's
+1. **Design system set in `config/settings_data.json`** (from the brand's `get_brand` tokens
+   when it has one here, otherwise from `web-ui-design` section 2, approved by the owner): heading and body fonts from Shopify's
    library (e.g. `barlow_condensed_n7` + `barlow_n4`; read the font handle list on
    shopify.dev), `type_size_paragraph` 16, heading sizes and case, `color_palette`, button /
    badge / input / card radius, button text case, `page_width`, `card_hover_effect`. Read the
