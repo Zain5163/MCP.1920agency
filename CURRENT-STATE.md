@@ -78,7 +78,7 @@ Around the posting:
 | Stale-playbook warning after 90 days | ✅ |
 | 50 marketing skills (copywriting, SEO, CRO, pricing, launch…) | ✅ MIT-licensed, pinned |
 | Prompts: launch a Meta campaign, write ad copy | ✅ |
-| Brand design systems: 1920 Agency and PSX Ascend (imported), Muzaree and the product (proposed); `list_brands`, `get_brand`, `brand_viewer_link` on both transports; private docs-style viewer at `/brands` (signed, expiring links; tenant-scoped) | 🟡 2026-10-10 Built and tested (branch `brand-systems`; local run of the real HTTP server checked 404 without a link, 200 with one). Not merged or deployed: needs `BRAND_VIEW_SECRET` and `BRANDS_OWNER_TENANT_ID` on the server, a release and a gate reload. See `architecture/2026-10-10-brand-design-systems.md` |
+| Brand design systems: 1920 Agency and PSX Ascend (imported), Muzaree and the product (proposed); `list_brands`, `get_brand`, `brand_viewer_link` on both transports; private docs-style viewer at `/brands` (signed, expiring links; tenant-scoped) | ✅ 2026-10-10 Live: 1920 Agency, PSX Ascend (imported), Muzaree and the product (proposed); tools list_brands / get_brand / brand_viewer_link; private viewer at /brands (signed 24 h links, 404 otherwise) released `142423d` and the gate site file reloaded |
 
 ## 4. AI image generation
 
