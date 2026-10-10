@@ -650,6 +650,43 @@ describe('large media is never held in memory whole', () => {
   })
 })
 
+describe('video size limit (Videos API: 500 MB, checked 2026-10-11)', () => {
+  test('the capability says 500 MB, not the stale 200 MB', () => {
+    assert.equal(CAPABILITIES.linkedin.maxVideoBytes, 500_000_000)
+    // A 300 MB video, refused under the old note, now validates.
+    const result = validateAgainstCapabilities(
+      draft({ media: [{ id: 'v', kind: 'video', mime: 'video/mp4', bytes: 300_000_000, localPath: 'v.mp4', durationSeconds: 60 }] }),
+      'linkedin',
+      CAPABILITIES.linkedin,
+    )
+    assert.ok(!result.issues.some((i) => i.code === 'video_too_large'))
+  })
+
+  test('a video over 500 MB is refused by its real size before anything is sent', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'li-vid-big-'))
+    const file = join(dir, 'big.mp4')
+    try {
+      await writeFile(file, '')
+      await truncate(file, 500_000_001)
+      const { li, calls } = make([CREATED])
+      // Declared as 0 bytes, as the MCP does, so only the real size can catch it.
+      await assert.rejects(
+        () => li.publish(ctx(), draft({ media: [{ id: 'v', kind: 'video', mime: 'video/mp4', bytes: 0, localPath: file }] })),
+        (error: unknown) => {
+          assert.ok(error instanceof PublishError)
+          assert.equal(error.failureClass, 'permanent')
+          assert.match(error.message, /500 MB limit/)
+          assert.match(error.message, /Nothing was uploaded or posted/)
+          return true
+        },
+      )
+      assert.equal(calls.length, 0)
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+})
+
 describe('documents (PDF carousels)', () => {
   /**
    * Request shapes from the Documents API on Microsoft Learn, checked

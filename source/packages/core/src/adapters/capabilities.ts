@@ -282,10 +282,15 @@ export const CAPABILITIES: Readonly<Record<Platform, CapabilityRecord>> = {
     maxDocumentBytes: 100_000_000,
     // Neither: LinkedIn is the only platform here that takes uploaded bytes and
     // will not fetch a URL, so the adapter reads from disk or downloads first.
-    // Reported as 3 seconds to 30 minutes for the API. Feed video in the app is
-    // capped lower (~15 minutes), so the API figure is the permissive one.
+    // "Length: Three seconds to 30 minutes." and "File size: Between 75kb and
+    // 500MB." (Videos API, "Video File Size Specifications", learn.microsoft.com,
+    // version 2026-09, checked 2026-10-11). WHY 500 MB and not 200 MB: the 200 MB
+    // note here was a stale report. The same page's schema says "Maximum allowed
+    // Videos size is 5GB"; the stricter documented figure is enforced, read as
+    // 500,000,000 bytes, the stricter reading.
     videoMinSeconds: 3,
     videoMaxSeconds: 1_800,
+    maxVideoBytes: 500_000_000,
     requiresPublicMediaUrl: false,
     supportsNativeScheduling: false,
     allowsMixedMedia: false,
@@ -329,10 +334,11 @@ export const CAPABILITIES: Readonly<Record<Platform, CapabilityRecord>> = {
       'Reported but unverified: Community Management and Sign In with OpenID Connect cannot ' +
       'coexist on one app, which would mean company-page posting needs a SECOND LinkedIn app ' +
       'rather than another product on this one. Confirm before building for it. ' +
-      'FILE SIZE: sources CONFLICT. The Videos API is reported as capped at 200 MB, ' +
-      'while native upload in the LinkedIn app takes 5 GB — so a video that uploads ' +
-      'fine by hand may be refused through the API. Unverified either way; find out ' +
-      'empirically before promising a customer a large upload. ' +
+      'VIDEO FILE SIZE (checked 2026-10-11, Videos API page, version 2026-09): "File size: ' +
+      'Between 75kb and 500MB", 3 s to 30 min, MP4. The same page\'s schema also says ' +
+      '"Maximum allowed Videos size is 5GB", so LinkedIn\'s own page conflicts; 500 MB is ' +
+      'enforced (maxVideoBytes, and by the real file size in the adapter). The old 200 MB ' +
+      'figure here was a stale report. Nothing near 500 MB has been posted for real. ' +
       'Video is a SEPARATE endpoint from images: /rest/videos, split into 4 MB parts, ' +
       'each PUT returning an ETag that must be collected and handed to finalizeUpload. ' +
       'Losing one ETag wastes the whole upload. A post carries images, one video, or ' +

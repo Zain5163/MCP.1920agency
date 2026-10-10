@@ -476,6 +476,27 @@ export class LinkedInAdapter implements PlatformAdapter {
     media: MediaRef,
     source: MediaSource,
   ): Promise<string> {
+    /**
+     * The size limit, by the real length rather than the declared one (the
+     * MCP declares 0 bytes, so validation cannot see it).
+     *
+     * WHY 500 MB (2026-10-11): LinkedIn's Videos API page, "Video File Size
+     * Specifications" (learn.microsoft.com/en-us/linkedin/marketing/
+     * community-management/shares/videos-api, version 2026-09, checked
+     * 2026-10-11): "File size: Between 75kb and 500MB." The same page's schema
+     * says "Maximum allowed Videos size is 5GB", so the two conflict; the
+     * stricter documented figure is enforced so nothing is uploaded only to be
+     * refused. The 200 MB figure this replaced was a stale report.
+     */
+    const limit = this.capabilities.maxVideoBytes
+    if (limit !== undefined && source.size > limit) {
+      throw new PublishError(
+        `The video is ${megabytes(source.size)}, over LinkedIn's ${megabytes(limit)} limit for video posted through its API. ` +
+          'Export it at a lower bitrate or shorten it, then post again. Nothing was uploaded or posted.',
+        { failureClass: 'permanent', platformCode: 'video_too_large' },
+      )
+    }
+
     const init = await this.#send(
       ctx,
       'POST',
@@ -902,4 +923,9 @@ async function drain(response: Response): Promise<void> {
   } catch {
     // Nothing to release.
   }
+}
+
+/** Bytes as decimal megabytes for a message, e.g. 500 MB or 512.3 MB. */
+function megabytes(bytes: number): string {
+  return `${Math.round(bytes / 100_000) / 10} MB`
 }
