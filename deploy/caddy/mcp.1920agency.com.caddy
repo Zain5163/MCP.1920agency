@@ -81,6 +81,22 @@ mcp.1920agency.com {
 		header Cache-Control "no-store"
 		reverse_proxy adspilot-mcp:8080
 	}
+	# Private brand viewer (source/packages/brands, served by the MCP app;
+	# architecture/2026-10-10-brand-design-systems.md). GET and HEAD only:
+	# anything else falls through to the 404 below. Every page needs a signed,
+	# expiring ?t= link made by the brand_viewer_link tool; without one the app
+	# answers the same 404 for every path, so nothing lists or confirms a brand.
+	# No cache may keep a page (the address carries the link), and no search
+	# engine may index one. There is no access log on this site (see above).
+	@brands {
+		method GET HEAD
+		path /brands /brands/*
+	}
+	handle @brands {
+		header Cache-Control "no-store, private"
+		header X-Robots-Tag "noindex, nofollow, noarchive"
+		reverse_proxy adspilot-mcp:8080
+	}
 	@oauth {
 		method GET
 		path /callback /instagram/callback /threads/callback /pinterest/callback /linkedin/callback /linkedin-page/callback /google/callback

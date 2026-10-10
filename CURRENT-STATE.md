@@ -1,6 +1,6 @@
 # What is built today
 
-**Updated 2026-10-08.** This file lists only what exists now. Everything planned
+**Updated 2026-10-10.** This file lists only what exists now. Everything planned
 is in `FUTURE-PLANS.md`. The history of how each piece was built and proven is in
 `PROJECT-LOG.md`.
 
@@ -76,6 +76,7 @@ Around the posting:
 | Stale-playbook warning after 90 days | ✅ |
 | 50 marketing skills (copywriting, SEO, CRO, pricing, launch…) | ✅ MIT-licensed, pinned |
 | Prompts: launch a Meta campaign, write ad copy | ✅ |
+| Brand design systems: 1920 Agency and PSX Ascend (imported), Muzaree and the product (proposed); `list_brands`, `get_brand`, `brand_viewer_link` on both transports; private docs-style viewer at `/brands` (signed, expiring links; tenant-scoped) | 🟡 2026-10-10 Built and tested (branch `brand-systems`; local run of the real HTTP server checked 404 without a link, 200 with one). Not merged or deployed: needs `BRAND_VIEW_SECRET` and `BRANDS_OWNER_TENANT_ID` on the server, a release and a gate reload. See `architecture/2026-10-10-brand-design-systems.md` |
 
 ## 4. AI image generation
 
