@@ -667,7 +667,8 @@ export function registerAdsTools(server: McpServer): void {
           `Campaign ${status.campaign.name}: ${status.campaign.effectiveStatus}`,
           `Daily budget: ${formatMoney({ minor: status.dailyBudgetMinor, currency: loaded.account.currency })}`,
           '',
-          ...status.ads.map((ad) => `  ${ad.effectiveStatus.padEnd(16)} ${ad.name}`),
+          // Ids printed so a check can switch an ad off without guessing (a check could not, 2026-10-11).
+          ...status.ads.map((ad) => `  ${ad.effectiveStatus.padEnd(16)} ${ad.name}  (ad id ${ad.id})`),
         ]
         if (status.rejected.length > 0) {
           lines.push('', `REJECTED by Meta (${status.rejected.length}) — these will not run:`)
@@ -837,7 +838,7 @@ export function registerAdsTools(server: McpServer): void {
         }
         const money = (minor: number) => formatMoney({ minor, currency: loaded.account.currency })
         const lines = rows.flatMap((r) => [
-          `${r.name}`,
+          `${r.name}  (ad id ${r.adId})`,
           `  spent ${money(r.spendMinor)}, ${r.results} ${resultLabel(r.resultAction)}` +
             (r.costPerResultMinor !== undefined ? `, ${money(r.costPerResultMinor)} each` : '') +
             `, ${r.impressions.toLocaleString('en-US')} impressions, frequency ${r.frequency.toFixed(1)}, link CTR ${r.linkCtr.toFixed(2)}%` +
