@@ -213,7 +213,11 @@ export interface GoogleProviderConfig extends GoogleOAuthConfig {
  *
  * Scopes are joined with spaces, like LinkedIn and unlike Meta's commas.
  * `access_type=offline` is what earns a refresh token at all, `prompt=consent`
- * makes Google issue one again on a reconnect, and `include_granted_scopes`
+ * makes Google issue one again on a reconnect, and `select_account` makes Google
+ * show the account chooser every time: without it Google silently reuses the
+ * account already signed in to the browser, so a YouTube Brand Account (a
+ * channel owned by that login, e.g. The Unsealed World) could never be picked
+ * (2026-10-10). `include_granted_scopes`
  * keeps permissions granted earlier for other products. `state` is the CSRF
  * check the callback server verifies.
  */
@@ -229,7 +233,7 @@ export function buildGoogleAuthUrl(
   url.searchParams.set('scope', googleScopes(bundles).join(' '))
   url.searchParams.set('access_type', 'offline')
   url.searchParams.set('include_granted_scopes', 'true')
-  url.searchParams.set('prompt', 'consent')
+  url.searchParams.set('prompt', 'select_account consent')
   url.searchParams.set('state', state)
   return url.toString()
 }

@@ -103,7 +103,8 @@ describe('the authorise URL', () => {
     // offline earns a refresh token; prompt=consent earns one again on a reconnect.
     assert.equal(url.searchParams.get('access_type'), 'offline')
     assert.equal(url.searchParams.get('include_granted_scopes'), 'true')
-    assert.equal(url.searchParams.get('prompt'), 'consent')
+    // select_account: always show the chooser, so a YouTube Brand Account can be picked.
+    assert.equal(url.searchParams.get('prompt'), 'select_account consent')
   })
 
   test('the YouTube bundle is upload plus read-only, not full account management', () => {
