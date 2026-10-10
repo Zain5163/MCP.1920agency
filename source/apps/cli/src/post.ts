@@ -30,7 +30,7 @@ import {
   failedColumns,
   publishedColumns,
 } from '@social-publisher/db'
-import { MediaStore } from '@social-publisher/media'
+import { MediaStore, MediaUploadError } from '@social-publisher/media'
 import { PublishService } from '@social-publisher/publisher'
 import { TokenVault, parseKey } from '@social-publisher/vault'
 
@@ -238,7 +238,9 @@ async function main(): Promise<void> {
         result = await store.uploadFile(item.localPath, { tenantId: tenant.id, mime: item.mime })
       } catch (error) {
         console.error(`\n  Could not host ${item.localPath}: ${error instanceof Error ? error.message : String(error)}`)
-        if (scheduledFor !== undefined) {
+        // A file over the storage cap already says all of this in its message.
+        const overCap = error instanceof MediaUploadError && error.code === 'STORAGE_REJECTED'
+        if (scheduledFor !== undefined && !overCap) {
           // The usual cause for a video, and the one with a way round it.
           console.error(
             '  A scheduled post is published later by the worker, which can only use media hosted in the' +

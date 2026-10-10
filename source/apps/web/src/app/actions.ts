@@ -115,6 +115,15 @@ export async function createPost(_prev: unknown, formData: FormData): Promise<Ac
 
   if (files.length > 0) {
     const store = mediaStore()
+    // Before any file is read or sent: one over the storage cap (50 MB on
+    // Supabase's Free plan) would be refused anyway, after the whole upload.
+    for (const file of files) {
+      try {
+        store.assertFits(file.size, file.type)
+      } catch (error) {
+        return { ok: false, message: error instanceof Error ? error.message : String(error) }
+      }
+    }
     for (const [index, file] of files.entries()) {
       const bytes = new Uint8Array(await file.arrayBuffer())
       const kind: MediaRef['kind'] = file.type.startsWith('video/') ? 'video' : 'image'

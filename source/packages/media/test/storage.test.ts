@@ -2,7 +2,13 @@ import { strict as assert } from 'node:assert'
 import { createHash } from 'node:crypto'
 import { test, describe } from 'node:test'
 
-import { MediaStore, MediaUploadError, mimeForPath } from '../src/storage.ts'
+import {
+  MediaStore,
+  MediaUploadError,
+  SUPABASE_FREE_FILE_LIMIT_BYTES,
+  mimeForPath,
+  tooLargeForStorageMessage,
+} from '../src/storage.ts'
 
 interface Call {
   url: string
@@ -154,12 +160,23 @@ describe('upload', () => {
     )
   })
 
-  test('explains an oversized file', async () => {
+  test('explains an oversized file the bucket refuses although it is under the plan cap', async () => {
     const { media } = store([{ status: 413 }])
     await assert.rejects(
       () => media.upload(bytes, { mime: 'image/png', tenantId: 't1' }),
-      /larger than the bucket allows/i,
+      (error: unknown) => {
+        assert.ok(error instanceof MediaUploadError)
+        assert.equal(error.code, 'STORAGE_REJECTED')
+        assert.match(error.message, /refused this file as too large \(HTTP 413\)/)
+        assert.match(error.message, /bucket "media" has a lower limit of its own/)
+        return true
+      },
     )
+  })
+
+  test('recognises "too large" sent as HTTP 400 with the status in the body', async () => {
+    const { media } = store([{ status: 400, body: '{"statusCode":"413","error":"Payload too large"}' }])
+    await assert.rejects(() => media.upload(bytes, { mime: 'image/png', tenantId: 't1' }), /too large \(HTTP 413\)/)
   })
 
   test('surfaces the status code on the error', async () => {
@@ -198,5 +215,62 @@ describe('isPubliclyReachable', () => {
       fetch: fetchImpl,
     })
     assert.equal(await media.isPubliclyReachable('https://x/y'), false)
+  })
+})
+
+describe('the per-file storage cap (Supabase Free plan, 50 MB; 2026-10-11)', () => {
+  test('defaults to 50 MB, the Free plan cap, and can be set', () => {
+    assert.equal(SUPABASE_FREE_FILE_LIMIT_BYTES, 50 * 1024 * 1024)
+    assert.equal(store([]).media.maxFileBytes, SUPABASE_FREE_FILE_LIMIT_BYTES)
+    const pro = new MediaStore({ supabaseUrl: 'https://p.supabase.co', serviceRoleKey: 'K', bucket: 'media', maxFileBytes: 500 })
+    assert.equal(pro.maxFileBytes, 500)
+  })
+
+  test('a video over the cap fails before anything is sent, naming the cap, the plan and what to do', async () => {
+    const { media, calls } = store([{ status: 200 }])
+    const big = new Uint8Array(SUPABASE_FREE_FILE_LIMIT_BYTES + 1)
+    await assert.rejects(
+      () => media.upload(big, { mime: 'video/mp4', tenantId: 't1' }),
+      (error: unknown) => {
+        assert.ok(error instanceof MediaUploadError)
+        assert.equal(error.code, 'STORAGE_REJECTED')
+        assert.match(error.message, /^This video is 50 MB, over the 50 MB per-file limit of the media storage/)
+        assert.match(error.message, /Supabase Storage on the Free plan/)
+        assert.match(error.message, /nothing was posted/)
+        assert.match(error.message, /publish it immediately from the local file/)
+        assert.match(error.message, /decision V4/)
+        return true
+      },
+    )
+    assert.equal(calls.length, 0, 'nothing reaches storage')
+  })
+
+  test('a file on disk over the cap is refused by its size, before it is read', async () => {
+    const { mkdtemp, rm, truncate, writeFile } = await import('node:fs/promises')
+    const { tmpdir } = await import('node:os')
+    const { join } = await import('node:path')
+    const dir = await mkdtemp(join(tmpdir(), 'media-cap-'))
+    try {
+      const file = join(dir, 'clip.mp4')
+      await writeFile(file, '')
+      await truncate(file, 120 * 1024 * 1024)
+      const { media, calls } = store([{ status: 200 }])
+      await assert.rejects(() => media.uploadFile(file, { tenantId: 't1' }), /This video is 120 MB, over the 50 MB per-file limit/)
+      assert.equal(calls.length, 0)
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  test('assertFits lets a caller refuse early, before reading the bytes at all', () => {
+    const { media } = store([])
+    assert.doesNotThrow(() => media.assertFits(SUPABASE_FREE_FILE_LIMIT_BYTES, 'video/mp4'))
+    assert.throws(() => media.assertFits(SUPABASE_FREE_FILE_LIMIT_BYTES + 1, 'image/png'), /This file is .* Use a file under 50 MB/)
+  })
+
+  test('the message names the size, the cap and the plan', () => {
+    const message = tooLargeForStorageMessage(200 * 1024 * 1024, SUPABASE_FREE_FILE_LIMIT_BYTES, 'video/quicktime')
+    assert.match(message, /200 MB, over the 50 MB per-file limit/)
+    assert.match(message, /Free plan/)
   })
 })
